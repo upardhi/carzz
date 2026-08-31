@@ -129,6 +129,7 @@ export function adminNav(counts: NavCounts): NavGroup[] {
     {
       heading: 'Setup',
       items: [
+        { href: '/admin/website', label: 'Website', icon: <IconGrid width={18} height={18} /> },
         { href: '/admin/users', label: 'People & roles', icon: <IconUsers width={18} height={18} /> },
         { href: '/admin/settings', label: 'Settings', icon: <IconCog width={18} height={18} /> },
       ],

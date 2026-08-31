@@ -1,3 +1,4 @@
+import { revalidatePath } from 'next/cache';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { HttpError, requireApiSession } from '@/lib/auth/server';
@@ -44,6 +45,8 @@ export async function POST(request: Request) {
         services: parsed.data.services,
         active: true,
       });
+      // The website advertises these prices, so it has to be refreshed.
+      revalidatePath('/', 'layout');
       return NextResponse.json({
         ok: true,
         package: created,
@@ -77,6 +80,7 @@ export async function POST(request: Request) {
       ...(patch.active !== undefined ? { active: patch.active } : {}),
     });
 
+    revalidatePath('/', 'layout');
     return NextResponse.json({
       ok: true,
       package: updated,
