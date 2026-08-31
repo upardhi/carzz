@@ -479,6 +479,19 @@ export interface Testimonial {
   order: number;
 }
 
+/** A before/after pair the Super Admin has chosen to show publicly. */
+export interface GalleryItem {
+  id: Id;
+  /** URLs from the photo store. */
+  beforeUrl: string;
+  afterUrl: string;
+  caption: string;
+  /** Car model or area, for context. Never a number plate. */
+  detail: string;
+  visible: boolean;
+  order: number;
+}
+
 export interface SiteFeature {
   id: Id;
   title: string;
@@ -530,8 +543,30 @@ export interface SiteContent {
   areasTitle: string;
   areasBody: string;
 
+  /** Before/after work */
+  galleryTitle: string;
+  galleryBody: string;
+  gallery: GalleryItem[];
+
   testimonialsTitle: string;
   testimonials: Testimonial[];
+
+  /**
+   * Show real ratings customers left on real washes, instead of — or as well
+   * as — the written quotes above. These are far more credible, and they keep
+   * themselves up to date.
+   */
+  showRealReviews: boolean;
+  /** Only reviews at or above this many stars are shown. */
+  minReviewStars: number;
+
+  /** Where we work */
+  mapTitle: string;
+  /**
+   * An embeddable map URL. OpenStreetMap needs no API key; a Google Maps
+   * "embed" link works too. Empty hides the map and shows only the area list.
+   */
+  mapEmbedUrl: string;
 
   /** Enquiry form */
   contactTitle: string;

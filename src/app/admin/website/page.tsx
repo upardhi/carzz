@@ -3,6 +3,7 @@ import { Note } from '@/components/ui/primitives';
 import { requirePermission } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { formatDateFull } from '@/lib/util/format';
+import { GalleryEditor, ReviewsAndMapEditor } from './GalleryEditor';
 import {
   BannerEditor,
   ContactEditor,
@@ -53,6 +54,8 @@ export default async function AdminWebsite() {
           <BannerEditor content={content} />
           <SectionsEditor content={content} />
           <PackagesEditor content={content} packages={packages} />
+          <GalleryEditor content={content} />
+          <ReviewsAndMapEditor content={content} />
           <TestimonialsEditor content={content} />
           <ContactEditor content={content} />
           <SeoEditor content={content} />

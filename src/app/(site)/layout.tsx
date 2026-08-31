@@ -24,6 +24,8 @@ export async function generateMetadata(): Promise<Metadata> {
 const NAV = [
   { href: '#how', label: 'How it works' },
   { href: '#packages', label: 'Packages' },
+  { href: '#work', label: 'Our work' },
+  { href: '#reviews', label: 'Reviews' },
   { href: '#areas', label: 'Areas' },
   { href: '#book', label: 'Book' },
 ];

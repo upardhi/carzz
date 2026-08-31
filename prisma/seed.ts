@@ -235,6 +235,7 @@ async function main() {
       howSteps: json(db.siteContent.howSteps),
       features: json(db.siteContent.features),
       testimonials: json(db.siteContent.testimonials),
+      gallery: json(db.siteContent.gallery),
     },
   });
   process.stdout.write('       3  settings rows\n');

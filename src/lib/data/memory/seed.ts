@@ -90,6 +90,16 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
   visiblePackageIds: [],
   areasTitle: 'Where we wash',
   areasBody: 'We run fixed routes in these areas. If your building is nearby, ask — we add new roads as demand grows.',
+  galleryTitle: 'See the difference',
+  galleryBody:
+    'Real cars, photographed before and after by the wash boy who did the work. Every customer sees these for their own car in the app.',
+  gallery: [],
+  showRealReviews: true,
+  minReviewStars: 4,
+  mapTitle: 'Find us',
+  // OpenStreetMap needs no API key, so the map works out of the box.
+  mapEmbedUrl:
+    'https://www.openstreetmap.org/export/embed.html?bbox=79.02%2C21.10%2C79.14%2C21.19&layer=mapnik',
   testimonialsTitle: 'What our customers say',
   testimonials: [
     { id: 't_1', name: 'Shyam Patil', area: 'Wadi', quote: 'Two cars, one bill, and I stopped phoning anyone to ask when the wash is. The photos settle everything.', rating: 5, visible: true, order: 0 },
@@ -151,6 +161,20 @@ const CAR_MODELS: [string, string][] = [
   ['Seltos', 'Kia'], ['XUV700', 'Mahindra'], ['Ertiga', 'Maruti'],
 ];
 const COLOURS = ['White', 'Silver', 'Grey', 'Red', 'Blue', 'Black', 'Brown'];
+// What customers actually write when they bother to write something.
+const RATING_COMMENTS = [
+  'Very neat work, and he never misses the day.',
+  'Car looks brand new every time. Photos are a nice touch.',
+  'Came on time even in the rain. Very happy.',
+  'Interior vacuum was thorough this week. Thank you.',
+  'Polite boy, good work. Been with them six months now.',
+  'Best part is I never have to call and ask anything.',
+  'Tyres and dashboard done properly without me asking.',
+  'Quick and clean. Worth the money.',
+  'He messaged before coming, which I appreciated.',
+  'Consistent quality, that is what I wanted.',
+];
+
 const SOCIETIES = [
   'Sai Residency', 'Green Park', 'Laxmi Nagar', 'Shivaji Chowk',
   'Trimurti Nagar', 'Ashirwad Heights', 'Gokul Enclave', 'Sunrise Towers',
@@ -441,7 +465,9 @@ export function buildSeed(today = new Date()): Db {
           afterPhotoUrl: status === 'DONE' ? `/api/photos/${car.id}-${cyc}-${index}-after` : null,
           missReason, missNote: null, rescheduledToVisitId: null,
           rating: status === 'DONE' && rand() > 0.35 ? int(3, 5) : null,
-          ratingComment: null,
+          // Most people rate without writing; a minority leave a comment.
+          ratingComment:
+            status === 'DONE' && rand() > 0.72 ? pick(RATING_COMMENTS) : null,
           onTime: status === 'DONE' ? rand() > 0.16 : false,
         });
       });

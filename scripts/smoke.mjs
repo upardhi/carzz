@@ -460,6 +460,69 @@ async function suitePwa() {
   }
 }
 
+
+/* -------------------------------------------------------------------------- */
+/* Suite 6 — the public website                                               */
+/* -------------------------------------------------------------------------- */
+
+async function suiteWebsite() {
+  suiteName = 'website';
+  const owner = (await login('owner@carzz.app', 'owner123')).cookie;
+  const manager = (await login('manager.wadi@carzz.app', 'manager123')).cookie;
+
+  const home = await fetch(BASE + '/', { redirect: 'manual' });
+  check('the website is public — no sign-in needed', home.status === 200);
+  const body = await html('/');
+  check('it advertises live package prices', /₹1,600|₹2,000|₹3,200/.test(body));
+  check('it lists the areas served', /Wadi|Bajaj Nagar|Civil Lines/.test(body));
+  check('it shows real customer ratings', /rated washes/.test(body));
+
+  /* Booking */
+  const booking = await post('/api/enquiries', {
+    name: 'Smoke Enquirer', phone: '9800112233', areaId: 'ar_wadi',
+    locality: 'Test Society', carCount: 2, packageId: 'pkg_bucket',
+  });
+  check('a visitor can book a wash', booking.ok, booking.body.message);
+  check('a booking with no name is refused',
+    (await post('/api/enquiries', { phone: '9800112233' })).status === 400);
+  const bogusArea = await post('/api/enquiries', {
+    name: 'Bogus Area', phone: '9800112244', areaId: 'ar_does_not_exist',
+  });
+  check('a made-up area on a booking is dropped, not stored',
+    bogusArea.ok, 'accepted with the area ignored');
+
+  /* Only the owner edits the site */
+  check('a manager cannot edit the website',
+    (await post('/api/admin/website', { heroTitle: 'Hacked' }, manager)).status === 403);
+  check('an anonymous visitor cannot edit the website',
+    (await post('/api/admin/website', { heroTitle: 'Hacked' })).status === 401);
+
+  /* Editing reaches the live page */
+  const heading = `Smoke heading ${Date.now()}`;
+  const saved = await post('/api/admin/website', { heroTitle: heading }, owner);
+  check('the owner edits the banner', saved.ok, saved.body.message);
+  check('and the change appears on the live page immediately',
+    (await html('/')).includes(heading));
+
+  /* Prices cannot be advertised for a package that does not exist */
+  check('advertising an unknown package is refused',
+    (await post('/api/admin/website', { visiblePackageIds: ['pkg_nope'] }, owner)).status === 400);
+
+  /* Wash photos must never be reachable through the public gallery route */
+  const leak = await fetch(BASE + '/api/gallery/some-wash-photo-before');
+  check('a wash photo cannot be fetched through the public gallery route',
+    leak.status === 404);
+
+  /* Taking the site offline */
+  await post('/api/admin/website', { published: false }, owner);
+  const offline = await fetch(BASE + '/', { redirect: 'manual' });
+  check('taking the site offline hides it', offline.status === 404, `got ${offline.status}`);
+  const refused = await post('/api/enquiries', { name: 'Too Late', phone: '9800112255' });
+  check('and bookings are refused while it is offline', refused.status === 503);
+  await post('/api/admin/website', { published: true }, owner);
+  check('publishing brings it back', (await fetch(BASE + '/')).status === 200);
+}
+
 /* -------------------------------------------------------------------------- */
 
 const SUITES = [
@@ -468,6 +531,7 @@ const SUITES = [
   ['The wash', suiteWash],
   ['Money, people and stock', suiteOperations],
   ['PWA', suitePwa],
+  ['The public website', suiteWebsite],
 ];
 
 let exitCode = 0;

@@ -607,9 +607,21 @@ model SiteContent {
   areasTitle String
   areasBody  String
 
+  galleryTitle String
+  galleryBody  String
+  /// [{ id, beforeUrl, afterUrl, caption, detail, visible, order }]
+  gallery Json
+
   testimonialsTitle String
   /// [{ id, name, area, quote, rating, visible, order }]
   testimonials Json
+
+  /// Show real ratings from completed washes alongside written quotes.
+  showRealReviews Boolean @default(true)
+  minReviewStars  Int     @default(4)
+
+  mapTitle    String
+  mapEmbedUrl String
 
   contactTitle String
   contactBody  String

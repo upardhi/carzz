@@ -9,6 +9,7 @@ import {
   IconStar,
 } from '@/components/shell/icons';
 import { getStore } from '@/lib/data';
+import { publicReviews } from '@/lib/services/reviews';
 import { EnquiryForm } from './EnquiryForm';
 import type { SiteFeature } from '@/lib/data/types';
 import { money } from '@/lib/util/format';
@@ -24,10 +25,15 @@ const FEATURE_ICONS: Record<string, React.ComponentType<{ className?: string }>>
 
 export default async function HomePage() {
   const store = await getStore();
-  const [site, allPackages, areas] = await Promise.all([
-    store.getSiteContent(),
+  const site = await store.getSiteContent();
+  const [allPackages, areas, reviews] = await Promise.all([
     store.packages.find({ where: { active: true } }),
     store.areas.find({ orderBy: [{ field: 'name' }] }),
+    // Genuine ratings from completed washes — more persuasive than written
+    // quotes, and they keep themselves current without anyone maintaining them.
+    site.showRealReviews
+      ? publicReviews(store, { minStars: site.minReviewStars, limit: 6 })
+      : Promise.resolve({ average: 0, count: 0, reviews: [] }),
   ]);
 
   // Taken off the site entirely rather than shown half-finished.
@@ -42,6 +48,9 @@ export default async function HomePage() {
   const features = [...site.features].sort((a, b) => a.order - b.order);
   const testimonials = site.testimonials
     .filter((t) => t.visible)
+    .sort((a, b) => a.order - b.order);
+  const gallery = site.gallery
+    .filter((g) => g.visible)
     .sort((a, b) => a.order - b.order);
 
   return (
@@ -256,17 +265,31 @@ export default async function HomePage() {
             </p>
           </div>
 
-          <ul className="grid gap-3 sm:grid-cols-2">
-            {areas.map((area) => (
-              <li
-                key={area.id}
-                className="rounded-card border border-line bg-white p-4 shadow-card"
-              >
-                <h3 className="text-base font-extrabold text-ink">{area.name}</h3>
-                <p className="text-sm text-ink-mute">{area.city}</p>
-              </li>
-            ))}
-          </ul>
+          <div>
+            <ul className="grid gap-3 sm:grid-cols-2">
+              {areas.map((area) => (
+                <li
+                  key={area.id}
+                  className="rounded-card border border-line bg-white p-4 shadow-card"
+                >
+                  <h3 className="text-base font-extrabold text-ink">{area.name}</h3>
+                  <p className="text-sm text-ink-mute">{area.city}</p>
+                </li>
+              ))}
+            </ul>
+
+            {site.mapEmbedUrl ? (
+              <div className="mt-4 overflow-hidden rounded-card border border-line shadow-card">
+                <iframe
+                  src={site.mapEmbedUrl}
+                  title={site.mapTitle}
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                  className="h-72 w-full border-0"
+                />
+              </div>
+            ) : null}
+          </div>
         </div>
       </section>
 
@@ -301,6 +324,118 @@ export default async function HomePage() {
                 </figure>
               ))}
             </div>
+          </div>
+        </section>
+      ) : null}
+
+
+      {/* ---------------------------------------------------------------- */}
+      {gallery.length ? (
+        <section id="work" className="scroll-mt-20 bg-white px-5 py-20">
+          <div className="mx-auto w-full max-w-6xl">
+            <h2 className="text-3xl font-extrabold tracking-tight text-ink">
+              {site.galleryTitle}
+            </h2>
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-ink-soft">
+              {site.galleryBody}
+            </p>
+
+            <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {gallery.map((item) => (
+                <figure
+                  key={item.id}
+                  className="overflow-hidden rounded-card border border-line bg-white shadow-card"
+                >
+                  <div className="grid grid-cols-2">
+                    {([['Before', item.beforeUrl], ['After', item.afterUrl]] as const).map(
+                      ([label, url]) => (
+                        <div key={label} className="relative">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={url}
+                            alt={`${label} — ${item.caption || 'car wash'}`}
+                            loading="lazy"
+                            className="aspect-[4/3] w-full object-cover"
+                          />
+                          <span className="absolute left-2 top-2 rounded-pill bg-navy-950/80 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white">
+                            {label}
+                          </span>
+                        </div>
+                      ),
+                    )}
+                  </div>
+                  {item.caption || item.detail ? (
+                    <figcaption className="p-4">
+                      {item.caption ? (
+                        <p className="text-sm font-bold text-ink">{item.caption}</p>
+                      ) : null}
+                      {item.detail ? (
+                        <p className="text-xs text-ink-mute">{item.detail}</p>
+                      ) : null}
+                    </figcaption>
+                  ) : null}
+                </figure>
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {/* ---------------------------------------------------------------- */}
+      {reviews.reviews.length ? (
+        <section id="reviews" className="scroll-mt-20 bg-surface-muted px-5 py-20">
+          <div className="mx-auto w-full max-w-6xl">
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <h2 className="text-3xl font-extrabold tracking-tight text-ink">
+                Rated by the people we wash for
+              </h2>
+              <p className="flex items-baseline gap-2">
+                <span className="text-4xl font-extrabold text-navy-800">
+                  {reviews.average.toFixed(1)}
+                </span>
+                <span className="text-sm text-ink-mute">
+                  from {reviews.count.toLocaleString('en-IN')} rated washes
+                </span>
+              </p>
+            </div>
+
+            <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {reviews.reviews.map((review) => (
+                <figure
+                  key={review.id}
+                  className="rounded-card border border-line bg-white p-5 shadow-card"
+                >
+                  <div
+                    className="flex gap-0.5 text-gold-500"
+                    aria-label={`${review.rating} out of 5`}
+                  >
+                    {Array.from({ length: review.rating }).map((_, i) => (
+                      <IconStar key={i} width={15} height={15} fill="currentColor" />
+                    ))}
+                  </div>
+                  {review.comment ? (
+                    <blockquote className="mt-3 text-sm leading-relaxed text-ink-soft">
+                      “{review.comment}”
+                    </blockquote>
+                  ) : (
+                    <p className="mt-3 text-sm leading-relaxed text-ink-mute">
+                      Rated {review.rating} out of 5 for a {review.service.toLowerCase()}.
+                    </p>
+                  )}
+                  <figcaption className="mt-4 text-sm font-extrabold text-ink">
+                    {review.name}
+                    <span className="ml-1 font-semibold text-ink-mute">
+                      · {review.area}
+                    </span>
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+
+            <p className="mt-6 text-xs text-ink-mute">
+              These are real ratings left by customers on washes we actually
+              did. We show first names and areas only.
+            </p>
           </div>
         </section>
       ) : null}

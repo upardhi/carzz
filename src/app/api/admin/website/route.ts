@@ -26,7 +26,24 @@ const feature = z.object({
  * Every field is optional: the editor saves one section at a time, so a
  * manager fixing a phone number never has to resubmit the whole page.
  */
+const galleryItem = z.object({
+  id: z.string().min(1),
+  beforeUrl: z.string().min(1),
+  afterUrl: z.string().min(1),
+  caption: z.string().trim().max(120),
+  detail: z.string().trim().max(120),
+  visible: z.boolean(),
+  order: z.number().int().min(0),
+});
+
 const schema = z.object({
+  galleryTitle: z.string().trim().max(120).optional(),
+  galleryBody: z.string().trim().max(600).optional(),
+  gallery: z.array(galleryItem).max(60).optional(),
+  showRealReviews: z.boolean().optional(),
+  minReviewStars: z.number().int().min(1).max(5).optional(),
+  mapTitle: z.string().trim().max(120).optional(),
+  mapEmbedUrl: z.string().trim().max(600).optional(),
   heroEyebrow: z.string().trim().max(60).optional(),
   heroTitle: z.string().trim().min(1).max(120).optional(),
   heroTitleAccent: z.string().trim().max(120).optional(),
