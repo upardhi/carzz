@@ -57,6 +57,19 @@ export function InstallPrompt() {
     setIosHint(false);
   };
 
+  // The banner is fixed, so without reserving space it silently covers
+  // whatever sits at the bottom of the page — on the customer's car list that
+  // was the "View wash history" button, which simply stopped responding.
+  const visible = Boolean(deferred) || iosHint;
+  useEffect(() => {
+    const root = document.documentElement;
+    if (visible) root.dataset.installBanner = '1';
+    else delete root.dataset.installBanner;
+    return () => {
+      delete root.dataset.installBanner;
+    };
+  }, [visible]);
+
   const install = async () => {
     if (!deferred) return;
     await deferred.prompt();
@@ -64,7 +77,7 @@ export function InstallPrompt() {
     dismiss();
   };
 
-  if (!deferred && !iosHint) return null;
+  if (!visible) return null;
 
   return (
     <div className="fixed inset-x-3 bottom-24 z-40 mx-auto max-w-md rounded-card border border-navy-700 bg-navy-850 p-3 text-white shadow-raised sm:bottom-4">

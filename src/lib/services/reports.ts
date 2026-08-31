@@ -7,6 +7,7 @@ import type {
   LeadSource,
   MissReason,
   Rupees,
+  StaffPayout,
 } from '../data/types';
 import { computePayoutRun } from './payroll';
 
@@ -39,23 +40,31 @@ export async function areaPerformance(
   store: DataStore,
   cycle: string,
   areaIds: Id[] | null,
+  /** Pass an already-computed run to avoid recalculating every payout. */
+  precomputedPayouts?: StaffPayout[],
 ): Promise<AreaPerformance[]> {
   const areas = (await store.areas.find({ orderBy: [{ field: 'name' }] })).filter(
     (a) => areaIds === null || areaIds.includes(a.id),
   );
 
-  const [payouts, items] = await Promise.all([
-    computePayoutRun(store, cycle, areaIds),
+  // Cars are read once and indexed, rather than pulling the whole table for
+  // each area in turn — that was the dominant cost of this report.
+  const [payouts, items, allCars] = await Promise.all([
+    precomputedPayouts ?? computePayoutRun(store, cycle, areaIds),
     store.inventoryItems.find(),
+    store.cars.find({ where: { active: true } }),
   ]);
   const itemCost = new Map(items.map((i) => [i.id, i]));
+  const carsByCustomer = new Map<Id, number>();
+  for (const car of allCars) {
+    carsByCustomer.set(car.customerId, (carsByCustomer.get(car.customerId) ?? 0) + 1);
+  }
 
   return Promise.all(
     areas.map(async (area) => {
-      const [customers, cars, staff, visits, invoices, complaints, issues] =
+      const [customers, staff, visits, invoices, complaints, issues] =
         await Promise.all([
           store.customers.find({ where: { areaId: area.id } }),
-          store.cars.find({ where: { active: true } }),
           store.staff.find({ where: { areaId: area.id, role: 'EMPLOYEE' } }),
           store.visits.find({ where: { areaId: area.id, cycle } }),
           store.invoices.find({ where: { areaId: area.id, cycle } }),
@@ -65,8 +74,10 @@ export async function areaPerformance(
           store.stockIssues.find({ where: { areaId: area.id } }),
         ]);
 
-      const customerIds = new Set(customers.map((c) => c.id));
-      const activeCars = cars.filter((c) => customerIds.has(c.customerId));
+      const activeCarCount = customers.reduce(
+        (sum, c) => sum + (carsByCustomer.get(c.id) ?? 0),
+        0,
+      );
 
       const done = visits.filter((v) => v.status === 'DONE');
       const missed = visits.filter((v) => v.status === 'MISSED');
@@ -88,7 +99,7 @@ export async function areaPerformance(
       return {
         area,
         customers: customers.filter((c) => c.status !== 'INACTIVE').length,
-        activeCars: activeCars.length,
+        activeCars: activeCarCount,
         staff: staff.length,
         washesDone: done.length,
         washesMissed: missed.length,
@@ -308,8 +319,10 @@ export async function businessSummary(
   store: DataStore,
   cycle: string,
   areaIds: Id[] | null,
+  /** Pass rows you already have; this report is derived entirely from them. */
+  precomputedAreas?: AreaPerformance[],
 ): Promise<BusinessSummary> {
-  const areas = await areaPerformance(store, cycle, areaIds);
+  const areas = precomputedAreas ?? (await areaPerformance(store, cycle, areaIds));
   const expenses = await store.expenses.find({ where: { cycle } });
 
   const collected = areas.reduce((s, a) => s + a.collected, 0);

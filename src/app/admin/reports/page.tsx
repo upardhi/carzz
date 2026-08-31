@@ -30,15 +30,15 @@ export default async function AdminReports() {
   const store = await getStore();
   const cycle = currentCycle();
 
-  const [summary, areas, missed, staff, consumption, customers] =
-    await Promise.all([
-      businessSummary(store, cycle, null),
-      areaPerformance(store, cycle, null),
-      missedWashReport(store, cycle, null),
-      staffPerformance(store, cycle, null),
-      consumptionByArea(store, cycle, null),
-      store.customers.find(),
-    ]);
+  // businessSummary is derived from the area rows, so compute those once.
+  const areas = await areaPerformance(store, cycle, null);
+  const [summary, missed, staff, consumption, customers] = await Promise.all([
+    businessSummary(store, cycle, null, areas),
+    missedWashReport(store, cycle, null),
+    staffPerformance(store, cycle, null),
+    consumptionByArea(store, cycle, null),
+    store.customers.find(),
+  ]);
 
   const areaById = new Map(areas.map((a) => [a.area.id, a.area]));
 

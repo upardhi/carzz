@@ -36,10 +36,12 @@ export default async function AdminOverview() {
   const store = await getStore();
   const cycle = currentCycle();
 
-  const [summary, areas, payouts, sources, purchases] = await Promise.all([
-    businessSummary(store, cycle, null),
-    areaPerformance(store, cycle, null),
-    computePayoutRun(store, cycle, null),
+  // The payout run is expensive, and both reports below need it — so compute
+  // it once and hand it down rather than letting each recalculate.
+  const payouts = await computePayoutRun(store, cycle, null);
+  const areas = await areaPerformance(store, cycle, null, payouts);
+  const [summary, sources, purchases] = await Promise.all([
+    businessSummary(store, cycle, null, areas),
     leadSourceReport(store, null),
     store.purchaseRequests.count({ status: 'PENDING' }),
   ]);

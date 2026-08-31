@@ -67,6 +67,14 @@
   }
 }
 
+@layer base {
+  /* While the install banner is showing, keep the bottom of the page clear of
+     it so nothing tappable ends up underneath. */
+  :root[data-install-banner] main {
+    padding-bottom: 11rem;
+  }
+}
+
 @layer utilities {
   .pt-safe {
     padding-top: var(--safe-top);
