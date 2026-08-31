@@ -42,8 +42,8 @@ export async function ConsoleAlerts({
       />
 
       <KpiGrid>
-        <Kpi label="Customers" value={alerts.length} tone={alerts.length ? 'danger' : 'teal'} />
-        <Kpi label="Outstanding" value={money(total)} tone={total ? 'gold' : 'teal'} />
+        <Kpi label="Customers" value={alerts.length} tone={alerts.length ? 'danger' : 'success'} />
+        <Kpi label="Outstanding" value={money(total)} tone={total ? 'gold' : 'success'} />
         <Kpi label="Over 14 days" value={severe.length} tone={severe.length ? 'danger' : 'default'} />
         <Kpi
           label="Worst"
@@ -90,7 +90,7 @@ export async function ConsoleAlerts({
                     <Td>
                       <Link
                         href={`${base}/customers/${alert.customer.id}`}
-                        className="font-bold text-ink hover:text-teal-600"
+                        className="font-bold text-ink hover:text-navy-800"
                       >
                         {alert.customer.name}
                       </Link>
@@ -121,7 +121,7 @@ export async function ConsoleAlerts({
                           )}`}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center rounded-lg bg-teal-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-teal-600"
+                          className="inline-flex items-center rounded-lg bg-navy-800 px-3 py-1.5 text-xs font-bold text-white hover:bg-navy-700"
                         >
                           Remind
                         </a>

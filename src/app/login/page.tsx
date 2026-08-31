@@ -13,11 +13,16 @@ export default async function LoginPage({
   return (
     <main className="min-h-[100dvh] bg-navy-900 lg:grid lg:grid-cols-2">
       {/* Brand panel — hidden on phones, where the form is the whole screen. */}
-      <section className="hidden flex-col justify-between bg-gradient-to-br from-navy-800 via-navy-900 to-navy-950 p-10 lg:flex">
-        <BrandLockup subtitle="Management" />
+      <section className="relative hidden flex-col justify-between overflow-hidden bg-gradient-to-br from-navy-800 via-navy-900 to-navy-950 p-10 lg:flex">
+        {/* Faint grid, as on the reference panel */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-navy-grid bg-grid opacity-70"
+        />
+        <BrandLockup subtitle="Management" className="relative" />
 
-        <div>
-          <span className="inline-flex items-center gap-2 rounded-pill border border-gold-600/50 px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.14em] text-gold-500">
+        <div className="relative">
+          <span className="inline-flex items-center gap-2 rounded-pill border border-gold-500/50 px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.14em] text-gold-500">
             Every wash, on record
           </span>
           <h1 className="mt-5 text-4xl font-extrabold leading-tight tracking-tight text-white">
@@ -39,7 +44,7 @@ export default async function LoginPage({
             ].map(([value, label]) => (
               <div key={label}>
                 <dt className="text-sm font-extrabold text-white">{value}</dt>
-                <dd className="text-[11px] uppercase tracking-wide text-teal-300">
+                <dd className="text-[11px] uppercase tracking-wide text-navy-300">
                   {label}
                 </dd>
               </div>
@@ -47,19 +52,19 @@ export default async function LoginPage({
           </dl>
         </div>
 
-        <p className="text-[11px] text-navy-500">
+        <p className="relative text-[11px] text-navy-400">
           © {new Date().getFullYear()} Carz Management
         </p>
       </section>
 
-      <section className="flex min-h-[100dvh] items-center justify-center px-5 py-10 lg:min-h-0 lg:bg-surface-sunken">
+      <section className="flex min-h-[100dvh] items-center justify-center px-5 py-10 lg:min-h-0 lg:bg-white">
         <div className="w-full max-w-sm">
           <div className="lg:hidden">
             <BrandLockup subtitle="Management" className="mb-8 justify-center" />
           </div>
 
           <div className="rounded-card border border-navy-600 bg-navy-850 p-6 shadow-raised lg:border-line lg:bg-white">
-            <p className="text-[11px] font-extrabold uppercase tracking-wider text-teal-300 lg:text-teal-600">
+            <p className="text-[11px] font-extrabold uppercase tracking-wider text-navy-300 lg:text-navy-800">
               Welcome back
             </p>
             <h2 className="mt-1 text-xl font-extrabold text-white lg:text-ink">
@@ -69,7 +74,7 @@ export default async function LoginPage({
               Use the account your manager set up for you.
             </p>
 
-            <div className="[&_.field-label]:text-teal-300 lg:[&_.field-label]:text-ink-soft">
+            <div className="[&_.field-label]:text-navy-300 lg:[&_.field-label]:text-ink-soft">
               <LoginForm next={next} />
             </div>
           </div>

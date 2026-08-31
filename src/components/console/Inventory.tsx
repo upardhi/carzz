@@ -224,7 +224,7 @@ export async function ConsoleInventory({ session }: { session: Session }) {
             items={items.map((i) => ({ id: i.id, name: i.name, unit: i.unit }))}
           />
           <div className="mt-3">
-            <Note tone="teal">
+            <Note tone="brand">
               You cannot buy directly. The owner approves every purchase, so
               stock cost stays under his control.
             </Note>

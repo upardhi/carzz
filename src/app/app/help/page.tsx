@@ -52,7 +52,7 @@ export default async function CustomerHelp() {
             existingRating={lastWash.rating}
           />
           <div className="mt-3">
-            <Note tone="teal">
+            <Note tone="success">
               A rating of {rules.goodReviewMinStars} stars or more pays your wash
               boy ₹{rules.goodReviewBonus} extra for that wash.
             </Note>

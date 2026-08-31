@@ -121,7 +121,7 @@ export async function ConsoleCustomers({
         <Kpi
           label="Active"
           value={all.filter((c) => c.status === 'ACTIVE').length}
-          tone="teal"
+          tone="success"
         />
         <Kpi
           label="On hold"
@@ -224,11 +224,11 @@ export async function ConsoleCustomers({
               const owed = invoice ? invoice.amount - invoice.paidAmount : 0;
 
               return (
-                <tr key={customer.id} className="cursor-pointer hover:bg-teal-50">
+                <tr key={customer.id} className="cursor-pointer hover:bg-navy-50">
                   <Td>
                     <Link
                       href={`${base}/customers/${customer.id}`}
-                      className="font-bold text-ink hover:text-teal-600"
+                      className="font-bold text-ink hover:text-navy-800"
                     >
                       {customer.name}
                     </Link>
@@ -314,7 +314,7 @@ export async function ConsoleCustomers({
                   aria-current={n === page ? 'page' : undefined}
                   className={`rounded-md px-2.5 py-1 text-[13px] font-bold ${
                     n === page
-                      ? 'bg-teal-500 text-white'
+                      ? 'bg-navy-800 text-white'
                       : 'border border-line-strong bg-white text-ink hover:bg-surface-muted'
                   }`}
                 >

@@ -53,7 +53,7 @@ export function PayActions({
 
   if (amount <= 0) {
     return (
-      <Note tone="teal">
+      <Note tone="success">
         Nothing is due right now. You will get a reminder before the next due
         date.
       </Note>
@@ -78,7 +78,7 @@ export function PayActions({
         </Button>
       ))}
 
-      {message ? <Note tone="teal">{message}</Note> : null}
+      {message ? <Note tone="success">{message}</Note> : null}
       {error ? <Note tone="danger">{error}</Note> : null}
     </div>
   );

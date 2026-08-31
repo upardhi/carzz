@@ -67,7 +67,7 @@ export default async function CarDetail({
       <div className="grid grid-cols-2 gap-3">
         <Card className="p-3.5">
           <CardHeading>Done</CardHeading>
-          <Stat value={car.tally.done} tone="teal" sub="this month" />
+          <Stat value={car.tally.done} tone="success" sub="this month" />
         </Card>
         <Card className="p-3.5">
           <CardHeading>Remaining</CardHeading>
@@ -125,7 +125,7 @@ export default async function CarDetail({
               ).map(([label, url]) => (
                 <div
                   key={label}
-                  className="flex aspect-[4/3] flex-col items-center justify-center rounded-lg border-2 border-teal-500 bg-teal-50 text-xs font-bold text-teal-600"
+                  className="flex aspect-[4/3] flex-col items-center justify-center rounded-lg border-2 border-success-500 bg-success-50 text-xs font-bold text-success-600"
                 >
                   <IconCamera width={22} height={22} />
                   <span className="mt-1">{label}</span>
@@ -168,7 +168,7 @@ export default async function CarDetail({
             </div>
             {visit.rescheduledToVisitId ? (
               <div className="mt-2.5">
-                <Note tone="teal">
+                <Note tone="success">
                   This wash was <b>returned to your count</b> — you did not lose
                   it. It has been rescheduled.
                 </Note>

@@ -67,11 +67,11 @@ export function InstallPrompt() {
   if (!deferred && !iosHint) return null;
 
   return (
-    <div className="fixed inset-x-3 bottom-24 z-40 mx-auto max-w-md rounded-card border border-navy-600 bg-navy-850 p-3 text-white shadow-raised sm:bottom-4">
+    <div className="fixed inset-x-3 bottom-24 z-40 mx-auto max-w-md rounded-card border border-navy-700 bg-navy-850 p-3 text-white shadow-raised sm:bottom-4">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-bold">Install Carz on your phone</p>
-          <p className="mt-0.5 text-xs text-teal-300">
+          <p className="mt-0.5 text-xs text-navy-300">
             {deferred
               ? 'Open it from your home screen, works offline.'
               : 'Tap Share, then “Add to Home Screen”.'}
@@ -91,7 +91,7 @@ export function InstallPrompt() {
             type="button"
             onClick={dismiss}
             aria-label="Dismiss"
-            className="rounded-lg border border-navy-600 px-2.5 py-1.5 text-xs font-bold text-teal-300"
+            className="rounded-lg border border-navy-600 px-2.5 py-1.5 text-xs font-bold text-navy-300"
           >
             ✕
           </button>

@@ -35,9 +35,9 @@ export default async function StaffPocket() {
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
-        <Card tone="teal" className="p-3.5">
+        <Card tone="success" className="p-3.5">
           <CardHeading>You can take</CardHeading>
-          <Stat value={money(allowance.available)} tone="teal" sub="right now" />
+          <Stat value={money(allowance.available)} tone="success" sub="right now" />
         </Card>
         <Card className="p-3.5">
           <CardHeading>In your account</CardHeading>
@@ -60,7 +60,7 @@ export default async function StaffPocket() {
         <Row
           label="Available now"
           value={money(allowance.available)}
-          tone="teal"
+          tone="success"
         />
       </Card>
 

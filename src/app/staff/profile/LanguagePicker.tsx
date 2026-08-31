@@ -59,7 +59,7 @@ export function LanguagePicker({
           onClick={() => choose(language)}
           className={`flex-1 rounded-md py-2 text-sm font-bold transition-colors ${
             value === language
-              ? 'bg-white text-teal-600 shadow-card'
+              ? 'bg-white text-navy-800 shadow-card'
               : 'text-ink-mute hover:text-ink'
           }`}
         >

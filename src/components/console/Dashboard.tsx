@@ -97,7 +97,7 @@ export async function ConsoleDashboard({
       <KpiGrid>
         <Kpi label="Active customers" value={totals.customers} />
         <Kpi label="Cars today" value={visits.length} />
-        <Kpi label="Completed" value={done} tone="teal" />
+        <Kpi label="Completed" value={done} tone="success" />
         <Kpi label="Not done" value={missed} tone={missed ? 'gold' : 'default'} />
         <Kpi
           label="Unassigned"
@@ -116,7 +116,7 @@ export async function ConsoleDashboard({
           <h3 className="mb-3 text-sm font-extrabold">Needs you right now</h3>
 
           {unassigned.length === 0 && alerts.length === 0 && complaints.length === 0 ? (
-            <p className="rounded-lg border border-teal-200 bg-teal-50 px-3 py-6 text-center text-sm font-semibold text-teal-700">
+            <p className="rounded-lg border border-success-200 bg-success-50 px-3 py-6 text-center text-sm font-semibold text-success-700">
               Nothing is blocking work. Every car has a wash boy, every customer
               is paid up.
             </p>
@@ -151,7 +151,7 @@ export async function ConsoleDashboard({
 
           {complaints.length > 0 ? (
             <Link href={`${base}/complaints`} className="block">
-              <div className="rounded-lg border border-line border-l-4 border-l-teal-500 bg-white p-3 hover:bg-surface-muted">
+              <div className="rounded-lg border border-line border-l-4 border-l-navy-800 bg-white p-3 hover:bg-surface-muted">
                 <b className="text-sm">{complaints.length} open complaints</b>
                 <p className="mt-0.5 text-xs text-ink-mute">
                   {complaints.filter((c) => c.status === 'ESCALATED').length} escalated
@@ -215,7 +215,7 @@ export async function ConsoleDashboard({
           </h3>
           <Row label="Washes completed" value={totals.washesDone} />
           <Row label="Washes missed" value={totals.washesMissed} tone={totals.washesMissed ? 'gold' : undefined} />
-          <Row label="Collection" value={money(totals.collected)} tone="teal" />
+          <Row label="Collection" value={money(totals.collected)} tone="success" />
           <Row label="Outstanding" value={money(outstanding)} tone={outstanding ? 'danger' : undefined} />
           <Row
             label="Average rating"

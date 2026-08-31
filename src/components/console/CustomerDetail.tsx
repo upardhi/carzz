@@ -171,7 +171,7 @@ export async function ConsoleCustomerDetail({
           <Row
             label="Balance"
             value={money(Math.max(0, account.balance))}
-            tone="teal"
+            tone="success"
           />
           <Row
             label="Outstanding"
@@ -263,7 +263,7 @@ export async function ConsoleCustomerDetail({
 
           {visits.some((v) => v.rescheduledToVisitId) ? (
             <div className="mt-3">
-              <Note tone="teal">
+              <Note tone="success">
                 Missed washes on this account were returned to the customer’s
                 count and rescheduled — they were not lost.
               </Note>

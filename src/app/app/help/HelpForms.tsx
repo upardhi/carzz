@@ -98,7 +98,7 @@ export function RateWashForm({
 
       {state.ok ? (
         <div className="mt-2.5">
-          <Note tone="teal">{state.ok}</Note>
+          <Note tone="success">{state.ok}</Note>
         </div>
       ) : null}
       {state.error ? (
@@ -183,7 +183,7 @@ export function ComplaintForm() {
 
       {state.ok ? (
         <div className="mt-2.5">
-          <Note tone="teal">{state.ok}</Note>
+          <Note tone="success">{state.ok}</Note>
         </div>
       ) : null}
       {state.error ? (

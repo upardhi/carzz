@@ -53,11 +53,11 @@ export default async function StaffEarnings() {
 
   return (
     <div className="space-y-3">
-      <Card tone="teal" className="p-4">
+      <Card tone="brand" className="p-4">
         <CardHeading>Earned this month</CardHeading>
         <Stat
           value={money(current.net)}
-          tone="teal"
+          tone="success"
           sub={`${cycleLabel(cycle)} · net payable`}
         />
         <div className="mt-3">
@@ -84,7 +84,7 @@ export default async function StaffEarnings() {
               </>
             }
             value={line.amount > 0 ? `+${money(line.amount)}` : money(0)}
-            tone={line.amount > 0 ? 'teal' : undefined}
+            tone={line.amount > 0 ? 'success' : undefined}
           />
         ))}
 
@@ -117,20 +117,20 @@ export default async function StaffEarnings() {
         </div>
       </Card>
 
-      <Card tone="teal" className="p-4">
+      <Card tone="success" className="p-4">
         <CardHeading>Refer and earn</CardHeading>
         <Row
           label="A new car on your reference"
           value={money(rules.carReferralBonus)}
-          tone="teal"
+          tone="success"
         />
         <Row
           label="A new wash boy on your reference"
           value={money(rules.staffReferralBonus)}
-          tone="teal"
+          tone="success"
         />
         <div className="mt-2">
-          <Note tone="teal">
+          <Note tone="brand">
             Tell your manager who you referred when they join — the bonus is
             added to that month’s pay automatically.
           </Note>
@@ -144,7 +144,7 @@ export default async function StaffEarnings() {
           label="On-time rate"
           value={percent(visits.length ? onTime / visits.length : 0)}
           tone={
-            visits.length && onTime / visits.length >= 0.85 ? 'teal' : 'gold'
+            visits.length && onTime / visits.length >= 0.85 ? 'success' : 'gold'
           }
         />
         <Row

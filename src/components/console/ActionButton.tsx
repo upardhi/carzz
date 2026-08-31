@@ -72,7 +72,7 @@ export function ActionButton({
       {feedback ? (
         <span
           role="status"
-          className={`text-[11px] font-semibold ${failed ? 'text-danger-500' : 'text-teal-600'}`}
+          className={`text-[11px] font-semibold ${failed ? 'text-danger-500' : 'text-success-600'}`}
         >
           {feedback}
         </span>

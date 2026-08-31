@@ -40,15 +40,16 @@
   }
 
   :focus-visible {
-    @apply outline-none ring-2 ring-teal-500 ring-offset-2 ring-offset-white;
+    @apply outline-none ring-2 ring-navy-500 ring-offset-2 ring-offset-white;
   }
 }
 
 @layer components {
   .field {
-    @apply w-full rounded-lg border border-line-strong bg-white px-3 py-2.5
+    @apply w-full rounded-lg border border-line bg-surface-sunken px-3 py-2.5
       text-ink placeholder:text-ink-faint
-      focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100;
+      focus:border-navy-500 focus:bg-white focus:outline-none focus:ring-2
+      focus:ring-navy-100;
   }
 
   .field-label {

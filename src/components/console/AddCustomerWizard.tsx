@@ -166,11 +166,11 @@ export function AddCustomerWizard({
         {STEPS.map((label, i) => (
           <li key={label} className="flex-1">
             <div
-              className={`h-1.5 rounded-pill ${i < step ? 'bg-teal-500' : 'bg-line-strong'}`}
+              className={`h-1.5 rounded-pill ${i < step ? 'bg-navy-800' : 'bg-line-strong'}`}
             />
             <span
               className={`mt-1 block text-[10px] font-bold uppercase tracking-wide ${
-                i < step ? 'text-teal-600' : 'text-ink-faint'
+                i < step ? 'text-navy-800' : 'text-ink-faint'
               }`}
             >
               {label}
@@ -207,7 +207,7 @@ export function AddCustomerWizard({
               <span
                 className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
                   source === option
-                    ? 'border-teal-500 bg-teal-500 text-white'
+                    ? 'border-navy-800 bg-navy-800 text-white'
                     : 'border-line-strong'
                 }`}
               >
@@ -346,7 +346,7 @@ export function AddCustomerWizard({
           </Button>
 
           <div className="mt-3">
-            <Note tone="teal">
+            <Note tone="brand">
               Every car sits on this one account with a single payment history,
               but keeps its own wash count and time slot.
             </Note>
@@ -403,7 +403,7 @@ export function AddCustomerWizard({
             />
 
             <div className="mt-3">
-              <Note tone="teal">
+              <Note tone="brand">
                 Only staff working in this area are listed — a wash boy is never
                 sent across the city.
               </Note>
@@ -438,7 +438,7 @@ export function AddCustomerWizard({
           </div>
 
           <div className="sm:col-span-2">
-            <Note tone="teal">
+            <Note tone="brand">
               On save the system creates all {washes} wash visits for this month
               and the customer’s account is live immediately.
             </Note>

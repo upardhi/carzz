@@ -1,80 +1,91 @@
 import type { Config } from 'tailwindcss';
 
 /**
- * Carz Management design tokens.
+ * Carz Management design tokens, taken from the supplied reference screens.
  *
- * The palette is taken from the FleetGuard reference screens (deep navy shell,
- * gold accent) blended with the car-wash prototype (teal as the primary action
- * colour). Everything in the UI is expressed with these semantic names so a
- * rebrand is a change to this file, not a sweep through components.
+ * The system is deep blue navy + gold, not navy + teal:
+ *   - navy   is the shell AND the primary action colour (the "Sign in" button
+ *            and the action cards in the reference are solid navy blue)
+ *   - gold   is the accent — the active sidebar item, the highlight line in
+ *            the hero copy, the brand mark
+ *   - green  marks positive state (the "Exited" pill), orange marks an exit
+ *            or outbound action, red marks a problem
+ *
+ * Everything in the UI is expressed with these semantic names, so a rebrand is
+ * a change to this file rather than a sweep through components.
  */
 const config: Config = {
   content: ['./src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {
-        // Shell / chrome
+        // Shell, chrome and primary actions
         navy: {
-          950: '#08171f',
-          900: '#0f1e2a',
-          850: '#12202c',
-          800: '#16293a',
-          700: '#1b2f3f',
-          600: '#2b4759',
-          500: '#41606f',
+          50: '#f1f6fb',
+          100: '#e1ebf5',
+          200: '#c3d8ec',
+          300: '#8fb3d9',
+          400: '#5b8cbe',
+          500: '#3a6ea5',
+          600: '#22558a',
+          700: '#17456f',
+          800: '#123a63',
+          850: '#0e2748',
+          900: '#0a1f3d',
+          950: '#061529',
         },
-        // Primary action colour
-        teal: {
-          50: '#f0fbfb',
-          100: '#d5f2f0',
-          200: '#b8e5e5',
-          300: '#4fd1d1',
-          400: '#2cc0c0',
-          500: '#00aaaa',
-          600: '#0a8f8f',
-          700: '#08706e',
-        },
-        // Accent — highlights, active nav, brand marks
+        // Accent — active nav, brand highlight, "needs a decision"
         gold: {
-          50: '#fffaf0',
-          100: '#fbe9cf',
-          200: '#f0dcb4',
-          300: '#e3b063',
-          400: '#f0b429',
-          500: '#e9a825',
-          600: '#a9720f',
-          700: '#8a5410',
+          50: '#fff9ec',
+          100: '#fcefd2',
+          200: '#f7e3b5',
+          300: '#fad98a',
+          400: '#f5c453',
+          500: '#e8a317',
+          600: '#b87a0f',
+          700: '#8a5a0b',
+        },
+        // Positive state
+        success: {
+          50: '#eef8f3',
+          100: '#dcf2e4',
+          200: '#b6e3ce',
+          500: '#0f8560',
+          600: '#0b6b4f',
+          700: '#07553d',
+        },
+        // Outbound / exit actions
+        orange: {
+          50: '#fdf3ea',
+          100: '#fae2cd',
+          500: '#c85e0d',
+          600: '#b4530a',
+          700: '#8d4108',
         },
         danger: {
-          50: '#fff5f5',
-          100: '#fadcdc',
-          300: '#e08d8d',
-          500: '#b53b3b',
-          600: '#962626',
+          50: '#fef3f2',
+          100: '#f8dad8',
+          300: '#e39a95',
+          500: '#b3261e',
+          600: '#8f1d18',
         },
-        success: {
-          50: '#eefaf4',
-          100: '#cdeee0',
-          500: '#0b6b4f',
-          600: '#085840',
-        },
-        // Content surfaces
+        // Content
         ink: {
-          DEFAULT: '#12202c',
-          soft: '#5d7684',
-          mute: '#6b8492',
-          faint: '#8ba5b6',
+          DEFAULT: '#10233d',
+          soft: '#4a5f7a',
+          mute: '#64788f',
+          faint: '#8fa3b8',
         },
         surface: {
           DEFAULT: '#ffffff',
-          muted: '#f2f6f8',
-          sunken: '#eef3f5',
-          raised: '#e5edf1',
+          muted: '#f4f7fa',
+          sunken: '#eef3f8',
+          raised: '#e3eaf2',
         },
         line: {
-          DEFAULT: '#dde7ec',
-          soft: '#eef3f5',
-          strong: '#cfdbe1',
+          DEFAULT: '#dce5ef',
+          soft: '#edf2f7',
+          strong: '#c8d5e3',
         },
       },
       fontFamily: {
@@ -93,9 +104,18 @@ const config: Config = {
         pill: '999px',
       },
       boxShadow: {
-        card: '0 1px 2px rgba(18,32,44,.06), 0 1px 3px rgba(18,32,44,.05)',
-        raised: '0 8px 24px rgba(8,23,31,.12)',
-        float: '0 14px 40px rgba(0,0,0,.45)',
+        card: '0 1px 2px rgba(16,35,61,.06), 0 1px 3px rgba(16,35,61,.05)',
+        raised: '0 8px 24px rgba(6,21,41,.14)',
+        float: '0 14px 40px rgba(6,21,41,.45)',
+      },
+      backgroundImage: {
+        // The faint grid the reference screens carry over their navy panels.
+        'navy-grid':
+          'linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),' +
+          'linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px)',
+      },
+      backgroundSize: {
+        grid: '44px 44px',
       },
       keyframes: {
         'fade-up': {

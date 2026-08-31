@@ -46,7 +46,7 @@ export function MobileShell({
               type="button"
               onClick={() => router.back()}
               aria-label="Go back"
-              className="-ml-1 rounded-lg p-1 text-teal-300 hover:bg-navy-800"
+              className="-ml-1 rounded-lg p-1 text-navy-300 hover:bg-navy-800"
             >
               <IconBack />
             </button>
@@ -56,7 +56,7 @@ export function MobileShell({
               {title}
             </h1>
             {subtitle ? (
-              <p className="truncate text-xs text-teal-300">{subtitle}</p>
+              <p className="truncate text-xs text-navy-300">{subtitle}</p>
             ) : null}
           </div>
           {action}
@@ -85,7 +85,7 @@ export function MobileShell({
                 className={clsx(
                   'flex flex-1 flex-col items-center gap-0.5 py-2 text-[10.5px] font-bold transition-colors',
                   active
-                    ? 'text-teal-600 shadow-[inset_0_2px_0_0_currentColor]'
+                    ? 'text-navy-800 shadow-[inset_0_2px_0_0_currentColor]'
                     : 'text-ink-mute hover:text-ink-soft',
                 )}
               >

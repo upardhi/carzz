@@ -43,7 +43,7 @@ export default async function StaffLayout({
           <form action="/api/auth/logout" method="post">
             <button
               type="submit"
-              className="rounded-lg px-2 py-1 text-xs font-bold text-teal-300 hover:bg-navy-800"
+              className="rounded-lg px-2 py-1 text-xs font-bold text-navy-300 hover:bg-navy-800"
             >
               Sign out
             </button>

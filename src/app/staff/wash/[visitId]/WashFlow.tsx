@@ -110,7 +110,7 @@ export function WashFlow({
         {[Boolean(before), done.length > 0, Boolean(after)].map((complete, i) => (
           <li
             key={i}
-            className={`h-1.5 flex-1 rounded-pill ${complete ? 'bg-teal-500' : 'bg-line-strong'}`}
+            className={`h-1.5 flex-1 rounded-pill ${complete ? 'bg-navy-800' : 'bg-line-strong'}`}
           />
         ))}
       </ol>
@@ -157,7 +157,7 @@ export function WashFlow({
               <span
                 className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 ${
                   on
-                    ? 'border-teal-500 bg-teal-500 text-white'
+                    ? 'border-navy-800 bg-navy-800 text-white'
                     : 'border-line-strong'
                 }`}
               >
@@ -193,7 +193,7 @@ export function WashFlow({
 
         <div className="mt-3">
           {before && after ? (
-            <Note tone="teal">
+            <Note tone="success">
               Both photos saved. You can close this wash.
             </Note>
           ) : (
@@ -239,10 +239,10 @@ function PhotoTile({
       disabled={disabled || busy}
       className={`flex aspect-[4/3] w-full max-w-[220px] flex-col items-center justify-center gap-1.5 rounded-lg border-2 text-sm font-bold transition-colors ${
         url
-          ? 'border-teal-500 bg-teal-50 text-teal-600'
+          ? 'border-success-500 bg-success-50 text-success-600'
           : disabled
             ? 'border-dashed border-line-strong bg-surface-raised text-ink-faint'
-            : 'border-dashed border-line-strong bg-surface-raised text-ink-mute hover:border-teal-400'
+            : 'border-dashed border-line-strong bg-surface-raised text-ink-mute hover:border-navy-400'
       }`}
     >
       {url ? (
@@ -329,7 +329,7 @@ function MissWashForm({
             <span
               className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
                 reason === r
-                  ? 'border-teal-500 bg-teal-500 text-white'
+                  ? 'border-navy-800 bg-navy-800 text-white'
                   : 'border-line-strong'
               }`}
             >
@@ -363,7 +363,7 @@ function MissWashForm({
         />
       </Card>
 
-      <Note tone="teal">
+      <Note tone="success">
         The wash goes <b>back into the customer’s count</b> — he does not lose
         it. The customer and your area manager are both told.
       </Note>

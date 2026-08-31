@@ -72,7 +72,7 @@ export async function ConsoleComplaints({
       />
 
       <KpiGrid>
-        <Kpi label="Open" value={open.length} tone={open.length ? 'danger' : 'teal'} />
+        <Kpi label="Open" value={open.length} tone={open.length ? 'danger' : 'success'} />
         <Kpi
           label="Escalated"
           value={open.filter((c) => c.status === 'ESCALATED').length}

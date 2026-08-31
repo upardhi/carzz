@@ -84,7 +84,7 @@ export async function ConsoleSchedule({
         <Kpi
           label="Completed"
           value={visits.filter((v) => v.status === 'DONE').length}
-          tone="teal"
+          tone="success"
         />
         <Kpi
           label="In progress"
@@ -230,7 +230,7 @@ export async function ConsoleSchedule({
       </TableWrap>
 
       <div className="mt-3">
-        <Note tone="teal">
+        <Note tone="brand">
           A wash boy can only be given cars in his own area. Reassigning tells
           both the customer and the staff member.
         </Note>

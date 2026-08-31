@@ -64,14 +64,14 @@ export default async function StaffToday() {
       <div className="grid grid-cols-2 gap-3">
         <Card className="p-3.5">
           <CardHeading>Cars today</CardHeading>
-          <Stat value={visits.length} tone="teal" sub={`${pending} still to do`} />
+          <Stat value={visits.length} tone="success" sub={`${pending} still to do`} />
           <div className="mt-2">
             <Progress value={done} max={visits.length || 1} />
           </div>
         </Card>
-        <Card tone="teal" className="p-3.5">
+        <Card tone="brand" className="p-3.5">
           <CardHeading>Earned today</CardHeading>
-          <Stat value={money(earnedToday)} tone="teal" sub="updates per car" />
+          <Stat value={money(earnedToday)} tone="success" sub="updates per car" />
         </Card>
       </div>
 
@@ -101,7 +101,7 @@ export default async function StaffToday() {
             <Card key={visit.id} className="border-l-4 border-l-line-strong p-3.5 opacity-70">
               <div className="flex items-baseline justify-between gap-3">
                 <span className="truncate font-extrabold">{customer?.name}</span>
-                <span className="shrink-0 text-sm font-bold text-teal-600">
+                <span className="shrink-0 text-sm font-bold text-navy-800">
                   {formatTime(visit.scheduledTime)}
                 </span>
               </div>
@@ -136,10 +136,10 @@ export default async function StaffToday() {
 
         return (
           <Link key={visit.id} href={`/staff/wash/${visit.id}`} className="block">
-            <Card accent="teal" className="p-3.5 transition-colors hover:border-teal-300">
+            <Card accent="brand" className="p-3.5 transition-colors hover:border-navy-300">
               <div className="flex items-baseline justify-between gap-3">
                 <span className="truncate font-extrabold">{customer?.name}</span>
-                <span className="shrink-0 text-sm font-bold text-teal-600">
+                <span className="shrink-0 text-sm font-bold text-navy-800">
                   {formatTime(visit.scheduledTime)}
                 </span>
               </div>
@@ -156,7 +156,7 @@ export default async function StaffToday() {
                 </p>
               ) : null}
 
-              <div className="mt-2.5 flex items-center justify-between rounded-lg bg-teal-500 px-3 py-2 text-sm font-extrabold text-white">
+              <div className="mt-2.5 flex items-center justify-between rounded-lg bg-navy-800 px-3 py-2 text-sm font-extrabold text-white">
                 {visit.status === 'IN_PROGRESS' ? 'Continue wash' : 'Start wash'}
                 <IconChevron width={16} height={16} />
               </div>
@@ -166,7 +166,7 @@ export default async function StaffToday() {
       })}
 
       {pending > 0 ? (
-        <Note tone="teal">
+        <Note tone="brand">
           Take the before photo, tick what you did, then the after photo. A wash
           cannot be closed without both photos.
         </Note>

@@ -80,7 +80,7 @@ export function LoginForm({ next }: { next?: string }) {
           <button
             type="button"
             onClick={() => setShow((v) => !v)}
-            className="absolute inset-y-0 right-2 px-2 text-xs font-bold text-teal-600"
+            className="absolute inset-y-0 right-2 px-2 text-xs font-bold text-navy-800"
           >
             {show ? 'Hide' : 'Show'}
           </button>
@@ -115,7 +115,7 @@ export function DemoAccounts() {
 
   return (
     <div className="mt-6 rounded-card border border-navy-600 bg-navy-850 p-3">
-      <p className="mb-2 text-[11px] font-extrabold uppercase tracking-wider text-teal-300">
+      <p className="mb-2 text-[11px] font-extrabold uppercase tracking-wider text-navy-300">
         Demo sign-ins
       </p>
       <div className="space-y-1">
@@ -135,7 +135,7 @@ export function DemoAccounts() {
             className="flex w-full items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left text-xs text-slate-300 hover:bg-navy-700"
           >
             <span className="font-bold text-white">{a.role}</span>
-            <span className="truncate font-mono text-[11px] text-teal-300">
+            <span className="truncate font-mono text-[11px] text-navy-300">
               {a.email}
             </span>
           </button>

@@ -66,7 +66,7 @@ export default async function CustomerCars() {
         </Card>
       ))}
 
-      <Note tone="teal">
+      <Note tone="brand">
         All your cars share one payment account with a single balance and due
         date, while each car keeps its own wash count and time slot.
       </Note>

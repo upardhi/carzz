@@ -81,7 +81,7 @@ export function RecordPaymentForm({
 
       {state.ok ? (
         <div className="mt-2">
-          <Note tone="teal">{state.ok}</Note>
+          <Note tone="success">{state.ok}</Note>
         </div>
       ) : null}
       {state.error ? (

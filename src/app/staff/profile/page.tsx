@@ -54,7 +54,7 @@ export default async function StaffProfile() {
               ? formatClock(todayAttendance.loginAt)
               : 'Not yet recorded'
           }
-          tone={todayAttendance?.loginAt ? 'teal' : 'gold'}
+          tone={todayAttendance?.loginAt ? 'success' : 'gold'}
         />
       </Card>
 
@@ -72,7 +72,7 @@ export default async function StaffProfile() {
         <Row
           label="On-time rate"
           value={percent(done.length ? done.filter((v) => v.onTime).length / done.length : 0)}
-          tone="teal"
+          tone="success"
         />
         <Row
           label="Average rating"
@@ -88,7 +88,7 @@ export default async function StaffProfile() {
         />
       </Card>
 
-      <Note tone="teal">
+      <Note tone="success">
         A tea break of {settings.teaBreakMinutes} minutes is allowed. Tell your
         manager if you need longer.
       </Note>

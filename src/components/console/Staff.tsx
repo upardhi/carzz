@@ -104,7 +104,7 @@ export async function ConsoleStaff({ session }: { session: Session }) {
         <Kpi
           label="Working today"
           value={staff.length - absentToday.length}
-          tone="teal"
+          tone="success"
         />
         <Kpi
           label="Absent today"

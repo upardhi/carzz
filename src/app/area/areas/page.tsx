@@ -48,7 +48,7 @@ export default async function AreaAdminAreas() {
         <Kpi
           label="Collected"
           value={money(performance.reduce((s, p) => s + p.collected, 0))}
-          tone="teal"
+          tone="success"
         />
         <Kpi
           label="Outstanding"
@@ -79,7 +79,7 @@ export default async function AreaAdminAreas() {
           return (
             <Card
               key={area.area.id}
-              accent={isWorst ? 'danger' : isBest ? 'teal' : undefined}
+              accent={isWorst ? 'danger' : isBest ? 'success' : undefined}
               className="p-4"
             >
               <div className="mb-2 flex items-start justify-between gap-2">
@@ -98,7 +98,7 @@ export default async function AreaAdminAreas() {
               <Row label="Customers" value={area.customers} />
               <Row label="Cars" value={area.activeCars} />
               <Row label="Staff" value={area.staff} />
-              <Row label="Collected" value={money(area.collected)} tone="teal" />
+              <Row label="Collected" value={money(area.collected)} tone="success" />
               <Row
                 label="Outstanding"
                 value={money(area.outstanding)}
@@ -107,7 +107,7 @@ export default async function AreaAdminAreas() {
               <Row
                 label="Profit"
                 value={`${money(area.profit)} (${percent(area.margin)})`}
-                tone={area.profit > 0 ? 'teal' : 'danger'}
+                tone={area.profit > 0 ? 'success' : 'danger'}
               />
               <Row
                 label="Missed washes"

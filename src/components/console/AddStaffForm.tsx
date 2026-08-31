@@ -99,7 +99,7 @@ export function AddStaffForm({
       </Button>
 
       {state.ok ? (
-        <div className="mt-2"><Note tone="teal">{state.ok}</Note></div>
+        <div className="mt-2"><Note tone="success">{state.ok}</Note></div>
       ) : null}
       {state.error ? (
         <div className="mt-2"><Note tone="danger">{state.error}</Note></div>

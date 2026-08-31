@@ -40,7 +40,7 @@ function useAction(endpoint: string) {
 }
 
 function Feedback({ state }: { state: { ok?: string; error?: string } }) {
-  if (state.ok) return <div className="mt-2"><Note tone="teal">{state.ok}</Note></div>;
+  if (state.ok) return <div className="mt-2"><Note tone="success">{state.ok}</Note></div>;
   if (state.error) return <div className="mt-2"><Note tone="danger">{state.error}</Note></div>;
   return null;
 }

@@ -54,7 +54,7 @@ export function ResolveComplaintForm({
             key={text}
             type="button"
             onClick={() => setResolution(text)}
-            className="rounded-pill border border-line-strong bg-white px-2.5 py-1 text-[11px] font-semibold text-ink-mute hover:border-teal-400 hover:text-teal-600"
+            className="rounded-pill border border-line-strong bg-white px-2.5 py-1 text-[11px] font-semibold text-ink-mute hover:border-navy-400 hover:text-navy-800"
           >
             {text}
           </button>

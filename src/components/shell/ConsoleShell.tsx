@@ -54,11 +54,11 @@ export function ConsoleShell({
     .sort((a, b) => b.length - a.length)[0];
 
   const sidebar = (
-    <div className="flex h-full flex-col bg-gradient-to-b from-navy-800 to-navy-950">
+    <div className="flex h-full flex-col bg-gradient-to-b from-navy-850 to-navy-950">
       <div className="border-b border-navy-700 px-4 py-4">
         <BrandLockup subtitle={roleLabel} />
-        <div className="mt-3 rounded-lg border border-navy-600 bg-navy-850 px-3 py-2">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-teal-300">
+        <div className="mt-3 rounded-lg border border-navy-700 bg-navy-900 px-3 py-2">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-navy-300">
             Scope
           </div>
           <div className="truncate text-sm font-bold text-white">{scopeLabel}</div>
@@ -82,8 +82,8 @@ export function ConsoleShell({
                   className={clsx(
                     'mb-0.5 flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-semibold transition-colors',
                     active
-                      ? 'bg-gold-500 text-navy-900'
-                      : 'text-teal-100/70 hover:bg-navy-700 hover:text-white',
+                      ? 'bg-gold-500 text-navy-950'
+                      : 'text-navy-200/80 hover:bg-navy-700 hover:text-white',
                   )}
                 >
                   <span aria-hidden>{item.icon}</span>
@@ -106,13 +106,13 @@ export function ConsoleShell({
       </nav>
 
       <div className="border-t border-navy-700 p-3">
-        <div className="flex items-center gap-2.5 rounded-lg bg-navy-850 px-3 py-2">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-teal-600 text-xs font-extrabold text-white">
+        <div className="flex items-center gap-2.5 rounded-lg bg-navy-900 px-3 py-2">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-navy-600 text-xs font-extrabold text-white">
             {userName.slice(0, 2).toUpperCase()}
           </div>
           <div className="min-w-0 flex-1">
             <div className="truncate text-[13px] font-bold text-white">{userName}</div>
-            <div className="text-[10.5px] text-teal-300">{roleLabel}</div>
+            <div className="text-[10.5px] text-navy-300">{roleLabel}</div>
           </div>
           <form action="/api/auth/logout" method="post">
             <button
@@ -155,7 +155,7 @@ export function ConsoleShell({
             type="button"
             onClick={() => setOpen(true)}
             aria-label="Open menu"
-            className="rounded-lg p-1 text-teal-300 hover:bg-navy-800"
+            className="rounded-lg p-1 text-navy-300 hover:bg-navy-800"
           >
             <IconMenu />
           </button>

@@ -50,12 +50,12 @@ export default async function CustomerHome() {
   return (
     <div className="space-y-3">
       {account.nextVisit && nextCar ? (
-        <Card tone="teal" className="p-4">
+        <Card tone="brand" className="p-4">
           <CardHeading>Next wash</CardHeading>
-          <div className="text-2xl font-extrabold tracking-tight text-teal-600">
+          <div className="text-2xl font-extrabold tracking-tight text-navy-800">
             {formatDateFull(account.nextVisit.scheduledDate)}
           </div>
-          <div className="mt-0.5 text-lg font-bold text-teal-700">
+          <div className="mt-0.5 text-lg font-bold text-navy-800">
             {formatTime(account.nextVisit.scheduledTime)}
           </div>
           <p className="mt-1.5 text-[13px] text-ink-mute">
@@ -79,7 +79,7 @@ export default async function CustomerHome() {
           <CardHeading>Washes left</CardHeading>
           <Stat
             value={washesLeft}
-            tone="teal"
+            tone="success"
             sub={`across ${account.cars.length} ${account.cars.length === 1 ? 'car' : 'cars'}`}
           />
           <div className="mt-2">
@@ -99,7 +99,7 @@ export default async function CustomerHome() {
 
       {account.cars.map((car) => (
         <Link key={car.id} href={`/app/cars/${car.id}`} className="block">
-          <Card className="p-3.5 transition-colors hover:border-teal-300">
+          <Card className="p-3.5 transition-colors hover:border-navy-300">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <div className="truncate text-[15px] font-extrabold">
@@ -142,13 +142,13 @@ export default async function CustomerHome() {
           </ButtonLink>
         </Card>
       ) : (
-        <Card tone="teal" className="p-4">
+        <Card tone="success" className="p-4">
           <Row label="Account" value={<Tag tone="ok">All paid up</Tag>} />
           <Row label="Monthly package" value={money(account.monthly)} />
         </Card>
       )}
 
-      <Note tone="teal">
+      <Note tone="brand">
         Every wash is photographed before and after. Open a car to see the proof
         for each visit, and how any missed wash was returned to your count.
       </Note>

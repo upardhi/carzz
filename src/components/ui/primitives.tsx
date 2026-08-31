@@ -6,14 +6,21 @@ import type { ComponentProps, ReactNode } from 'react';
 /* Card                                                                       */
 /* -------------------------------------------------------------------------- */
 
-export type CardTone = 'default' | 'teal' | 'gold' | 'danger' | 'navy';
+export type CardTone =
+  | 'default'
+  | 'brand'
+  | 'success'
+  | 'gold'
+  | 'danger'
+  | 'navy';
 
 const CARD_TONES: Record<CardTone, string> = {
   default: 'border-line bg-white',
-  teal: 'border-teal-200 bg-teal-50',
+  brand: 'border-navy-200 bg-navy-50',
+  success: 'border-success-200 bg-success-50',
   gold: 'border-gold-200 bg-gold-50',
   danger: 'border-danger-300 bg-danger-50',
-  navy: 'border-navy-600 bg-navy-850 text-white',
+  navy: 'border-navy-700 bg-navy-850 text-white',
 };
 
 export function Card({
@@ -25,7 +32,8 @@ export function Card({
 }: ComponentProps<'div'> & { tone?: CardTone; accent?: CardTone }) {
   const ACCENT: Record<CardTone, string> = {
     default: 'border-l-4 border-l-line-strong',
-    teal: 'border-l-4 border-l-teal-500',
+    brand: 'border-l-4 border-l-navy-800',
+    success: 'border-l-4 border-l-success-500',
     gold: 'border-l-4 border-l-gold-500',
     danger: 'border-l-4 border-l-danger-500',
     navy: 'border-l-4 border-l-navy-700',
@@ -60,12 +68,13 @@ export function Stat({
   sub,
 }: {
   value: ReactNode;
-  tone?: 'default' | 'teal' | 'gold' | 'danger';
+  tone?: 'default' | 'brand' | 'success' | 'gold' | 'danger';
   sub?: ReactNode;
 }) {
   const TONE = {
     default: 'text-ink',
-    teal: 'text-teal-600',
+    brand: 'text-navy-800',
+    success: 'text-success-600',
     gold: 'text-gold-600',
     danger: 'text-danger-500',
   };
@@ -87,10 +96,11 @@ export function Row({
 }: {
   label: ReactNode;
   value: ReactNode;
-  tone?: 'teal' | 'gold' | 'danger';
+  tone?: 'brand' | 'success' | 'gold' | 'danger';
 }) {
   const TONE = {
-    teal: 'text-teal-600',
+    brand: 'text-navy-800',
+    success: 'text-success-600',
     gold: 'text-gold-600',
     danger: 'text-danger-500',
   };
@@ -111,11 +121,11 @@ export function Row({
 export type TagTone = 'ok' | 'warn' | 'bad' | 'neutral' | 'info';
 
 const TAG_TONES: Record<TagTone, string> = {
-  ok: 'bg-teal-100 text-teal-700',
+  ok: 'bg-success-100 text-success-700',
   warn: 'bg-gold-100 text-gold-700',
   bad: 'bg-danger-100 text-danger-600',
   neutral: 'bg-surface-raised text-ink-soft',
-  info: 'bg-navy-850 text-white',
+  info: 'bg-navy-100 text-navy-800',
 };
 
 export function Tag({
@@ -148,10 +158,10 @@ type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'gold';
 type ButtonSize = 'sm' | 'md' | 'lg';
 
 const VARIANTS: Record<ButtonVariant, string> = {
-  primary: 'bg-teal-500 text-white hover:bg-teal-600 disabled:bg-line-strong',
+  primary: 'bg-navy-800 text-white hover:bg-navy-700 disabled:bg-line-strong',
   secondary:
-    'bg-white text-ink border border-line-strong hover:bg-surface-muted disabled:text-ink-faint',
-  ghost: 'text-teal-600 hover:bg-teal-50 disabled:text-ink-faint',
+    'bg-white text-navy-800 border border-line-strong hover:bg-surface-muted disabled:text-ink-faint',
+  ghost: 'text-navy-800 hover:bg-navy-50 disabled:text-ink-faint',
   danger: 'bg-danger-500 text-white hover:bg-danger-600 disabled:bg-line-strong',
   gold: 'bg-gold-500 text-navy-900 hover:bg-gold-400 disabled:bg-line-strong',
 };
@@ -241,12 +251,13 @@ export function Note({
   tone = 'gold',
   children,
 }: {
-  tone?: 'gold' | 'teal' | 'danger';
+  tone?: 'gold' | 'brand' | 'success' | 'danger';
   children: ReactNode;
 }) {
   const TONES = {
     gold: 'bg-gold-50 border-gold-200 text-gold-700',
-    teal: 'bg-teal-50 border-teal-200 text-teal-700',
+    brand: 'bg-navy-50 border-navy-200 text-navy-800',
+    success: 'bg-success-50 border-success-200 text-success-700',
     danger: 'bg-danger-50 border-danger-300 text-danger-600',
   };
   return (
@@ -291,12 +302,13 @@ export function Kpi({
 }: {
   label: string;
   value: ReactNode;
-  tone?: 'default' | 'teal' | 'gold' | 'danger';
+  tone?: 'default' | 'brand' | 'success' | 'gold' | 'danger';
   hint?: string;
 }) {
   const TONE = {
     default: 'text-ink',
-    teal: 'text-teal-600',
+    brand: 'text-navy-800',
+    success: 'text-success-600',
     gold: 'text-gold-600',
     danger: 'text-danger-500',
   };
@@ -359,14 +371,19 @@ export function Td({ children, className, ...rest }: ComponentProps<'td'>) {
 export function Progress({
   value,
   max,
-  tone = 'teal',
+  tone = 'brand',
 }: {
   value: number;
   max: number;
-  tone?: 'teal' | 'gold' | 'danger';
+  tone?: 'brand' | 'success' | 'gold' | 'danger';
 }) {
   const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
-  const TONE = { teal: 'bg-teal-500', gold: 'bg-gold-500', danger: 'bg-danger-500' };
+  const TONE = {
+    brand: 'bg-navy-800',
+    success: 'bg-success-500',
+    gold: 'bg-gold-500',
+    danger: 'bg-danger-500',
+  };
   return (
     <div
       className="h-1.5 w-full overflow-hidden rounded-pill bg-surface-raised"
@@ -383,13 +400,13 @@ export function Progress({
 /** Simple bar chart — no charting library, no client JS. */
 export function BarChart({
   data,
-  tone = 'teal',
+  tone = 'brand',
 }: {
   data: { label: string; value: number }[];
-  tone?: 'teal' | 'gold';
+  tone?: 'brand' | 'gold';
 }) {
   const max = Math.max(1, ...data.map((d) => d.value));
-  const TONE = { teal: 'bg-teal-500', gold: 'bg-gold-500' };
+  const TONE = { brand: 'bg-navy-800', gold: 'bg-gold-500' };
   return (
     <div>
       <div className="flex h-20 items-end gap-1.5">

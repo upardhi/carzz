@@ -44,9 +44,9 @@ export default async function CustomerPayments() {
           />
         </Card>
       ) : (
-        <Card tone="teal" className="p-4">
+        <Card tone="success" className="p-4">
           <CardHeading>Amount due</CardHeading>
-          <Stat value={money(0)} tone="teal" sub="You are fully paid up" />
+          <Stat value={money(0)} tone="success" sub="You are fully paid up" />
         </Card>
       )}
 
@@ -59,7 +59,7 @@ export default async function CustomerPayments() {
         <Row
           label="Balance"
           value={money(Math.max(0, account.balance))}
-          tone={account.balance >= 0 ? 'teal' : undefined}
+          tone={account.balance >= 0 ? 'success' : undefined}
         />
         <Row
           label="Outstanding"
@@ -115,7 +115,7 @@ export default async function CustomerPayments() {
         )}
       </Card>
 
-      <Note tone="teal">
+      <Note tone="brand">
         You get a reminder {settings.reminderDaysBeforeDue} days before the due
         date and a confirmation the moment a payment is recorded.
       </Note>

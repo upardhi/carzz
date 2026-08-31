@@ -53,11 +53,11 @@ export default async function AreaReports() {
 
       <KpiGrid>
         <Kpi label="Billed" value={money(billed)} />
-        <Kpi label="Collected" value={money(collected)} tone="teal" />
+        <Kpi label="Collected" value={money(collected)} tone="success" />
         <Kpi
           label="Collection rate"
           value={percent(billed ? collected / billed : 0)}
-          tone={billed && collected / billed < 0.8 ? 'gold' : 'teal'}
+          tone={billed && collected / billed < 0.8 ? 'gold' : 'success'}
         />
         <Kpi label="Washes done" value={performance.reduce((s, p) => s + p.washesDone, 0)} />
         <Kpi label="Washes missed" value={missed.total} tone="gold" />
@@ -89,7 +89,7 @@ export default async function AreaReports() {
                       <Td>{money(area.outstanding)}</Td>
                       <Td
                         className={
-                          rate < 0.75 ? 'font-bold text-danger-500' : 'text-teal-600'
+                          rate < 0.75 ? 'font-bold text-danger-500' : 'text-success-600'
                         }
                       >
                         {percent(rate)}
