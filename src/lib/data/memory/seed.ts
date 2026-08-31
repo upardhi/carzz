@@ -1,3 +1,4 @@
+import { businessClock, businessToday, slotInstant } from '../../util/time';
 import type {
   Area,
   Attendance,
@@ -103,6 +104,9 @@ const SOCIETIES = [
  * visits to work through, whenever it is run.
  */
 export function buildSeed(today = new Date()): Db {
+  // The working day and wall clock as the business sees them, not UTC.
+  const businessDate = businessToday(today);
+  const nowClock = businessClock(today);
   const rand = rng(20260826);
   const pick = <T,>(xs: readonly T[]) => xs[Math.floor(rand() * xs.length)];
   const int = (lo: number, hi: number) => lo + Math.floor(rand() * (hi - lo + 1));
@@ -237,7 +241,9 @@ export function buildSeed(today = new Date()): Db {
   };
 
   const patterns: WeekdayPattern[] = ['MON_THU', 'TUE_FRI', 'WED_SAT', 'THU_SUN'];
-  const slotTimes = ['07:00', '07:30', '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00'];
+  const MORNING_SLOTS = ['07:00', '07:30', '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00'];
+  // A minority of customers take an evening round after office hours.
+  const EVENING_SLOTS = ['17:00', '17:30', '18:00', '18:30', '19:00', '19:30', '20:00'];
 
   const perArea = [62, 58, 54];
   areaSpec.forEach((spec, ai) => {
@@ -265,6 +271,7 @@ export function buildSeed(today = new Date()): Db {
       // client specifically wanted to see working.
       const carCount = rand() > 0.8 ? 2 : 1;
       const pattern = pick(patterns);
+      const slotTimes = rand() > 0.78 ? EVENING_SLOTS : MORNING_SLOTS;
       const baseSlot = int(0, slotTimes.length - 2);
       const emp = emps[c % emps.length];
 
@@ -340,14 +347,11 @@ export function buildSeed(today = new Date()): Db {
               );
 
       allowed.forEach((date, index) => {
-        const isToday = date === dateOnly(today);
+        const isToday = date === businessDate;
         // A slot whose time has already passed today counts as worked, so the
         // manager's dashboard shows a round in progress rather than a dead day.
-        const slotPassed =
-          isToday &&
-          car.scheduleTime <=
-            `${String(today.getUTCHours()).padStart(2, '0')}:${String(today.getUTCMinutes()).padStart(2, '0')}`;
-        const isPast = date < dateOnly(today) || slotPassed;
+        const slotPassed = isToday && car.scheduleTime <= nowClock;
+        const isPast = date < businessDate || slotPassed;
         const roll = rand();
         let status: WashVisit['status'] = 'PENDING';
         let missReason: WashVisit['missReason'] = null;
@@ -360,7 +364,7 @@ export function buildSeed(today = new Date()): Db {
           if (status === 'MISSED') missReason = pick(missReasons);
         }
 
-        const slotAt = new Date(`${date}T${car.scheduleTime}:00.000Z`);
+        const slotAt = slotInstant(date, car.scheduleTime);
         const completedAt =
           status === 'DONE' ? iso(new Date(slotAt.getTime() + int(1, 26) * 60000)) : null;
 
@@ -399,8 +403,8 @@ export function buildSeed(today = new Date()): Db {
     const date = dateOnly(cursor);
     const replacementId = `${missed.id}_rep`;
     // A make-good scheduled in the past has already been delivered.
-    const delivered = date < dateOnly(today);
-    const slotAt = new Date(`${date}T${car.scheduleTime}:00.000Z`);
+    const delivered = date < businessDate;
+    const slotAt = slotInstant(date, car.scheduleTime);
 
     visits.push({
       ...missed,

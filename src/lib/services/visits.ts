@@ -2,6 +2,7 @@ import 'server-only';
 
 import type { DataStore } from '../data/ports/store';
 import type { Id, MissReason, WashVisit } from '../data/types';
+import { slotInstant } from '../util/time';
 import { nextSlotAfter } from './schedule';
 
 export class WashRuleError extends Error {}
@@ -45,8 +46,9 @@ export async function completeWash(
 
   const completedAt = new Date();
   // "On time" means closed within the hour of the booked slot — the window the
-  // on-time bonus is paid against.
-  const slot = new Date(`${visit.scheduledDate}T${visit.scheduledTime}:00.000Z`);
+  // on-time bonus is paid against. The slot is a wall-clock time in the
+  // business timezone, so it is resolved to a real instant first.
+  const slot = slotInstant(visit.scheduledDate, visit.scheduledTime);
   const onTime = completedAt.getTime() - slot.getTime() <= 60 * 60 * 1000;
 
   return store.visits.update(visitId, {

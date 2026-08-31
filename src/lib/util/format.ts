@@ -1,4 +1,5 @@
 import type { DateOnly, Rupees, Timestamp } from '../data/types';
+import { businessClock, businessCycle, businessToday } from './time';
 
 const INR = new Intl.NumberFormat('en-IN', {
   style: 'currency',
@@ -61,10 +62,9 @@ export function formatTime(hhmm: string): string {
 
 export function formatClock(value: Timestamp | null): string {
   if (!value) return '—';
-  const d = toDate(value);
-  return formatTime(
-    `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`,
-  );
+  // Rendered in the business timezone so a completion time lines up with the
+  // slot it is being compared against.
+  return formatTime(businessClock(toDate(value)));
 }
 
 /** "in 2 days", "3 days ago", "today". */
@@ -87,12 +87,13 @@ export function toDate(value: DateOnly | Timestamp | Date): Date {
   return new Date(value.length === 10 ? `${value}T00:00:00.000Z` : value);
 }
 
+/** Today in the business timezone — the working day, not the UTC day. */
 export function todayISO(): DateOnly {
-  return new Date().toISOString().slice(0, 10);
+  return businessToday();
 }
 
 export function currentCycle(): string {
-  return new Date().toISOString().slice(0, 7);
+  return businessCycle();
 }
 
 export function cycleLabel(cycle: string): string {
