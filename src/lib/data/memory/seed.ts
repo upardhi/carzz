@@ -340,7 +340,14 @@ export function buildSeed(today = new Date()): Db {
               );
 
       allowed.forEach((date, index) => {
-        const isPast = date < dateOnly(today);
+        const isToday = date === dateOnly(today);
+        // A slot whose time has already passed today counts as worked, so the
+        // manager's dashboard shows a round in progress rather than a dead day.
+        const slotPassed =
+          isToday &&
+          car.scheduleTime <=
+            `${String(today.getUTCHours()).padStart(2, '0')}:${String(today.getUTCMinutes()).padStart(2, '0')}`;
+        const isPast = date < dateOnly(today) || slotPassed;
         const roll = rand();
         let status: WashVisit['status'] = 'PENDING';
         let missReason: WashVisit['missReason'] = null;
@@ -435,7 +442,15 @@ export function buildSeed(today = new Date()): Db {
     for (const cyc of [prevCycle, cycle]) {
       const isCurrent = cyc === cycle;
       const roll = rand();
-      const paidAmount = roll < 0.62 ? monthly : roll < 0.78 ? Math.round(monthly / 2) : 0;
+      // Prior months are largely settled; the current month is still being
+      // collected, which is what puts a realistic handful on the chase list.
+      const paidRate = isCurrent ? 0.72 : 0.9;
+      const paidAmount =
+        roll < paidRate
+          ? monthly
+          : roll < paidRate + 0.12
+            ? Math.round(monthly / 2)
+            : 0;
       const dueOn = `${cyc}-05`;
       const status: Invoice['status'] =
         paidAmount >= monthly ? 'PAID'

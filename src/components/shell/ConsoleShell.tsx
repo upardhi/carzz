@@ -43,6 +43,16 @@ export function ConsoleShell({
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
+  // The section index (`/manager`) is a prefix of every page beneath it, so a
+  // plain startsWith would light two items at once. Pick the single longest
+  // href that matches instead.
+  const activeHref = nav
+    .flatMap((group) => group.items.map((item) => item.href))
+    .filter(
+      (href) => pathname === href || pathname.startsWith(`${href}/`),
+    )
+    .sort((a, b) => b.length - a.length)[0];
+
   const sidebar = (
     <div className="flex h-full flex-col bg-gradient-to-b from-navy-800 to-navy-950">
       <div className="border-b border-navy-700 px-4 py-4">
@@ -62,8 +72,7 @@ export function ConsoleShell({
               {group.heading}
             </div>
             {group.items.map((item) => {
-              const active =
-                pathname === item.href || pathname.startsWith(`${item.href}/`);
+              const active = item.href === activeHref;
               return (
                 <Link
                   key={item.href}
