@@ -1,0 +1,558 @@
+// Relational schema for Carz Management.
+//
+// This mirrors src/lib/data/types.ts one-to-one, so `DATA_PROVIDER=prisma`
+// needs no application changes. Switch `provider` below to mysql or sqlite if
+// you prefer — only the two String[] columns (services, servicesDone,
+// paymentModesEnabled, languages, slabByCarIndex) need attention on engines
+// without native arrays, where a Json column is the drop-in replacement.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  AREA_ADMIN
+  MANAGER
+  EMPLOYEE
+  CUSTOMER
+}
+
+enum Language {
+  en
+  hi
+  mr
+}
+
+enum StaffRole {
+  MANAGER
+  EMPLOYEE
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  OFF
+  OFF_UNINFORMED
+}
+
+enum PocketRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PAID
+}
+
+enum LeadSource {
+  GUARD_REF
+  CUSTOMER_REF
+  STAFF_REF
+  DETAILING_CENTRE
+  ONLINE_ADS
+  PAMPHLET
+  OTHER
+}
+
+enum CustomerStatus {
+  ACTIVE
+  HOLD
+  INACTIVE
+}
+
+enum WeekdayPattern {
+  MON_THU
+  TUE_FRI
+  WED_SAT
+  THU_SUN
+}
+
+enum VisitStatus {
+  PENDING
+  IN_PROGRESS
+  DONE
+  MISSED
+}
+
+enum MissReason {
+  CAR_NOT_AVAILABLE
+  CUSTOMER_SKIPPED
+  WEATHER
+  NO_WATER_OR_ACCESS
+  CUSTOMER_UNREACHABLE
+  STAFF_ABSENT
+  OTHER
+}
+
+enum PaymentMode {
+  CASH
+  MANUAL_UPI
+  GATEWAY
+}
+
+enum PaymentStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentKind {
+  ADVANCE
+  PACKAGE
+  REFUND
+  ADJUSTMENT
+}
+
+enum InvoiceStatus {
+  OPEN
+  PARTIAL
+  PAID
+  OVERDUE
+  WRITTEN_OFF
+}
+
+enum ExpenseHead {
+  STAFF_PAYOUT
+  GOODS
+  MARKETING
+  STATIONERY
+  RND
+  OTHER
+}
+
+enum PayoutStatus {
+  DRAFT
+  APPROVED
+  PAID
+  HELD
+}
+
+enum ComplaintType {
+  WASH_QUALITY
+  STAFF_LATE
+  WASH_NOT_DONE
+  PAYMENT_ISSUE
+  STAFF_BEHAVIOUR
+  REFUND_DEMAND
+  OTHER
+}
+
+enum ComplaintStatus {
+  OPEN
+  ESCALATED
+  RESOLVED
+}
+
+enum PurchaseRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  RECEIVED
+}
+
+enum ReminderChannel {
+  WHATSAPP
+  SMS
+  PUSH
+}
+
+model User {
+  id         String   @id @default(cuid())
+  name       String
+  email      String   @unique
+  phone      String
+  role       Role
+  regionId   String?
+  areaId     String?
+  customerId String?
+  staffId    String?
+  language   Language @default(en)
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  credential UserCredential?
+
+  @@index([role])
+  @@index([areaId])
+  @@index([regionId])
+}
+
+model UserCredential {
+  userId       String @id
+  passwordHash String
+  user         User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Region {
+  id          String   @id @default(cuid())
+  name        String
+  areaAdminId String?
+  createdAt   DateTime @default(now())
+  areas       Area[]
+}
+
+model Area {
+  id        String   @id @default(cuid())
+  regionId  String
+  name      String
+  city      String
+  managerId String?
+  createdAt DateTime @default(now())
+
+  region    Region   @relation(fields: [regionId], references: [id])
+  staff     Staff[]
+  customers Customer[]
+
+  @@index([regionId])
+}
+
+model Staff {
+  id                String    @id @default(cuid())
+  userId            String    @unique
+  name              String
+  phone             String
+  areaId            String
+  role              StaffRole
+  joinedOn          DateTime  @db.Date
+  referredByStaffId String?
+  active            Boolean   @default(true)
+
+  area        Area                 @relation(fields: [areaId], references: [id])
+  attendance  Attendance[]
+  pocket      PocketMoneyRequest[]
+  cars        Car[]
+  visits      WashVisit[]
+  payouts     StaffPayout[]
+  complaints  Complaint[]
+  stockIssues StockIssue[]
+
+  @@index([areaId, role])
+}
+
+model Attendance {
+  id      String           @id @default(cuid())
+  staffId String
+  date    DateTime         @db.Date
+  loginAt DateTime?
+  status  AttendanceStatus
+  note    String?
+
+  staff Staff @relation(fields: [staffId], references: [id])
+
+  @@unique([staffId, date])
+  @@index([date])
+}
+
+model PocketMoneyRequest {
+  id              String              @id @default(cuid())
+  staffId         String
+  amount          Int
+  status          PocketRequestStatus @default(PENDING)
+  requestedAt     DateTime            @default(now())
+  decidedAt       DateTime?
+  decidedByUserId String?
+  overrodeCap     Boolean             @default(false)
+  note            String?
+
+  staff Staff @relation(fields: [staffId], references: [id])
+
+  @@index([staffId, status])
+}
+
+model Customer {
+  id           String         @id @default(cuid())
+  userId       String?        @unique
+  areaId       String
+  name         String
+  phone        String
+  altPhone     String?
+  address      String
+  landmark     String?
+  lat          Float?
+  lng          Float?
+  source       LeadSource
+  referredById String?
+  status       CustomerStatus @default(ACTIVE)
+  holdUntil    DateTime?      @db.Date
+  note         String?
+  joinedOn     DateTime       @db.Date
+
+  area       Area        @relation(fields: [areaId], references: [id])
+  cars       Car[]
+  visits     WashVisit[]
+  payments   Payment[]
+  invoices   Invoice[]
+  complaints Complaint[]
+
+  @@index([areaId, status])
+  @@index([phone])
+}
+
+model ServicePackage {
+  id             String   @id @default(cuid())
+  name           String
+  washesPerMonth Int
+  price          Int
+  costToDeliver  Int
+  services       String[]
+  active         Boolean  @default(true)
+
+  cars Car[]
+}
+
+model Car {
+  id                  String         @id @default(cuid())
+  customerId          String
+  model               String
+  make                String
+  colour              String
+  plate               String
+  packageId           String
+  assignedStaffId     String?
+  schedulePattern     WeekdayPattern
+  scheduleTime        String
+  specialInstructions String?
+  active              Boolean        @default(true)
+
+  customer      Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  servicePackage ServicePackage @relation(fields: [packageId], references: [id])
+  assignedStaff Staff?         @relation(fields: [assignedStaffId], references: [id])
+  visits        WashVisit[]
+
+  @@index([customerId])
+  @@index([assignedStaffId])
+  @@index([plate])
+}
+
+model WashVisit {
+  id                   String      @id @default(cuid())
+  carId                String
+  customerId           String
+  areaId               String
+  staffId              String?
+  cycle                String
+  scheduledDate        DateTime    @db.Date
+  scheduledTime        String
+  status               VisitStatus @default(PENDING)
+  startedAt            DateTime?
+  completedAt          DateTime?
+  servicesDone         String[]
+  beforePhotoUrl       String?
+  afterPhotoUrl        String?
+  missReason           MissReason?
+  missNote             String?
+  rescheduledToVisitId String?
+  rating               Int?
+  ratingComment        String?
+  onTime               Boolean     @default(false)
+
+  car      Car      @relation(fields: [carId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  staff    Staff?   @relation(fields: [staffId], references: [id])
+
+  @@index([areaId, scheduledDate])
+  @@index([staffId, scheduledDate])
+  @@index([customerId, scheduledDate])
+  @@index([cycle, status])
+}
+
+model Payment {
+  id               String        @id @default(cuid())
+  customerId       String
+  areaId           String
+  amount           Int
+  kind             PaymentKind
+  mode             PaymentMode
+  status           PaymentStatus @default(PENDING)
+  cycle            String
+  recordedByUserId String?
+  reference        String?
+  note             String?
+  createdAt        DateTime      @default(now())
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId, cycle])
+  @@index([areaId, cycle])
+}
+
+model Invoice {
+  id         String        @id @default(cuid())
+  customerId String
+  areaId     String
+  cycle      String
+  amount     Int
+  dueOn      DateTime      @db.Date
+  paidAmount Int           @default(0)
+  status     InvoiceStatus @default(OPEN)
+  createdAt  DateTime      @default(now())
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, cycle])
+  @@index([areaId, status])
+}
+
+model Expense {
+  id               String      @id @default(cuid())
+  areaId           String?
+  head             ExpenseHead
+  amount           Int
+  cycle            String
+  note             String?
+  recordedByUserId String
+  createdAt        DateTime    @default(now())
+
+  @@index([cycle, head])
+}
+
+model StaffPayout {
+  id               String       @id @default(cuid())
+  staffId          String
+  areaId           String
+  cycle            String
+  washes           Int
+  base             Int
+  bonuses          Int
+  referrals        Int
+  deductions       Int
+  pocketTaken      Int
+  net              Int
+  lines            Json
+  status           PayoutStatus @default(DRAFT)
+  approvedByUserId String?
+  approvedAt       DateTime?
+
+  staff Staff @relation(fields: [staffId], references: [id])
+
+  @@unique([staffId, cycle])
+  @@index([cycle, status])
+}
+
+model Complaint {
+  id              String          @id @default(cuid())
+  customerId      String
+  areaId          String
+  staffId         String?
+  visitId         String?
+  type            ComplaintType
+  body            String
+  status          ComplaintStatus @default(OPEN)
+  resolution      String?
+  createdAt       DateTime        @default(now())
+  resolvedAt      DateTime?
+  handledByUserId String?
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  staff    Staff?   @relation(fields: [staffId], references: [id])
+
+  @@index([areaId, status])
+  @@index([staffId])
+}
+
+model InventoryItem {
+  id           String  @id @default(cuid())
+  name         String
+  unit         String
+  usagePerWash Float   @default(0)
+  reorderLevel Float
+  unitCost     Int
+  active       Boolean @default(true)
+
+  stockLevels      StockLevel[]
+  purchaseRequests PurchaseRequest[]
+  issues           StockIssue[]
+}
+
+model StockLevel {
+  id        String   @id @default(cuid())
+  areaId    String
+  itemId    String
+  quantity  Float
+  updatedAt DateTime @updatedAt
+
+  item InventoryItem @relation(fields: [itemId], references: [id])
+
+  @@unique([areaId, itemId])
+}
+
+model PurchaseRequest {
+  id              String                @id @default(cuid())
+  code            String                @unique
+  areaId          String
+  itemId          String
+  quantity        Float
+  estimatedCost   Int
+  neededBy        DateTime              @db.Date
+  reason          String?
+  status          PurchaseRequestStatus @default(PENDING)
+  raisedByUserId  String
+  decidedByUserId String?
+  createdAt       DateTime              @default(now())
+  decidedAt       DateTime?
+
+  item InventoryItem @relation(fields: [itemId], references: [id])
+
+  @@index([status, areaId])
+}
+
+model StockIssue {
+  id             String   @id @default(cuid())
+  areaId         String
+  itemId         String
+  staffId        String
+  quantity       Float
+  issuedByUserId String
+  createdAt      DateTime @default(now())
+
+  item  InventoryItem @relation(fields: [itemId], references: [id])
+  staff Staff         @relation(fields: [staffId], references: [id])
+
+  @@index([areaId, createdAt])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  title     String
+  body      String
+  href      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, readAt])
+}
+
+model AppSettings {
+  id                       String          @id @default("default")
+  photoRetentionMonths     Int             @default(1)
+  requireBothPhotos        Boolean         @default(true)
+  missedWashReturnsToCount Boolean         @default(true)
+  paymentModesEnabled      PaymentMode[]
+  reminderDaysBeforeDue    Int             @default(3)
+  reminderChannel          ReminderChannel @default(WHATSAPP)
+  autoApprovePurchaseUnder Int             @default(0)
+  teaBreakMinutes          Int             @default(15)
+  languages                Language[]
+}
+
+model PayoutSettings {
+  id                     String @id @default("default")
+  slabByCarIndex         Int[]
+  slabBeyond             Int    @default(400)
+  onTimeBonus            Int    @default(10)
+  goodReviewBonus        Int    @default(10)
+  goodReviewMinStars     Int    @default(4)
+  carReferralBonus       Int    @default(300)
+  staffReferralBonus     Int    @default(1000)
+  offsAllowedPerMonth    Int    @default(2)
+  extraOffPenalty        Int    @default(300)
+  uninformedLeavePenalty Int    @default(500)
+  pocketWeeklyCapPercent Int    @default(25)
+  pocketMinimumBalance   Int    @default(1000)
+}

@@ -1,0 +1,27 @@
+{
+  "name": "Carz Management",
+  "short_name": "Carz",
+  "description": "Car wash operations — schedules, wash proof, payments and payouts across every area.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "browser"],
+  "orientation": "portrait-primary",
+  "background_color": "#0f1e2a",
+  "theme_color": "#0f1e2a",
+  "categories": ["business", "productivity"],
+  "lang": "en-IN",
+  "dir": "ltr",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Today's cars", "short_name": "Today", "url": "/staff", "description": "Open the wash list for today" },
+    { "name": "My cars", "short_name": "Cars", "url": "/app/cars", "description": "Wash count and schedule" },
+    { "name": "Payments", "short_name": "Pay", "url": "/app/payments", "description": "Balance, dues and receipts" }
+  ]
+}

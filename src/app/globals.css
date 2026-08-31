@@ -1,0 +1,88 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+      'Helvetica Neue', Arial, sans-serif;
+    /* Safe-area insets, so an installed PWA clears the notch and home bar. */
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    color-scheme: light;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-surface-sunken text-ink antialiased;
+    font-family: var(--font-sans);
+    /* Overscroll on a standalone PWA otherwise reveals the browser chrome. */
+    overscroll-behavior-y: none;
+  }
+
+  /* Inputs must be >=16px on iOS or Safari zooms the page on focus. */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  @media (min-width: 768px) {
+    input,
+    select,
+    textarea {
+      font-size: 14px;
+    }
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-teal-500 ring-offset-2 ring-offset-white;
+  }
+}
+
+@layer components {
+  .field {
+    @apply w-full rounded-lg border border-line-strong bg-white px-3 py-2.5
+      text-ink placeholder:text-ink-faint
+      focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100;
+  }
+
+  .field-label {
+    @apply mb-1 block text-[11px] font-bold uppercase tracking-wide text-ink-soft;
+  }
+
+  /* Horizontal scroll container for wide tables on small screens. */
+  .scroll-x {
+    @apply -mx-3 overflow-x-auto px-3 sm:mx-0 sm:px-0;
+    scrollbar-width: thin;
+  }
+}
+
+@layer utilities {
+  .pt-safe {
+    padding-top: var(--safe-top);
+  }
+  .pb-safe {
+    padding-bottom: var(--safe-bottom);
+  }
+  .mb-safe {
+    margin-bottom: var(--safe-bottom);
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}
