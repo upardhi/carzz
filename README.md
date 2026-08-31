@@ -57,21 +57,46 @@ portable filter language. Three adapters implement it:
 Switching is a change to `DATA_PROVIDER` plus that provider's credentials. No
 route handler, service or component changes.
 
-```bash
-# Relational
-npm i @prisma/client prisma
-npx prisma generate && npx prisma db push
-DATA_PROVIDER=prisma npm run dev
+### Moving to Postgres (Neon, Supabase, RDS, or your own server)
 
-# Firestore
+Prisma is already installed. Put both URLs in `.env.local` and run:
+
+```bash
+npx prisma migrate deploy   # or: npx prisma db push, for a first run
+npm run db:seed             # loads the demo dataset
+DATA_PROVIDER=prisma npm run dev
+```
+
+**Two URLs, because they do different jobs.** `DATABASE_URL` is what the
+running app uses and must be the host's **pooled** connection string — on a
+serverless deployment each invocation otherwise opens its own connection and
+exhausts the limit. `DIRECT_URL` is used only by migrations, which issue DDL
+a pooler cannot run. On Neon the pooled host is the one containing
+`-pooler`; on a plain Postgres server with no pooler, leave `DIRECT_URL`
+unset and migrations fall back to `DATABASE_URL`. The app warns at boot if
+`DATABASE_URL` does not look pooled.
+
+**Which host?** Any Postgres works — the datasource is just a connection
+string. Neon suits this app well: it is only Postgres, which is all that is
+needed here since the app brings its own auth and its own photo storage, and
+it scales to zero between rounds without *pausing* the project the way a
+free tier that sleeps would.
+
+```bash
+# Firestore instead
 npm i firebase-admin
 DATA_PROVIDER=firebase npm run dev
 ```
 
-`prisma/schema.prisma` mirrors `src/lib/data/types.ts` one-to-one and is ready
-to push. Wash photos sit behind the same kind of seam
-(`src/lib/storage/index.ts`), so S3 or Firebase Storage drops in without
-touching the wash flow.
+`prisma/schema.prisma` mirrors `src/lib/data/types.ts` one-to-one, and
+`prisma/seed.ts` loads the same demo dataset the in-memory provider uses, so
+there is one definition of it rather than two that drift. Wash photos sit
+behind the same kind of seam (`src/lib/storage/index.ts`), so S3 or Firebase
+Storage drops in without touching the wash flow.
+
+> **Pin Prisma 7.** npm's `latest` tag for `prisma` currently points at an
+> 8.0 release candidate whose CLI is restructured — `generate`, `db push` and
+> `migrate` are gone from it. This project pins `7.10.0`, the last stable.
 
 ## What the app enforces
 

@@ -22,24 +22,47 @@ export async function getStore(): Promise<DataStore> {
   if (globalForStore.__carzzStore) return globalForStore.__carzzStore;
 
   const provider = (process.env.DATA_PROVIDER ?? 'memory') as DataProvider;
+  warnIfUnpooled(provider);
   let store: DataStore;
 
   switch (provider) {
     case 'prisma': {
-      const [{ PrismaStore }, prismaModule] = await Promise.all([
+      const [{ PrismaStore }, prismaModule, adapterModule] = await Promise.all([
         import('./prisma/store'),
-        // Not a static import: the package is only installed when this
-        // provider is actually used.
+        // Not static imports: these are only installed when this provider is
+        // actually used, so the memory provider stays dependency-free.
         import(/* webpackIgnore: true */ '@prisma/client' as string).catch(() => null),
+        import(/* webpackIgnore: true */ '@prisma/adapter-pg' as string).catch(() => null),
       ]);
-      if (!prismaModule) {
+      if (!prismaModule || !adapterModule) {
         throw new Error(
-          'DATA_PROVIDER=prisma but @prisma/client is not installed. ' +
-            'Run: npm i @prisma/client prisma && npx prisma generate',
+          'DATA_PROVIDER=prisma but the Prisma packages are not installed.\n' +
+            'Run: npm i @prisma/client @prisma/adapter-pg && npx prisma generate',
         );
       }
-      const { PrismaClient } = prismaModule as { PrismaClient: new () => unknown };
-      store = new PrismaStore(new PrismaClient() as never);
+
+      const { PrismaClient } = prismaModule as {
+        PrismaClient: new (options?: unknown) => unknown;
+      };
+      const { PrismaPg } = adapterModule as {
+        PrismaPg: new (options: { connectionString: string }) => unknown;
+      };
+
+      // One client per process, reused across requests. A fresh client per
+      // invocation would open its own connection pool every time and exhaust
+      // the database's connection limit on a serverless host.
+      const globalForPrisma = globalThis as unknown as { __carzzPrisma?: unknown };
+      globalForPrisma.__carzzPrisma ??= new PrismaClient({
+        // Prisma 7 connects through a driver adapter. node-postgres speaks to
+        // any Postgres — Neon, Supabase, RDS, a plain server — so the host
+        // stays a deployment choice rather than a code one.
+        adapter: new PrismaPg({
+          connectionString: requireEnv('DATABASE_URL'),
+        }),
+        log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
+      });
+
+      store = new PrismaStore(globalForPrisma.__carzzPrisma as never);
       break;
     }
 
@@ -84,6 +107,25 @@ export async function getStore(): Promise<DataStore> {
 
   globalForStore.__carzzStore = store;
   return store;
+}
+
+/**
+ * A serverless deployment pointed at a direct Postgres endpoint works fine in
+ * testing and then fails under real traffic with "too many connections". Say
+ * so at boot, while the cause is still obvious.
+ */
+function warnIfUnpooled(provider: DataProvider): void {
+  if (provider !== 'prisma') return;
+  const url = process.env.DATABASE_URL ?? '';
+  if (!url || url.includes('-pooler.') || url.includes('pgbouncer=true')) return;
+
+  console.warn(
+    'DATABASE_URL does not look like a pooled endpoint. On a serverless host ' +
+      'each invocation opens its own connection and the limit is quickly ' +
+      'exhausted. Use your provider\'s pooled connection string for ' +
+      'DATABASE_URL (on Neon, the host containing "-pooler"), and keep the ' +
+      'direct one in DIRECT_URL for migrations.',
+  );
 }
 
 function requireEnv(name: string): string {
