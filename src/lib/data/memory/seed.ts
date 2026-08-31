@@ -14,8 +14,10 @@ import type {
   PayoutSettings,
   PocketMoneyRequest,
   PurchaseRequest,
+  Enquiry,
   Region,
   ServicePackage,
+  SiteContent,
   Staff,
   StaffPayout,
   StockIssue,
@@ -50,7 +52,65 @@ export interface Db {
   notifications: Notification[];
   appSettings: AppSettings;
   payoutSettings: PayoutSettings;
+  siteContent: SiteContent;
+  enquiries: Enquiry[];
 }
+
+/** The website copy a new install starts with — real sentences, not lorem. */
+export const DEFAULT_SITE_CONTENT: SiteContent = {
+  id: 'default',
+  heroEyebrow: 'Doorstep car wash',
+  heroTitle: 'Your car, washed at your door.',
+  heroTitleAccent: 'Every wash, photographed.',
+  heroBody:
+    'A trained wash boy comes to your building on a fixed day and time. You get a before and after photo of every wash, and you only ever pay for the washes you actually receive.',
+  heroPrimaryCta: 'Book a wash',
+  heroSecondaryCta: 'See packages',
+  stats: [
+    { value: '500+', label: 'Cars washed every week' },
+    { value: '4.6 ★', label: 'Average customer rating' },
+    { value: '3', label: 'Areas across the city' },
+  ],
+  howTitle: 'How it works',
+  howSteps: [
+    { title: 'Tell us where you park', body: 'Your building, your slot, your days. We fit the round around you, not the other way round.' },
+    { title: 'We come to you', body: 'The same wash boy, on the same days, at the time you picked. No calls, no chasing.' },
+    { title: 'You see the proof', body: 'A before and after photo of every wash lands in your app, so you know exactly what you paid for.' },
+  ],
+  featuresTitle: 'Why people stay with us',
+  features: [
+    { id: 'f_photo', title: 'Photographed, every time', body: 'No photo, no completed wash — our staff cannot close a job without one. You are never charged for a wash that did not happen.', icon: 'camera', order: 0 },
+    { id: 'f_missed', title: 'A missed wash is never lost', body: 'Rain, a locked gate, your car not there — the wash goes back into your count and is rescheduled. You keep what you paid for.', icon: 'check', order: 1 },
+    { id: 'f_multi', title: 'More than one car? One account', body: 'Each car keeps its own schedule and wash count, all on a single bill.', icon: 'car', order: 2 },
+    { id: 'f_pay', title: 'Pay how you like', body: 'Cash to the wash boy, UPI, or online. Your balance and receipts are always in the app.', icon: 'rupee', order: 3 },
+  ],
+  packagesTitle: 'Simple monthly packages',
+  packagesBody:
+    'Pick the package that fits your car and how often you want it cleaned. Prices below are exactly what you are billed — nothing is added later.',
+  visiblePackageIds: [],
+  areasTitle: 'Where we wash',
+  areasBody: 'We run fixed routes in these areas. If your building is nearby, ask — we add new roads as demand grows.',
+  testimonialsTitle: 'What our customers say',
+  testimonials: [
+    { id: 't_1', name: 'Shyam Patil', area: 'Wadi', quote: 'Two cars, one bill, and I stopped phoning anyone to ask when the wash is. The photos settle everything.', rating: 5, visible: true, order: 0 },
+    { id: 't_2', name: 'Kavita Deshmukh', area: 'Green Park', quote: 'They missed a wash in the rain and it came back into my count automatically. I did not have to argue for it.', rating: 5, visible: true, order: 1 },
+    { id: 't_3', name: 'Nitin Bhosale', area: 'Bajaj Nagar', quote: 'Same boy every week, same time. My car is clean before I leave for work.', rating: 4, visible: true, order: 2 },
+  ],
+  contactTitle: 'Book a wash',
+  contactBody:
+    'Leave your number and we will call you back the same day with the slots free in your area.',
+  phone: '+91 98000 00000',
+  whatsapp: '+91 98000 00000',
+  email: 'hello@carzz.app',
+  addressLine: 'Nagpur, Maharashtra',
+  seoTitle: 'Carz — doorstep car wash, photographed every time',
+  seoDescription:
+    'Doorstep car washing on a fixed schedule. Before and after photos of every wash, missed washes returned to your count, and one bill for all your cars.',
+  published: true,
+  updatedAt: new Date().toISOString(),
+  updatedByUserId: null,
+};
+
 
 /** Deterministic PRNG so the demo dataset is identical on every boot. */
 function rng(seed: number) {
@@ -670,11 +730,33 @@ export function buildSeed(today = new Date()): Db {
     languages: ['en', 'hi', 'mr'],
   };
 
+  /* ---- website ---- */
+  const enquiries: Enquiry[] = [
+    {
+      id: 'enq_1', name: 'Rohit Malhotra', phone: '9822015544',
+      email: 'rohit.m@example.com', areaId: 'ar_wadi',
+      locality: 'Sai Residency, near Ram Mandir', carCount: 2,
+      packageId: 'pkg_pressure',
+      message: 'Two cars, both parked in the basement. Mornings before 9 suit us.',
+      status: 'NEW', convertedCustomerId: null, handledByUserId: null,
+      createdAt: iso(addDays(today, -1)), handledAt: null,
+    },
+    {
+      id: 'enq_2', name: 'Farida Sheikh', phone: '9822017788',
+      email: null, areaId: 'ar_bajaj', locality: 'Plot 7, Bajaj Nagar',
+      carCount: 1, packageId: 'pkg_bucket', message: null,
+      status: 'NEW', convertedCustomerId: null, handledByUserId: null,
+      createdAt: iso(addDays(today, -3)), handledAt: null,
+    },
+  ];
+
   return {
     users, credentials, regions, areas, staff, attendance, pocketRequests,
     customers, cars, packages, visits, payments, invoices, expenses,
     payouts: [] as StaffPayout[], complaints, inventoryItems, stockLevels,
     purchaseRequests, stockIssues, notifications: [] as Notification[],
     appSettings, payoutSettings,
+    siteContent: { ...DEFAULT_SITE_CONTENT, updatedAt: now },
+    enquiries,
   };
 }

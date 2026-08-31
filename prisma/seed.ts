@@ -10,7 +10,7 @@
  *
  * Running it twice is safe: every table is cleared first.
  */
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { buildSeed } from '../src/lib/data/memory/seed';
 
 const prisma = new PrismaClient();
@@ -21,6 +21,14 @@ const dayOrNull = (value: string | null) => (value ? day(value) : null);
 /** An ISO timestamp → Date, for a `DateTime` column. */
 const at = (value: string) => new Date(value);
 const atOrNull = (value: string | null) => (value ? at(value) : null);
+
+/**
+ * Prisma's `Json` input type only accepts values with a string index
+ * signature, which a declared interface never has — so a typed array of
+ * plain objects has to be handed over as JSON explicitly. The value really
+ * is JSON-serialisable; only the type needs the nudge.
+ */
+const json = <T>(value: T) => value as Prisma.InputJsonValue;
 
 /** Inserts in batches so a large visit table does not blow the query size. */
 async function insertMany<T>(
@@ -64,6 +72,8 @@ async function main() {
     prisma.user.deleteMany(),
     prisma.appSettings.deleteMany(),
     prisma.payoutSettings.deleteMany(),
+    prisma.enquiry.deleteMany(),
+    prisma.siteContent.deleteMany(),
   ]);
 
   process.stdout.write('Inserting:\n');
@@ -204,10 +214,30 @@ async function main() {
     }),
   );
 
+  await insertMany('website enquiries', db.enquiries, (batch) =>
+    prisma.enquiry.createMany({
+      data: batch.map((e) => ({
+        ...e,
+        createdAt: at(e.createdAt),
+        handledAt: atOrNull(e.handledAt),
+      })),
+    }),
+  );
+
   // Singletons.
   await prisma.appSettings.create({ data: db.appSettings });
   await prisma.payoutSettings.create({ data: db.payoutSettings });
-  process.stdout.write('       2  settings rows\n');
+  await prisma.siteContent.create({
+    data: {
+      ...db.siteContent,
+      updatedAt: at(db.siteContent.updatedAt),
+      stats: json(db.siteContent.stats),
+      howSteps: json(db.siteContent.howSteps),
+      features: json(db.siteContent.features),
+      testimonials: json(db.siteContent.testimonials),
+    },
+  });
+  process.stdout.write('       3  settings rows\n');
 
   process.stdout.write(
     `\nDone. Sign in as owner@carzz.app / owner123 with DATA_PROVIDER=prisma.\n`,

@@ -55,8 +55,16 @@ enum LeadSource {
   STAFF_REF
   DETAILING_CENTRE
   ONLINE_ADS
+  WEBSITE
   PAMPHLET
   OTHER
+}
+
+enum EnquiryStatus {
+  NEW
+  CONTACTED
+  CONVERTED
+  LOST
 }
 
 enum CustomerStatus {
@@ -563,4 +571,81 @@ model PayoutSettings {
   uninformedLeavePenalty Int    @default(500)
   pocketWeeklyCapPercent Int    @default(25)
   pocketMinimumBalance   Int    @default(1000)
+}
+
+/// Everything on the public website that the Super Admin controls.
+/// One row: the site is one page of marketing copy, and a single record that
+/// is read whole beats a block system nobody asked for. Package prices are
+/// deliberately absent — the site reads ServicePackage, so what is advertised
+/// is always what gets billed.
+model SiteContent {
+  id String @id @default("default")
+
+  heroEyebrow      String
+  heroTitle        String
+  heroTitleAccent  String
+  heroBody         String
+  heroPrimaryCta   String
+  heroSecondaryCta String
+
+  /// [{ label, value }]
+  stats Json
+
+  howTitle String
+  /// [{ title, body }]
+  howSteps Json
+
+  featuresTitle String
+  /// [{ id, title, body, icon, order }]
+  features Json
+
+  packagesTitle String
+  packagesBody  String
+  /// Empty means advertise every active package.
+  visiblePackageIds String[]
+
+  areasTitle String
+  areasBody  String
+
+  testimonialsTitle String
+  /// [{ id, name, area, quote, rating, visible, order }]
+  testimonials Json
+
+  contactTitle String
+  contactBody  String
+
+  phone       String
+  whatsapp    String
+  email       String
+  addressLine String
+
+  seoTitle       String
+  seoDescription String
+
+  published       Boolean  @default(true)
+  updatedAt       DateTime @updatedAt
+  updatedByUserId String?
+}
+
+/// Someone asking for a wash through the website. Converting one creates a
+/// customer with source WEBSITE, which is what lets the lead-source report
+/// say what the site is worth against guards and referrals.
+model Enquiry {
+  id                  String        @id @default(cuid())
+  name                String
+  phone               String
+  email               String?
+  areaId              String?
+  locality            String?
+  carCount            Int           @default(1)
+  packageId           String?
+  message             String?
+  status              EnquiryStatus @default(NEW)
+  convertedCustomerId String?
+  handledByUserId     String?
+  createdAt           DateTime      @default(now())
+  handledAt           DateTime?
+
+  @@index([status, createdAt])
+  @@index([areaId])
 }

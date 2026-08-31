@@ -31,6 +31,7 @@ export const LEAD_SOURCE_LABEL: Record<LeadSource, string> = {
   STAFF_REF: 'Staff reference',
   DETAILING_CENTRE: 'Detailing centre reference',
   ONLINE_ADS: 'Instagram / Google ads',
+  WEBSITE: 'Our website',
   PAMPHLET: 'Pamphlet / banner',
   OTHER: 'Other',
 };

@@ -6,6 +6,7 @@ import type {
   Car,
   Complaint,
   Customer,
+  Enquiry,
   Expense,
   Id,
   InventoryItem,
@@ -17,6 +18,7 @@ import type {
   PurchaseRequest,
   Region,
   ServicePackage,
+  SiteContent,
   Staff,
   StaffPayout,
   StockIssue,
@@ -54,6 +56,7 @@ export interface DataStore {
   readonly purchaseRequests: Repository<PurchaseRequest>;
   readonly stockIssues: Repository<StockIssue>;
   readonly notifications: Repository<Notification>;
+  readonly enquiries: Repository<Enquiry>;
 
   /** Credentials are kept apart so a password hash never rides on a `User`. */
   getCredential(userId: Id): Promise<UserCredential | null>;
@@ -64,6 +67,8 @@ export interface DataStore {
   saveAppSettings(patch: Partial<AppSettings>): Promise<AppSettings>;
   getPayoutSettings(): Promise<PayoutSettings>;
   savePayoutSettings(patch: Partial<PayoutSettings>): Promise<PayoutSettings>;
+  getSiteContent(): Promise<SiteContent>;
+  saveSiteContent(patch: Partial<SiteContent>): Promise<SiteContent>;
 
   /**
    * Runs `fn` atomically where the backend supports it. The memory adapter

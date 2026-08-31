@@ -1,5 +1,11 @@
 import type { DataStore } from '../ports/store';
-import type { AppSettings, Id, PayoutSettings, UserCredential } from '../types';
+import type {
+  AppSettings,
+  Id,
+  PayoutSettings,
+  SiteContent,
+  UserCredential,
+} from '../types';
 import { MemoryRepository } from './repository';
 import { buildSeed, type Db } from './seed';
 
@@ -31,10 +37,12 @@ export class MemoryStore implements DataStore {
   readonly purchaseRequests;
   readonly stockIssues;
   readonly notifications;
+  readonly enquiries;
 
   private credentials: UserCredential[];
   private appSettings: AppSettings;
   private payoutSettings: PayoutSettings;
+  private siteContent: SiteContent;
 
   constructor(private readonly db: Db = buildSeed()) {
     this.users = new MemoryRepository(db.users, 'usr');
@@ -57,10 +65,12 @@ export class MemoryStore implements DataStore {
     this.purchaseRequests = new MemoryRepository(db.purchaseRequests, 'pr');
     this.stockIssues = new MemoryRepository(db.stockIssues, 'isu');
     this.notifications = new MemoryRepository(db.notifications, 'ntf');
+    this.enquiries = new MemoryRepository(db.enquiries, 'enq');
 
     this.credentials = db.credentials;
     this.appSettings = db.appSettings;
     this.payoutSettings = db.payoutSettings;
+    this.siteContent = db.siteContent;
   }
 
   async getCredential(userId: Id): Promise<UserCredential | null> {
@@ -91,6 +101,20 @@ export class MemoryStore implements DataStore {
   ): Promise<PayoutSettings> {
     this.payoutSettings = { ...this.payoutSettings, ...patch, id: 'default' };
     return { ...this.payoutSettings };
+  }
+
+  async getSiteContent(): Promise<SiteContent> {
+    return { ...this.siteContent };
+  }
+
+  async saveSiteContent(patch: Partial<SiteContent>): Promise<SiteContent> {
+    this.siteContent = {
+      ...this.siteContent,
+      ...patch,
+      id: 'default',
+      updatedAt: new Date().toISOString(),
+    };
+    return { ...this.siteContent };
   }
 
   /**

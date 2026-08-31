@@ -6,6 +6,7 @@ import type {
   Car,
   Complaint,
   Customer,
+  Enquiry,
   Expense,
   Id,
   InventoryItem,
@@ -17,6 +18,7 @@ import type {
   PurchaseRequest,
   Region,
   ServicePackage,
+  SiteContent,
   Staff,
   StaffPayout,
   StockIssue,
@@ -54,6 +56,7 @@ export interface PrismaClientLike {
   purchaseRequest: PrismaDelegate;
   stockIssue: PrismaDelegate;
   notification: PrismaDelegate;
+  enquiry: PrismaDelegate;
   userCredential: {
     findUnique(args: { where: { userId: string } }): Promise<unknown>;
     upsert(args: {
@@ -64,6 +67,7 @@ export interface PrismaClientLike {
   };
   appSettings: SingletonDelegate;
   payoutSettings: SingletonDelegate;
+  siteContent: SingletonDelegate;
   $transaction<R>(fn: (tx: PrismaClientLike) => Promise<R>): Promise<R>;
 }
 
@@ -97,6 +101,7 @@ export class PrismaStore implements DataStore {
   readonly purchaseRequests;
   readonly stockIssues;
   readonly notifications;
+  readonly enquiries;
 
   constructor(private readonly prisma: PrismaClientLike) {
     this.users = new PrismaRepository<User>(prisma.user);
@@ -119,6 +124,7 @@ export class PrismaStore implements DataStore {
     this.purchaseRequests = new PrismaRepository<PurchaseRequest>(prisma.purchaseRequest);
     this.stockIssues = new PrismaRepository<StockIssue>(prisma.stockIssue);
     this.notifications = new PrismaRepository<Notification>(prisma.notification);
+    this.enquiries = new PrismaRepository<Enquiry>(prisma.enquiry);
   }
 
   async getCredential(userId: Id): Promise<UserCredential | null> {
@@ -168,6 +174,29 @@ export class PrismaStore implements DataStore {
     const current = await this.getPayoutSettings();
     const next = { ...current, ...patch, id: 'default' as const };
     await this.prisma.payoutSettings.upsert({
+      where: { id: 'default' },
+      create: next,
+      update: next,
+    });
+    return next;
+  }
+
+  async getSiteContent(): Promise<SiteContent> {
+    const row = await this.prisma.siteContent.findUnique({
+      where: { id: 'default' },
+    });
+    if (!row) throw new Error('Site content row missing — run the seed.');
+    return row as SiteContent;
+  }
+
+  async saveSiteContent(patch: Partial<SiteContent>): Promise<SiteContent> {
+    const next = {
+      ...(await this.getSiteContent()),
+      ...patch,
+      id: 'default' as const,
+      updatedAt: new Date().toISOString(),
+    };
+    await this.prisma.siteContent.upsert({
       where: { id: 'default' },
       create: next,
       update: next,

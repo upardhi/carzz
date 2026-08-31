@@ -127,6 +127,7 @@ export const LEAD_SOURCES = [
   'STAFF_REF',
   'DETAILING_CENTRE',
   'ONLINE_ADS',
+  'WEBSITE',
   'PAMPHLET',
   'OTHER',
 ] as const;
@@ -461,6 +462,123 @@ export interface AppSettings {
   autoApprovePurchaseUnder: Rupees;
   teaBreakMinutes: number;
   languages: Language[];
+}
+
+/* -------------------------------------------------------------------------- */
+/* Public website                                                             */
+/* -------------------------------------------------------------------------- */
+
+export interface Testimonial {
+  id: Id;
+  name: string;
+  area: string;
+  quote: string;
+  rating: number;
+  /** Hidden testimonials stay stored, so they can be brought back. */
+  visible: boolean;
+  order: number;
+}
+
+export interface SiteFeature {
+  id: Id;
+  title: string;
+  body: string;
+  /** Name of an icon in the site's icon set. */
+  icon: string;
+  order: number;
+}
+
+/**
+ * Everything on the public website that the Super Admin controls.
+ *
+ * Deliberately a single record: the site is one page of marketing copy, and
+ * one row that is read whole is simpler to edit and to reason about than a
+ * block system nobody asked for. Package prices are NOT copied in here —
+ * the site reads them from `ServicePackage`, so what is advertised is always
+ * what gets billed.
+ */
+export interface SiteContent {
+  id: 'default';
+
+  /** Banner */
+  heroEyebrow: string;
+  heroTitle: string;
+  /** Rendered in the accent colour under the title. */
+  heroTitleAccent: string;
+  heroBody: string;
+  heroPrimaryCta: string;
+  heroSecondaryCta: string;
+
+  /** Numbers under the banner, e.g. "500+ cars washed". */
+  stats: { label: string; value: string }[];
+
+  /** "How it works" */
+  howTitle: string;
+  howSteps: { title: string; body: string }[];
+
+  /** "Why us" */
+  featuresTitle: string;
+  features: SiteFeature[];
+
+  /** Packages section */
+  packagesTitle: string;
+  packagesBody: string;
+  /** Which packages to advertise. Empty means every active one. */
+  visiblePackageIds: Id[];
+
+  /** Areas served */
+  areasTitle: string;
+  areasBody: string;
+
+  testimonialsTitle: string;
+  testimonials: Testimonial[];
+
+  /** Enquiry form */
+  contactTitle: string;
+  contactBody: string;
+
+  /** Contact details shown in the footer */
+  phone: string;
+  whatsapp: string;
+  email: string;
+  addressLine: string;
+
+  /** Search engines and link previews */
+  seoTitle: string;
+  seoDescription: string;
+
+  /** Take the site offline without deleting anything. */
+  published: boolean;
+  updatedAt: Timestamp;
+  updatedByUserId: Id | null;
+}
+
+export type EnquiryStatus = 'NEW' | 'CONTACTED' | 'CONVERTED' | 'LOST';
+
+/**
+ * Someone asking for a wash through the website.
+ *
+ * Converting one creates a customer with `source: 'WEBSITE'`, which is what
+ * makes the lead-source report able to say what the site is actually worth
+ * against guards and referrals.
+ */
+export interface Enquiry {
+  id: Id;
+  name: string;
+  phone: string;
+  email: string | null;
+  areaId: Id | null;
+  /** Free text: the customer's own words about where they are. */
+  locality: string | null;
+  carCount: number;
+  packageId: Id | null;
+  message: string | null;
+  status: EnquiryStatus;
+  /** Set once a manager turns this into a real customer. */
+  convertedCustomerId: Id | null;
+  handledByUserId: Id | null;
+  createdAt: Timestamp;
+  handledAt: Timestamp | null;
 }
 
 export interface Notification {

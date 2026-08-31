@@ -6,6 +6,7 @@ import type {
   Car,
   Complaint,
   Customer,
+  Enquiry,
   Expense,
   Id,
   InventoryItem,
@@ -17,6 +18,7 @@ import type {
   PurchaseRequest,
   Region,
   ServicePackage,
+  SiteContent,
   Staff,
   StaffPayout,
   StockIssue,
@@ -25,6 +27,7 @@ import type {
   UserCredential,
   WashVisit,
 } from '../types';
+import { DEFAULT_SITE_CONTENT } from '../memory/seed';
 import { FirestoreRepository, type FirestoreCollection } from './repository';
 
 export interface FirestoreLike {
@@ -54,6 +57,7 @@ export const COLLECTIONS = {
   purchaseRequests: 'purchaseRequests',
   stockIssues: 'stockIssues',
   notifications: 'notifications',
+  enquiries: 'enquiries',
   settings: 'settings',
 } as const;
 
@@ -78,6 +82,7 @@ export class FirestoreStore implements DataStore {
   readonly purchaseRequests;
   readonly stockIssues;
   readonly notifications;
+  readonly enquiries;
 
   constructor(private readonly db: FirestoreLike) {
     const c = (name: string) => db.collection(name);
@@ -101,6 +106,7 @@ export class FirestoreStore implements DataStore {
     this.purchaseRequests = new FirestoreRepository<PurchaseRequest>(c(COLLECTIONS.purchaseRequests));
     this.stockIssues = new FirestoreRepository<StockIssue>(c(COLLECTIONS.stockIssues));
     this.notifications = new FirestoreRepository<Notification>(c(COLLECTIONS.notifications));
+    this.enquiries = new FirestoreRepository<Enquiry>(c(COLLECTIONS.enquiries));
   }
 
   async getCredential(userId: Id): Promise<UserCredential | null> {
@@ -139,6 +145,21 @@ export class FirestoreStore implements DataStore {
   async savePayoutSettings(patch: Partial<PayoutSettings>): Promise<PayoutSettings> {
     const next = { ...(await this.getPayoutSettings()), ...patch, id: 'default' as const };
     await this.db.collection(COLLECTIONS.settings).doc('payout').set(next, { merge: true });
+    return next;
+  }
+
+  async getSiteContent(): Promise<SiteContent> {
+    return this.singleton<SiteContent>('site', DEFAULT_SITE_CONTENT);
+  }
+
+  async saveSiteContent(patch: Partial<SiteContent>): Promise<SiteContent> {
+    const next = {
+      ...(await this.getSiteContent()),
+      ...patch,
+      id: 'default' as const,
+      updatedAt: new Date().toISOString(),
+    };
+    await this.db.collection(COLLECTIONS.settings).doc('site').set(next, { merge: true });
     return next;
   }
 

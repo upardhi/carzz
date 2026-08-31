@@ -14,7 +14,12 @@ export async function middleware(request: NextRequest) {
   const requiredRoles = rolesForPath(pathname);
   const claims = await verifySession(request.cookies.get(SESSION_COOKIE)?.value);
 
-  if (pathname === '/login' || pathname === '/') {
+  // The marketing site at `/` is public and stays public even when signed in —
+  // an existing customer following a link to it should see the site, not be
+  // bounced into their console.
+  if (pathname === '/') return NextResponse.next();
+
+  if (pathname === '/login') {
     if (claims) {
       return NextResponse.redirect(new URL(homeFor(claims.role), request.url));
     }
