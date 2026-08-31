@@ -167,6 +167,8 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
 
 export const DEFAULT_PAYOUT_SETTINGS: PayoutSettings = {
   id: 'default',
+  baseMode: 'PER_WASH',
+  perWashRate: 110,
   slabByCarIndex: [300, 350, 400],
   slabBeyond: 400,
   onTimeBonus: 10,

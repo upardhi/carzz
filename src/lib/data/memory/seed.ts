@@ -301,56 +301,122 @@ export function buildSeed(today = new Date()): Db {
   /* ---- visits: two months back, one month forward ---- */
   const visits: WashVisit[] = [];
   const missReasons = ['CAR_NOT_AVAILABLE', 'CUSTOMER_SKIPPED', 'WEATHER', 'NO_WATER_OR_ACCESS', 'STAFF_ABSENT'] as const;
-  const start = addDays(today, -60);
+
+  // The three cycles the app has data for: last month, this month, next month.
+  const cycles = [-1, 0, 1].map((offset) =>
+    cycleOf(new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + offset, 15))),
+  );
 
   for (const car of cars) {
     if (!car.active) continue;
     const customer = customers.find((c) => c.id === car.customerId)!;
     const pkg = packages.find((p) => p.id === car.packageId)!;
     const days = PATTERN_DAYS[car.schedulePattern];
-    // A detailing package visits weekly rather than twice a week.
+    // A detailing package visits weekly; anything larger runs on both days.
     const activeDays = pkg.washesPerMonth <= 4 ? [days[0]] : days;
 
-    for (let d = 0; d <= 90; d += 1) {
-      const day = addDays(start, d);
-      if (!activeDays.includes(day.getDay())) continue;
+    for (const cyc of cycles) {
+      const [cy, cm] = cyc.split('-').map(Number);
 
-      const isPast = day < today && dateOnly(day) !== dateOnly(today);
-      const roll = rand();
-      let status: WashVisit['status'] = 'PENDING';
-      let missReason: WashVisit['missReason'] = null;
-
-      if (isPast) {
-        // Civil Lines misses noticeably more washes — that gap is the story the
-        // Super Admin's area comparison is meant to surface.
-        const missRate = car.assignedStaffId?.startsWith('stf_ar_civil') ? 0.11 : 0.045;
-        status = roll < missRate ? 'MISSED' : 'DONE';
-        if (status === 'MISSED') missReason = pick(missReasons);
+      // Collect the pattern dates in this month, then cap at the package
+      // allowance — a five-Monday month must not hand out a ninth wash.
+      const dates: string[] = [];
+      const cursor = new Date(Date.UTC(cy, cm - 1, 1));
+      while (cursor.getUTCMonth() === cm - 1) {
+        if (activeDays.includes(cursor.getUTCDay())) dates.push(dateOnly(cursor));
+        cursor.setUTCDate(cursor.getUTCDate() + 1);
       }
 
-      const slotAt = new Date(`${dateOnly(day)}T${car.scheduleTime}:00.000Z`);
-      const completedAt =
-        status === 'DONE'
-          ? iso(new Date(slotAt.getTime() + int(1, 26) * 60000))
-          : null;
+      // Spread the allowance evenly instead of truncating the tail — a
+      // customer on 8 washes in a 9-slot month should get a wash roughly every
+      // 3-4 days, not eight in a row and a dead final week.
+      const allowed =
+        dates.length <= pkg.washesPerMonth
+          ? dates
+          : pkg.washesPerMonth <= 1
+            ? dates.slice(0, pkg.washesPerMonth)
+            : Array.from({ length: pkg.washesPerMonth }, (_, k) =>
+                dates[Math.round((k * (dates.length - 1)) / (pkg.washesPerMonth - 1))],
+              );
 
-      visits.push({
-        id: `vst_${car.id}_${d}`,
-        carId: car.id, customerId: customer.id, areaId: customer.areaId,
-        staffId: car.assignedStaffId, cycle: cycleOf(day),
-        scheduledDate: dateOnly(day), scheduledTime: car.scheduleTime,
-        status,
-        startedAt: status === 'DONE' ? completedAt : null,
-        completedAt,
-        servicesDone: status === 'DONE' ? pkg.services.slice(0, int(1, pkg.services.length)) : [],
-        beforePhotoUrl: status === 'DONE' ? `/api/photos/${car.id}-${d}-before` : null,
-        afterPhotoUrl: status === 'DONE' ? `/api/photos/${car.id}-${d}-after` : null,
-        missReason, missNote: null, rescheduledToVisitId: null,
-        rating: status === 'DONE' && rand() > 0.35 ? int(3, 5) : null,
-        ratingComment: null,
-        onTime: status === 'DONE' ? rand() > 0.16 : false,
+      allowed.forEach((date, index) => {
+        const isPast = date < dateOnly(today);
+        const roll = rand();
+        let status: WashVisit['status'] = 'PENDING';
+        let missReason: WashVisit['missReason'] = null;
+
+        if (isPast) {
+          // Civil Lines misses noticeably more washes — that gap is the story
+          // the Super Admin's area comparison is meant to surface.
+          const missRate = car.assignedStaffId?.startsWith('stf_ar_civil') ? 0.11 : 0.045;
+          status = roll < missRate ? 'MISSED' : 'DONE';
+          if (status === 'MISSED') missReason = pick(missReasons);
+        }
+
+        const slotAt = new Date(`${date}T${car.scheduleTime}:00.000Z`);
+        const completedAt =
+          status === 'DONE' ? iso(new Date(slotAt.getTime() + int(1, 26) * 60000)) : null;
+
+        visits.push({
+          id: `vst_${car.id}_${cyc}_${index}`,
+          carId: car.id, customerId: customer.id, areaId: customer.areaId,
+          staffId: car.assignedStaffId, cycle: cyc,
+          scheduledDate: date, scheduledTime: car.scheduleTime,
+          status,
+          startedAt: status === 'DONE' ? completedAt : null,
+          completedAt,
+          servicesDone: status === 'DONE' ? pkg.services.slice(0, int(1, pkg.services.length)) : [],
+          beforePhotoUrl: status === 'DONE' ? `/api/photos/${car.id}-${cyc}-${index}-before` : null,
+          afterPhotoUrl: status === 'DONE' ? `/api/photos/${car.id}-${cyc}-${index}-after` : null,
+          missReason, missNote: null, rescheduledToVisitId: null,
+          rating: status === 'DONE' && rand() > 0.35 ? int(3, 5) : null,
+          ratingComment: null,
+          onTime: status === 'DONE' ? rand() > 0.16 : false,
+        });
       });
     }
+  }
+
+  // Every missed wash returns to the customer's count, so the seed generates
+  // the replacement too — otherwise the demo data would quietly contradict the
+  // rule the whole product is sold on.
+  for (const missed of visits.filter((v) => v.status === 'MISSED')) {
+    const car = cars.find((c) => c.id === missed.carId)!;
+    const days = PATTERN_DAYS[car.schedulePattern];
+
+    const cursor = new Date(`${missed.scheduledDate}T00:00:00.000Z`);
+    for (let step = 0; step < 14; step += 1) {
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+      if (days.includes(cursor.getUTCDay())) break;
+    }
+    const date = dateOnly(cursor);
+    const replacementId = `${missed.id}_rep`;
+    // A make-good scheduled in the past has already been delivered.
+    const delivered = date < dateOnly(today);
+    const slotAt = new Date(`${date}T${car.scheduleTime}:00.000Z`);
+
+    visits.push({
+      ...missed,
+      id: replacementId,
+      // Deliberately stays in the missed visit's cycle: the customer is not
+      // billed again, and the month's count still balances.
+      cycle: missed.cycle,
+      scheduledDate: date,
+      status: delivered ? 'DONE' : 'PENDING',
+      startedAt: delivered ? iso(slotAt) : null,
+      completedAt: delivered ? iso(new Date(slotAt.getTime() + 12 * 60000)) : null,
+      servicesDone: delivered ? ['Exterior wash', 'Interior vacuum'] : [],
+      beforePhotoUrl: delivered ? `/api/photos/${replacementId}-before` : null,
+      afterPhotoUrl: delivered ? `/api/photos/${replacementId}-after` : null,
+      missReason: null,
+      missNote: null,
+      rescheduledToVisitId: null,
+      rating: null,
+      ratingComment: null,
+      onTime: delivered,
+    });
+
+    missed.rescheduledToVisitId = replacementId;
   }
 
   /* ---- invoices & payments ---- */
@@ -556,6 +622,8 @@ export function buildSeed(today = new Date()): Db {
   /* ---- settings ---- */
   const payoutSettings: PayoutSettings = {
     id: 'default',
+    baseMode: 'PER_WASH',
+    perWashRate: 110,
     slabByCarIndex: [300, 350, 400],
     slabBeyond: 400,
     onTimeBonus: 10,

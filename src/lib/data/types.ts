@@ -299,7 +299,22 @@ export interface Expense {
 /** Company-wide payout rules. Editable by the Super Admin. */
 export interface PayoutSettings {
   id: 'default';
-  /** Per-wash slab by position in the staff member's day, 1-indexed. */
+  /**
+   * How the base pay per wash is worked out.
+   *
+   *   PER_WASH  — a flat rate for every wash, whatever the day's order.
+   *   DAY_SLAB  — a rising rate by the car's position in that day's route,
+   *               which rewards a boy for taking a fuller round.
+   *
+   * The client has not settled which of these applies, so both are supported
+   * and the Super Admin can switch between them without a code change. The
+   * figures differ by roughly 3x, so this is the single most consequential
+   * setting in the system.
+   */
+  baseMode: 'PER_WASH' | 'DAY_SLAB';
+  /** Used when baseMode is PER_WASH. */
+  perWashRate: Rupees;
+  /** Used when baseMode is DAY_SLAB: rate by position in the day, 1-indexed. */
   slabByCarIndex: Rupees[];
   /** Applied beyond the last slab entry. */
   slabBeyond: Rupees;

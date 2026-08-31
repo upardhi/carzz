@@ -541,8 +541,15 @@ model AppSettings {
   languages                Language[]
 }
 
+enum PayoutBaseMode {
+  PER_WASH
+  DAY_SLAB
+}
+
 model PayoutSettings {
-  id                     String @id @default("default")
+  id                     String         @id @default("default")
+  baseMode               PayoutBaseMode @default(PER_WASH)
+  perWashRate            Int            @default(110)
   slabByCarIndex         Int[]
   slabBeyond             Int    @default(400)
   onTimeBonus            Int    @default(10)
