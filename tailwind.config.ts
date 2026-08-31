@@ -90,13 +90,20 @@ const config: Config = {
       },
       fontFamily: {
         sans: [
-          'var(--font-sans)',
+          // Already expands to `Geist, "Geist Fallback"`.
+          'var(--font-geist-sans)',
           '-apple-system',
+          'BlinkMacSystemFont',
           'Segoe UI',
-          'Roboto',
           'Helvetica Neue',
-          'Arial',
           'sans-serif',
+        ],
+        mono: [
+          'var(--font-geist-mono)',
+          'ui-monospace',
+          'SFMono-Regular',
+          'Menlo',
+          'monospace',
         ],
       },
       borderRadius: {

@@ -4,8 +4,12 @@
 
 @layer base {
   :root {
-    --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
-      'Helvetica Neue', Arial, sans-serif;
+    /* Expands to: Geist, "Geist Fallback", -apple-system, … — next/font
+       supplies the size-adjusted fallback face inside the variable. */
+    --font-sans: var(--font-geist-sans), -apple-system, BlinkMacSystemFont,
+      'Segoe UI', 'Helvetica Neue', sans-serif;
+    --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo,
+      monospace;
     /* Safe-area insets, so an installed PWA clears the notch and home bar. */
     --safe-top: env(safe-area-inset-top, 0px);
     --safe-bottom: env(safe-area-inset-bottom, 0px);
