@@ -108,10 +108,10 @@ function ToastElement({ item, onClose }: { item: ToastItem; onClose: () => void 
   return (
     <div
       role="alert"
-      className={`pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-xl p-3.5 shadow-xl backdrop-blur-md transition-all animate-slide-in ${cfg.card}`}
+      className={`pointer-events-auto flex w-full items-start gap-3.5 rounded-xl p-4 shadow-xl backdrop-blur-md transition-all animate-slide-in ${cfg.card}`}
     >
       <div
-        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full shadow-sm ${cfg.iconBg}`}
+        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full shadow-sm ${cfg.iconBg}`}
       >
         {cfg.icon}
       </div>
@@ -120,7 +120,7 @@ function ToastElement({ item, onClose }: { item: ToastItem; onClose: () => void 
         <div className={`text-sm font-bold leading-none ${cfg.title}`}>
           {title}
         </div>
-        <div className={`mt-1 text-xs sm:text-sm font-medium leading-snug ${cfg.message}`}>
+        <div className={`mt-1 text-sm font-medium leading-snug ${cfg.message}`}>
           {item.message}
         </div>
       </div>
@@ -128,10 +128,10 @@ function ToastElement({ item, onClose }: { item: ToastItem; onClose: () => void 
       <button
         type="button"
         onClick={onClose}
-        className={`-mr-1 -mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors ${cfg.close}`}
+        className={`-mr-1.5 -mt-1.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors ${cfg.close}`}
         aria-label="Dismiss"
       >
-        <IconClose width={15} height={15} strokeWidth={2} />
+        <IconClose width={16} height={16} strokeWidth={2.2} />
       </button>
     </div>
   );
@@ -174,7 +174,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       <div
         aria-live="polite"
-        className="fixed top-5 right-5 z-50 flex max-w-sm flex-col gap-2.5 pointer-events-none px-4 sm:px-0"
+        className="fixed top-4 right-4 z-50 flex w-[calc(100vw-2rem)] max-w-sm sm:w-[380px] flex-col gap-3 pointer-events-none sm:top-6 sm:right-6"
       >
         {toasts.map((t) => (
           <ToastElement key={t.id} item={t} onClose={() => removeToast(t.id)} />
