@@ -20,9 +20,6 @@ export async function middleware(request: NextRequest) {
   if (pathname === '/') return NextResponse.next();
 
   if (pathname === '/login') {
-    if (claims) {
-      return NextResponse.redirect(new URL(homeFor(claims.role), request.url));
-    }
     return NextResponse.next();
   }
 

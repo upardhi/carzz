@@ -163,7 +163,7 @@ const VARIANTS: Record<ButtonVariant, string> = {
     'bg-white text-navy-800 border border-line-strong hover:bg-surface-muted disabled:text-ink-faint',
   ghost: 'text-navy-800 hover:bg-navy-50 disabled:text-ink-faint',
   danger: 'bg-danger-500 text-white hover:bg-danger-600 disabled:bg-line-strong',
-  gold: 'bg-gold-500 text-navy-900 hover:bg-gold-400 disabled:bg-line-strong',
+  gold: 'bg-gold-500 text-white hover:bg-gold-600 disabled:bg-line-strong',
 };
 
 const SIZES: Record<ButtonSize, string> = {
@@ -429,3 +429,12 @@ export function BarChart({
     </div>
   );
 }
+
+export { ConfirmDialog } from './ConfirmDialog';
+export type { ConfirmDialogProps, ConfirmTone } from './ConfirmDialog';
+export { ConfirmProvider, useConfirm } from './ConfirmProvider';
+export type { ConfirmOptions, ConfirmFunction } from './ConfirmProvider';
+export { ToastProvider, useToast, toast } from './ToastProvider';
+export type { ToastItem, ToastType } from './ToastProvider';
+
+

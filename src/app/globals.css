@@ -2,33 +2,121 @@
 @tailwind components;
 @tailwind utilities;
 
+/* =============================================================================
+   FleetGuard Design System — globals.css
+   Single source of truth for colors, fonts, surfaces, and utility patterns.
+
+   HOW TO RETHEME:
+   1. Change CSS custom properties in :root below
+   2. Tailwind token values live in tailwind.config.ts (navy-*, gold-*, etc.)
+   Both files must stay in sync — the comments indicate which values mirror each other.
+   ============================================================================= */
+
 @layer base {
   :root {
-    /* Expands to: Geist, "Geist Fallback", -apple-system, … — next/font
-       supplies the size-adjusted fallback face inside the variable. */
+    /* Fonts — next/font injects the actual @font-face; these vars wire it in */
     --font-sans: var(--font-geist-sans), -apple-system, BlinkMacSystemFont,
       'Segoe UI', 'Helvetica Neue', sans-serif;
-    --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo,
-      monospace;
-    /* Safe-area insets, so an installed PWA clears the notch and home bar. */
-    --safe-top: env(safe-area-inset-top, 0px);
+    --font-mono: var(--font-geist-mono), ui-monospace, 'SF Mono',
+      'Roboto Mono', Menlo, monospace;
+    --font-display: var(--font-geist-sans), -apple-system, BlinkMacSystemFont,
+      'Segoe UI', sans-serif;
+
+    /* PWA safe-area insets */
+    --safe-top:    env(safe-area-inset-top, 0px);
     --safe-bottom: env(safe-area-inset-bottom, 0px);
+
+    /* ── Brand palette (mirrors tailwind.config.ts navy-*) ──────────────── */
+    --color-brand-50:  #f0f5fb;
+    --color-brand-100: #dae7f4;
+    --color-brand-200: #b6cfe8;
+    --color-brand-300: #84adda;
+    --color-brand-400: #4f86c6;
+    --color-brand-500: #2f66ae;
+    --color-brand-600: #214f92;
+    --color-brand-700: #1b4078;
+    --color-brand-800: #163363;
+    --color-brand-900: #0f2347;
+    --color-brand-950: #081429;
+
+    /* ── Accent palette (mirrors tailwind.config.ts gold-*) ─────────────── */
+    --color-accent-50:  #fffaeb;
+    --color-accent-100: #fef0c7;
+    --color-accent-200: #fde08a;
+    --color-accent-300: #fbc84c;
+    --color-accent-400: #fab224;
+    --color-accent-500: #f59e0b;
+    --color-accent-600: #d97706;
+    --color-accent-700: #b45309;
+    --color-accent-800: #92400e;
+    --color-accent-900: #78350f;
+
+    /* ── Success palette ─────────────────────────────────────────────────── */
+    --color-success-50:  #ecfdf5;
+    --color-success-100: #d1fae5;
+    --color-success-300: #6ee7b7;
+    --color-success-400: #34d399;
+    --color-success-500: #10b981;
+    --color-success-600: #059669;
+    --color-success-700: #047857;
+    --color-success-800: #065f46;
+
+    /* ── Warning palette ─────────────────────────────────────────────────── */
+    --color-warning-50:  #fffbeb;
+    --color-warning-100: #fef3c7;
+    --color-warning-500: #f59e0b;
+    --color-warning-600: #d97706;
+    --color-warning-700: #b45309;
+
+    /* ── Danger palette ──────────────────────────────────────────────────── */
+    --color-danger-50:  #fff1f2;
+    --color-danger-100: #ffe4e6;
+    --color-danger-300: #fda4af;
+    --color-danger-500: #f43f5e;
+    --color-danger-600: #e11d48;
+    --color-danger-700: #be123c;
+    --color-danger-800: #9f1239;
+
+    /* ── Semantic surfaces ───────────────────────────────────────────────── */
+    --surface-app:       #f5f7fa;   /* page background */
+    --surface-card:      #ffffff;   /* card / panel */
+    --surface-muted:     #eef2f7;   /* subtle tinted area */
+    --surface-sidebar:   #0f2347;   /* nav sidebar */
+    --surface-sidebar-2: #081429;   /* sidebar gradient end */
+
+    /* ── Semantic text ───────────────────────────────────────────────────── */
+    --text-primary:   #0f172a;
+    --text-secondary: #475569;
+    --text-muted:     #94a3b8;
+
+    /* ── Semantic borders ────────────────────────────────────────────────── */
+    --border-subtle: #e2e8f0;
+    --border-strong: #cbd5e1;
+
+    /* ── Focus ring ──────────────────────────────────────────────────────── */
+    --ring: rgba(33, 79, 146, 0.35);
+
     color-scheme: light;
   }
 
   html {
     -webkit-text-size-adjust: 100%;
     -webkit-tap-highlight-color: transparent;
+    height: 100%;
   }
 
   body {
-    @apply bg-surface-sunken text-ink antialiased;
+    background: var(--surface-app);
+    color: var(--text-primary);
     font-family: var(--font-sans);
-    /* Overscroll on a standalone PWA otherwise reveals the browser chrome. */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: 'cv11', 'ss01', 'ss03';
+    /* Prevent rubber-band reveal of browser chrome in standalone PWA */
     overscroll-behavior-y: none;
   }
 
-  /* Inputs must be >=16px on iOS or Safari zooms the page on focus. */
+  /* iOS Safari zooms the page on focus if font-size < 16px */
   input,
   select,
   textarea {
@@ -44,58 +132,170 @@
   }
 
   :focus-visible {
-    @apply outline-none ring-2 ring-navy-500 ring-offset-2 ring-offset-white;
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: 6px;
   }
 }
 
+
+
+/* =============================================================================
+   Component classes
+   ============================================================================= */
+
 @layer components {
+  /* Form field */
   .field {
     @apply w-full rounded-lg border border-line bg-surface-sunken px-3 py-2.5
       text-ink placeholder:text-ink-faint
-      focus:border-navy-500 focus:bg-white focus:outline-none focus:ring-2
+      focus:border-navy-600 focus:bg-white focus:outline-none focus:ring-2
       focus:ring-navy-100;
   }
 
+  /* Form label */
   .field-label {
     @apply mb-1 block text-[11px] font-bold uppercase tracking-wide text-ink-soft;
   }
 
-  /* Horizontal scroll container for wide tables on small screens. */
+  /* Horizontal scroll container for wide tables on small screens */
   .scroll-x {
     @apply -mx-3 overflow-x-auto px-3 sm:mx-0 sm:px-0;
     scrollbar-width: thin;
   }
 }
 
-@layer base {
-  /* While the install banner is showing, keep the bottom of the page clear of
-     it so nothing tappable ends up underneath. */
-  :root[data-install-banner] main {
-    padding-bottom: 11rem;
-  }
-}
+/* =============================================================================
+   Utility patterns — available everywhere, no Tailwind class required
+   ============================================================================= */
 
 @layer utilities {
-  .pt-safe {
-    padding-top: var(--safe-top);
-  }
-  .pb-safe {
-    padding-bottom: var(--safe-bottom);
-  }
-  .mb-safe {
-    margin-bottom: var(--safe-bottom);
-  }
-  .no-scrollbar::-webkit-scrollbar {
-    display: none;
-  }
+  /* Safe-area spacing (PWA notch / home bar) */
+  .pt-safe { padding-top: var(--safe-top); }
+  .pb-safe { padding-bottom: var(--safe-bottom); }
+  .mb-safe { margin-bottom: var(--safe-bottom); }
+
+  /* Hide scrollbar visually but keep functionality */
+  .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+
+  /* Tabular numbers — numeric data columns */
+  .num {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
+  }
+
+  /* Subtle grid overlay for navy hero panels */
+  .surface-grid {
+    background-image:
+      linear-gradient(var(--border-subtle) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px);
+    background-size: 40px 40px;
+    background-position: -1px -1px;
+  }
+
+  /* Deep navy radial glow — command-center hero backgrounds */
+  .radial-glow-brand {
+    background:
+      radial-gradient(ellipse at top left, rgba(33,79,146,0.25), transparent 60%),
+      radial-gradient(ellipse at bottom right, rgba(245,158,11,0.18), transparent 55%),
+      linear-gradient(135deg, #081429 0%, #0f2347 55%, #163363 100%);
+  }
+
+  /* Frosted glass — overlays, modals, popovers */
+  .glass {
+    background: rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  /* Shimmer skeleton loader */
+  .shimmer {
+    background: linear-gradient(90deg, #eef2f7 0%, #f8fafc 50%, #eef2f7 100%);
+    background-size: 800px 100%;
+    animation: shimmer 1.6s linear infinite;
+  }
+
+  /* Pulsing green dot for live / real-time indicators */
+  .live-dot {
+    animation: pulse-ring 2s infinite;
+  }
+
+  /* Slide-in for sidebar drawers, panels, and toasts */
+  .slide-in,
+  .animate-slide-in {
+    animation: slide-in-right 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .animate-scale-in {
+    animation: scale-in 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .animate-fade-in {
+    animation: fade-in 150ms ease-out both;
+  }
+
+  /* Hide from screen, show in print */
+  .print-only { display: none; }
+  @media print { .print-only { display: revert; } }
+
+  /* select without system arrow (DOB pickers, custom selects) */
+  .dob-select {
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    background-image: none !important;
+  }
 }
 
-@media print {
-  .no-print {
-    display: none !important;
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(20px) scale(0.96);
   }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* =============================================================================
+   Scrollbar styling (WebKit)
+   ============================================================================= */
+
+::-webkit-scrollbar              { width: 10px; height: 10px; }
+::-webkit-scrollbar-track        { background: transparent; }
+::-webkit-scrollbar-thumb        { background: #cbd5e1; border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover  { background: #94a3b8; background-clip: padding-box; border: 2px solid transparent; }
+
+/* =============================================================================
+   Print helpers
+   ============================================================================= */
+
+@media print {
+  .no-print { display: none !important; }
 }

@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Button, Note } from '@/components/ui/primitives';
+import { toast } from '@/components/ui/ToastProvider';
 import { IconCheck } from '@/components/shell/icons';
 
 const SERVICES = [
@@ -31,14 +32,19 @@ function useSave() {
       });
       const data = (await response.json()) as { message?: string; error?: string };
       if (!response.ok) {
-        setState({ error: data.error ?? 'Could not save that.' });
+        const err = data.error ?? 'Could not save that.';
+        setState({ error: err });
+        toast.error(err);
         return false;
       }
-      setState({ ok: data.message ?? 'Saved.' });
+      const msg = data.message ?? 'Saved.';
+      setState({ ok: msg });
+      toast.success(msg);
       router.refresh();
       return true;
     } catch {
       setState({ error: 'No connection.' });
+      toast.error('No connection.');
       return false;
     } finally {
       setPending(false);

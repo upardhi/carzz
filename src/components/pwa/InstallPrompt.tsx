@@ -61,14 +61,6 @@ export function InstallPrompt() {
   // whatever sits at the bottom of the page — on the customer's car list that
   // was the "View wash history" button, which simply stopped responding.
   const visible = Boolean(deferred) || iosHint;
-  useEffect(() => {
-    const root = document.documentElement;
-    if (visible) root.dataset.installBanner = '1';
-    else delete root.dataset.installBanner;
-    return () => {
-      delete root.dataset.installBanner;
-    };
-  }, [visible]);
 
   const install = async () => {
     if (!deferred) return;
@@ -80,7 +72,7 @@ export function InstallPrompt() {
   if (!visible) return null;
 
   return (
-    <div className="fixed inset-x-3 bottom-24 z-40 mx-auto max-w-md rounded-card border border-navy-700 bg-navy-850 p-3 text-white shadow-raised sm:bottom-4">
+    <div className="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-md rounded-card border border-navy-700 bg-navy-850 p-3.5 text-white shadow-float">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-bold">Install Carz on your phone</p>
@@ -95,7 +87,7 @@ export function InstallPrompt() {
             <button
               type="button"
               onClick={install}
-              className="rounded-lg bg-gold-500 px-3 py-1.5 text-xs font-extrabold text-navy-900"
+              className="rounded-lg bg-gold-500 px-3 py-1.5 text-xs font-extrabold text-white"
             >
               Install
             </button>

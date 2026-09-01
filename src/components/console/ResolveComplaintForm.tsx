@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Button, Note } from '@/components/ui/primitives';
+import { toast } from '@/components/ui/ToastProvider';
 
 const QUICK = [
   'Free re-wash scheduled',
@@ -33,14 +34,18 @@ export function ResolveComplaintForm({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ complaintId, action, resolution }),
       });
-      const data = (await response.json()) as { error?: string };
+      const data = (await response.json()) as { message?: string; error?: string };
       if (!response.ok) {
-        setError(data.error ?? 'That did not work.');
+        const err = data.error ?? 'That did not work.';
+        setError(err);
+        toast.error(err);
         return;
       }
+      toast.success(data.message ?? (action === 'resolve' ? 'Complaint closed.' : 'Escalated to owner.'));
       router.refresh();
     } catch {
       setError('No connection.');
+      toast.error('No connection.');
     } finally {
       setPending(null);
     }

@@ -1,4 +1,7 @@
+import { redirect } from 'next/navigation';
 import { BrandLockup } from '@/components/shell/Brand';
+import { homeFor } from '@/lib/auth/rbac';
+import { getSession } from '@/lib/auth/server';
 import { DemoAccounts, LoginForm } from './LoginForm';
 
 export const metadata = { title: 'Sign in' };
@@ -9,6 +12,10 @@ export default async function LoginPage({
   searchParams: Promise<{ next?: string }>;
 }) {
   const { next } = await searchParams;
+  const session = await getSession();
+  if (session && !next) {
+    redirect(homeFor(session.user.role));
+  }
 
   return (
     <main className="min-h-[100dvh] bg-navy-900 lg:grid lg:grid-cols-2">

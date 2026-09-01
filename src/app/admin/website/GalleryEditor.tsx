@@ -1,8 +1,10 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button, Card, CardHeading, Note, Tag } from '@/components/ui/primitives';
+import { toast } from '@/components/ui/ToastProvider';
+import { IconClose } from '@/components/shell/icons';
 import type { SiteContent } from '@/lib/data/types';
 
 /**
@@ -25,12 +27,52 @@ export function GalleryEditor({ content }: { content: SiteContent }) {
   const afterRef = useRef<HTMLInputElement>(null);
   const [beforeName, setBeforeName] = useState('');
   const [afterName, setAfterName] = useState('');
+  const [beforePreview, setBeforePreview] = useState<string | null>(null);
+  const [afterPreview, setAfterPreview] = useState<string | null>(null);
+
+  // Clean up object URLs on unmount
+  useEffect(() => {
+    return () => {
+      if (beforePreview) URL.revokeObjectURL(beforePreview);
+      if (afterPreview) URL.revokeObjectURL(afterPreview);
+    };
+  }, [beforePreview, afterPreview]);
+
+  function handleFile(type: 'before' | 'after', file?: File) {
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    if (type === 'before') {
+      if (beforePreview) URL.revokeObjectURL(beforePreview);
+      setBeforePreview(url);
+      setBeforeName(file.name);
+    } else {
+      if (afterPreview) URL.revokeObjectURL(afterPreview);
+      setAfterPreview(url);
+      setAfterName(file.name);
+    }
+  }
+
+  function removeFile(type: 'before' | 'after') {
+    if (type === 'before') {
+      if (beforePreview) URL.revokeObjectURL(beforePreview);
+      setBeforePreview(null);
+      setBeforeName('');
+      if (beforeRef.current) beforeRef.current.value = '';
+    } else {
+      if (afterPreview) URL.revokeObjectURL(afterPreview);
+      setAfterPreview(null);
+      setAfterName('');
+      if (afterRef.current) afterRef.current.value = '';
+    }
+  }
 
   async function upload() {
     const before = beforeRef.current?.files?.[0];
     const after = afterRef.current?.files?.[0];
     if (!before || !after) {
-      setState({ error: 'Choose both a before and an after photo.' });
+      const err = 'Choose both a before and an after photo.';
+      setState({ error: err });
+      toast.error(err);
       return;
     }
     setPending(true);
@@ -49,20 +91,23 @@ export function GalleryEditor({ content }: { content: SiteContent }) {
         error?: string;
       };
       if (!response.ok || !data.gallery) {
-        setState({ error: data.error ?? 'Could not add those images.' });
+        const err = data.error ?? 'Could not add those images.';
+        setState({ error: err });
+        toast.error(err);
         return;
       }
       setItems(data.gallery);
-      setState({ ok: data.message ?? 'Added.' });
+      const msg = data.message ?? 'Added to gallery.';
+      setState({ ok: msg });
+      toast.success(msg);
       setCaption('');
       setDetail('');
-      setBeforeName('');
-      setAfterName('');
-      if (beforeRef.current) beforeRef.current.value = '';
-      if (afterRef.current) afterRef.current.value = '';
+      removeFile('before');
+      removeFile('after');
       router.refresh();
     } catch {
       setState({ error: 'No connection.' });
+      toast.error('No connection.');
     } finally {
       setPending(false);
     }
@@ -90,26 +135,83 @@ export function GalleryEditor({ content }: { content: SiteContent }) {
         <div className="grid gap-3 sm:grid-cols-2">
           {(
             [
-              ['Before photo', beforeRef, beforeName, setBeforeName],
-              ['After photo', afterRef, afterName, setAfterName],
+              ['Before photo', 'before', beforeRef, beforeName, beforePreview],
+              ['After photo', 'after', afterRef, afterName, afterPreview],
             ] as const
-          ).map(([label, ref, name, setName]) => (
+          ).map(([label, type, ref, name, preview]) => (
             <div key={label}>
-              <span className="field-label">{label}</span>
+              <div className="mb-1 flex items-center justify-between">
+                <span className="field-label mb-0">{label}</span>
+                {preview ? (
+                  <button
+                    type="button"
+                    onClick={() => removeFile(type)}
+                    className="text-[11px] font-semibold text-danger-500 hover:text-danger-600"
+                  >
+                    Remove
+                  </button>
+                ) : null}
+              </div>
               <input
                 ref={ref}
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
                 className="sr-only"
-                onChange={(e) => setName(e.target.files?.[0]?.name ?? '')}
+                onChange={(e) => handleFile(type, e.target.files?.[0])}
               />
-              <button
-                type="button"
-                onClick={() => ref.current?.click()}
-                className="w-full rounded-lg border-2 border-dashed border-line-strong bg-white px-3 py-4 text-sm font-semibold text-ink-mute hover:border-navy-400"
-              >
-                {name || 'Choose an image'}
-              </button>
+              {preview ? (
+                <div className="relative aspect-[4/3] w-full overflow-hidden rounded-lg border border-line-strong bg-navy-950 shadow-sm">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={preview}
+                    alt={label}
+                    className="h-full w-full object-cover transition-transform duration-200 hover:scale-105"
+                  />
+                  <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/80 via-black/40 to-transparent p-2.5 text-white">
+                    <span className="max-w-[170px] truncate text-xs font-semibold text-slate-100">
+                      {name}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => ref.current?.click()}
+                      className="rounded bg-white/20 px-2 py-1 text-[11px] font-bold text-white backdrop-blur-sm transition-colors hover:bg-white/30"
+                    >
+                      Change
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => ref.current?.click()}
+                  className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-line-strong bg-white p-4 text-center transition-colors hover:border-navy-400 hover:bg-navy-50/50"
+                >
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-navy-50 text-navy-600">
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+                      <circle cx="9" cy="9" r="2" />
+                      <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                    </svg>
+                  </div>
+                  <div>
+                    <span className="block text-xs font-bold text-navy-800">
+                      Click to choose photo
+                    </span>
+                    <span className="block text-[11px] text-ink-mute">
+                      PNG, JPG, WEBP up to 10MB
+                    </span>
+                  </div>
+                </button>
+              )}
             </div>
           ))}
         </div>

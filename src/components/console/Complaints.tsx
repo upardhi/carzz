@@ -2,22 +2,17 @@ import { PageHeader } from '@/components/shell/ConsoleShell';
 import {
   Card,
   CardHeading,
-  EmptyState,
-  Kpi,
-  KpiGrid,
-  Row,
   Table,
   TableWrap,
-  Tag,
   Td,
   Th,
 } from '@/components/ui/primitives';
 import { scopeAreaFilter } from '@/lib/auth/rbac';
 import type { Session } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
-import { formatDateFull, relativeDays } from '@/lib/util/format';
+import { formatDateFull } from '@/lib/util/format';
 import { COMPLAINT_TYPE_LABEL } from '@/lib/util/labels';
-import { ResolveComplaintForm } from './ResolveComplaintForm';
+import { ComplaintsClient } from './ComplaintsClient';
 
 export async function ConsoleComplaints({
   session,
@@ -39,20 +34,11 @@ export async function ConsoleComplaints({
     store.customers.find({ where: areaFilter as never }),
   ]);
 
-  const areaById = new Map(areas.map((a) => [a.id, a]));
   const staffById = new Map(staff.map((s) => [s.id, s]));
   const customerById = new Map(customers.map((c) => [c.id, c]));
 
   const open = complaints.filter((c) => c.status !== 'RESOLVED');
   const resolved = complaints.filter((c) => c.status === 'RESOLVED');
-
-  const resolutionDays = resolved
-    .filter((c) => c.resolvedAt)
-    .map(
-      (c) =>
-        (new Date(c.resolvedAt!).getTime() - new Date(c.createdAt).getTime()) /
-        86400000,
-    );
 
   // A wash boy generating a disproportionate share of complaints is the single
   // most useful thing on this page, so compute it rather than making the
@@ -71,80 +57,13 @@ export async function ConsoleComplaints({
         description={`${open.length} open · ${resolved.length} resolved`}
       />
 
-      <KpiGrid>
-        <Kpi label="Open" value={open.length} tone={open.length ? 'danger' : 'success'} />
-        <Kpi
-          label="Escalated"
-          value={open.filter((c) => c.status === 'ESCALATED').length}
-          tone="gold"
-        />
-        <Kpi label="Resolved" value={resolved.length} />
-        <Kpi
-          label="Avg resolution"
-          value={
-            resolutionDays.length
-              ? `${(resolutionDays.reduce((a, b) => a + b, 0) / resolutionDays.length).toFixed(1)}d`
-              : '—'
-          }
-        />
-        <Kpi
-          label="Oldest open"
-          value={open.length ? relativeDays(open[open.length - 1].createdAt) : '—'}
-          tone={open.length ? 'gold' : 'default'}
-        />
-      </KpiGrid>
-
-      {open.length === 0 ? (
-        <div className="mt-4">
-          <EmptyState title="No open complaints" hint="Nothing needs your reply." />
-        </div>
-      ) : (
-        <div className="mt-4 grid gap-3 lg:grid-cols-2">
-          {open.slice(0, 12).map((complaint) => (
-            <Card
-              key={complaint.id}
-              accent={complaint.status === 'ESCALATED' ? 'danger' : 'gold'}
-              className="p-4"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <h3 className="text-sm font-extrabold">
-                  {COMPLAINT_TYPE_LABEL[complaint.type]}
-                </h3>
-                <Tag tone={complaint.status === 'ESCALATED' ? 'bad' : 'warn'}>
-                  {complaint.status === 'ESCALATED' ? 'Escalated' : 'Open'}
-                </Tag>
-              </div>
-
-              <Row
-                label="Customer"
-                value={customerById.get(complaint.customerId)?.name ?? '—'}
-              />
-              <Row label="Area" value={areaById.get(complaint.areaId)?.name ?? '—'} />
-              <Row
-                label="Wash boy"
-                value={
-                  complaint.staffId
-                    ? (staffById.get(complaint.staffId)?.name ?? '—')
-                    : '—'
-                }
-              />
-              <Row
-                label="Raised"
-                value={`${formatDateFull(complaint.createdAt)} · ${relativeDays(complaint.createdAt)}`}
-              />
-
-              <p className="my-3 rounded-lg bg-surface-muted p-3 text-sm italic text-ink-mute">
-                “{complaint.body}”
-              </p>
-
-              <ResolveComplaintForm
-                complaintId={complaint.id}
-                canEscalate={canEscalate && complaint.status !== 'ESCALATED'}
-              />
-            </Card>
-          ))}
-        </div>
-      )}
+      <ComplaintsClient
+        complaints={complaints}
+        areas={areas}
+        staff={staff}
+        customers={customers}
+        canEscalate={canEscalate}
+      />
 
       <div className="mt-4 grid gap-3 lg:grid-cols-2">
         <Card className="p-4">

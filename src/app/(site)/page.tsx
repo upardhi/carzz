@@ -79,7 +79,7 @@ export default async function HomePage() {
           <div className="mt-8 flex flex-wrap gap-3">
             <a
               href="#book"
-              className="rounded-lg bg-gold-500 px-6 py-3 text-[15px] font-extrabold text-navy-950 transition-colors hover:bg-gold-400"
+              className="rounded-lg bg-gold-500 px-6 py-3 text-[15px] font-extrabold text-white transition-colors hover:bg-gold-600"
             >
               {site.heroPrimaryCta}
             </a>
@@ -183,7 +183,7 @@ export default async function HomePage() {
                   }`}
                 >
                   {featured ? (
-                    <span className="absolute -top-3 left-6 rounded-pill bg-gold-500 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-navy-950">
+                    <span className="absolute -top-3 left-6 rounded-pill bg-gold-500 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-white">
                       Most popular
                     </span>
                   ) : null}
@@ -240,7 +240,7 @@ export default async function HomePage() {
                     href="#book"
                     className={`mt-6 rounded-lg py-2.5 text-center text-sm font-extrabold transition-colors ${
                       featured
-                        ? 'bg-gold-500 text-navy-950 hover:bg-gold-400'
+                        ? 'bg-gold-500 text-white hover:bg-gold-600'
                         : 'bg-navy-800 text-white hover:bg-navy-700'
                     }`}
                   >
@@ -441,44 +441,85 @@ export default async function HomePage() {
       ) : null}
 
       {/* ---------------------------------------------------------------- */}
-      <section id="book" className="scroll-mt-20 bg-navy-900 px-5 py-20">
-        <div className="mx-auto grid w-full max-w-6xl gap-10 lg:grid-cols-[1fr_1.1fr]">
+      {/* ---------------------------------------------------------------- */}
+      <section id="book" className="relative scroll-mt-16 overflow-hidden bg-gradient-to-br from-navy-900 via-navy-900 to-navy-950 px-5 py-16 sm:py-24">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-navy-grid bg-grid opacity-50"
+        />
+        <div className="relative mx-auto grid w-full max-w-6xl items-start gap-10 lg:grid-cols-[1fr_1.15fr]">
           <div>
-            <h2 className="text-3xl font-extrabold tracking-tight text-white">
+            <span className="inline-flex items-center rounded-pill border border-gold-500/50 px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.14em] text-gold-500">
+              No Advance Payment
+            </span>
+
+            <h2 className="mt-4 text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
               {site.contactTitle}
             </h2>
-            <p className="mt-3 text-sm leading-relaxed text-slate-300">
+            <p className="mt-3 text-base leading-relaxed text-slate-300">
               {site.contactBody}
             </p>
 
-            <div className="mt-8 space-y-3 text-sm">
+            {/* Value checklist */}
+            <ul className="mt-6 space-y-3">
+              <li className="flex items-center gap-3 text-sm text-slate-200">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-success-500/20 text-success-400">
+                  <IconCheck width={13} height={13} strokeWidth={3} />
+                </span>
+                <span>Same-day callback with confirmed slots in your area</span>
+              </li>
+              <li className="flex items-center gap-3 text-sm text-slate-200">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-success-500/20 text-success-400">
+                  <IconCheck width={13} height={13} strokeWidth={3} />
+                </span>
+                <span>Before & after photo proof of every single wash</span>
+              </li>
+              <li className="flex items-center gap-3 text-sm text-slate-200">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-success-500/20 text-success-400">
+                  <IconCheck width={13} height={13} strokeWidth={3} />
+                </span>
+                <span>You only pay for washes actually received</span>
+              </li>
+            </ul>
+
+            {/* Direct contact pills */}
+            <div className="mt-8 flex flex-wrap gap-3 text-sm">
               <a
                 href={`tel:${site.phone.replace(/\s/g, '')}`}
-                className="flex items-center gap-3 text-white hover:text-gold-500"
+                className="inline-flex items-center gap-2 rounded-lg border border-navy-700 bg-navy-800/80 px-4 py-2.5 font-bold text-white transition-colors hover:border-gold-500/50 hover:bg-navy-800"
               >
-                <span className="text-navy-300">Call</span>
-                <span className="font-extrabold">{site.phone}</span>
+                <span className="text-xs uppercase tracking-wider text-navy-300">Call</span>
+                <span className="text-gold-400">{site.phone}</span>
               </a>
               <a
                 href={`https://wa.me/${site.whatsapp.replace(/\D/g, '')}`}
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center gap-3 text-white hover:text-gold-500"
+                className="inline-flex items-center gap-2 rounded-lg border border-navy-700 bg-navy-800/80 px-4 py-2.5 font-bold text-white transition-colors hover:border-emerald-500/50 hover:bg-navy-800"
               >
-                <span className="text-navy-300">WhatsApp</span>
-                <span className="font-extrabold">{site.whatsapp}</span>
+                <span className="text-xs uppercase tracking-wider text-emerald-400">WhatsApp</span>
+                <span>{site.whatsapp}</span>
               </a>
             </div>
 
-            <p className="mt-8 text-sm text-navy-300">
-              Already with us?{' '}
-              <Link href="/login" className="font-bold text-gold-500 hover:underline">
-                Sign in to your account
-              </Link>
-            </p>
+            {/* Customer login prompt */}
+            <div className="mt-8 rounded-card border border-navy-800 bg-navy-950/60 p-4">
+              <p className="text-sm text-slate-300">
+                Already registered with us?{' '}
+                <Link href="/login" className="font-extrabold text-gold-400 hover:text-gold-300 hover:underline">
+                  Sign in to your account →
+                </Link>
+              </p>
+            </div>
           </div>
 
-          <div className="rounded-card bg-white p-6 shadow-raised sm:p-8">
+          <div className="rounded-card border border-line bg-white p-6 shadow-float sm:p-8">
+            <div className="mb-5 border-b border-line pb-4">
+              <h3 className="text-lg font-extrabold text-ink">Book your wash</h3>
+              <p className="mt-0.5 text-xs text-ink-mute">
+                Tell us your details — we will confirm available slots today.
+              </p>
+            </div>
             <EnquiryForm
               areas={areas.map((a) => ({ id: a.id, label: `${a.name}, ${a.city}` }))}
               packages={packages.map((p) => ({

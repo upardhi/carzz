@@ -84,7 +84,7 @@ export function EnquiryForm({
       <div>
         <label className="field-label" htmlFor="e-name">Your name</label>
         <input id="e-name" className="field" value={name} required
-          onChange={(e) => setName(e.target.value)} />
+          onChange={(e) => setName(e.target.value)} placeholder="e.g. Rahul Sharma" />
       </div>
       <div>
         <label className="field-label" htmlFor="e-phone">Mobile number</label>
@@ -132,7 +132,8 @@ export function EnquiryForm({
       <div className="sm:col-span-2">
         <label className="field-label" htmlFor="e-email">Email (optional)</label>
         <input id="e-email" className="field" inputMode="email" type="email"
-          value={email} onChange={(e) => setEmail(e.target.value)} />
+          value={email} onChange={(e) => setEmail(e.target.value)}
+          placeholder="e.g. rahul@example.com" />
       </div>
 
       <div className="sm:col-span-2">

@@ -40,12 +40,15 @@ export default async function AreaReports() {
   const areaById = new Map(areas.map((a) => [a.id, a]));
   const billed = performance.reduce((s, p) => s + p.billed, 0);
   const collected = performance.reduce((s, p) => s + p.collected, 0);
-  const bestPerWash = [...consumption]
-    .filter((c) => c.washes > 0)
-    .sort((a, b) => a.perWash - b.perWash)[0];
-  const worstPerWash = [...consumption]
-    .filter((c) => c.washes > 0)
-    .sort((a, b) => b.perWash - a.perWash)[0];
+  const activeConsumption = consumption.filter(
+    (c) => c.washes > 0 && c.perWash > 0,
+  );
+  const bestPerWash = [...activeConsumption].sort(
+    (a, b) => a.perWash - b.perWash,
+  )[0];
+  const worstPerWash = [...activeConsumption].sort(
+    (a, b) => b.perWash - a.perWash,
+  )[0];
 
   return (
     <>
@@ -217,12 +220,18 @@ export default async function AreaReports() {
             </Table>
           </TableWrap>
 
-          {bestPerWash && worstPerWash && worstPerWash.perWash > bestPerWash.perWash * 1.2 ? (
+          {bestPerWash &&
+          worstPerWash &&
+          bestPerWash.areaId !== worstPerWash.areaId &&
+          bestPerWash.perWash > 0 &&
+          worstPerWash.perWash > bestPerWash.perWash * 1.2 ? (
             <div className="mt-3">
               <Note tone="danger">
                 {worstPerWash.areaName} uses{' '}
                 {Math.round(
-                  (worstPerWash.perWash / bestPerWash.perWash - 1) * 100,
+                  ((worstPerWash.perWash - bestPerWash.perWash) /
+                    bestPerWash.perWash) *
+                    100,
                 )}
                 % more per wash than {bestPerWash.areaName} on the same packages.
                 Either staff are over-pouring, or stock is going missing.

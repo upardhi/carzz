@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 import { Button, Note, Tag } from '@/components/ui/primitives';
+import { toast } from '@/components/ui/ToastProvider';
 import { IconCheck } from '@/components/shell/icons';
 import type { AppSettings, PaymentMode, PayoutSettings } from '@/lib/data/types';
 import { money } from '@/lib/util/format';
@@ -24,13 +25,18 @@ function useSettings(scope: 'app' | 'payout') {
       });
       const data = (await response.json()) as { message?: string; error?: string };
       if (!response.ok) {
-        setState({ error: data.error ?? 'Could not save.' });
+        const err = data.error ?? 'Could not save.';
+        setState({ error: err });
+        toast.error(err);
         return;
       }
-      setState({ ok: data.message ?? 'Saved.' });
+      const msg = data.message ?? 'Saved.';
+      setState({ ok: msg });
+      toast.success(msg);
       router.refresh();
     } catch {
       setState({ error: 'No connection.' });
+      toast.error('No connection.');
     } finally {
       setPending(false);
     }

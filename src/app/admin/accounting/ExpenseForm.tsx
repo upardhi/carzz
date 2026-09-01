@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Button, Note } from '@/components/ui/primitives';
+import { toast } from '@/components/ui/ToastProvider';
 import { EXPENSE_HEADS, type ExpenseHead } from '@/lib/data/types';
 import { EXPENSE_HEAD_LABEL } from '@/lib/util/labels';
 
@@ -38,15 +39,20 @@ export function ExpenseForm({
       });
       const data = (await response.json()) as { message?: string; error?: string };
       if (!response.ok) {
-        setState({ error: data.error ?? 'Could not record that.' });
+        const err = data.error ?? 'Could not record that.';
+        setState({ error: err });
+        toast.error(err);
         return;
       }
-      setState({ ok: data.message ?? 'Recorded.' });
+      const msg = data.message ?? 'Recorded.';
+      setState({ ok: msg });
+      toast.success(msg);
       setAmount('');
       setNote('');
       router.refresh();
     } catch {
       setState({ error: 'No connection.' });
+      toast.error('No connection.');
     } finally {
       setPending(false);
     }
