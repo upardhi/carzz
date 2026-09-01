@@ -62,8 +62,7 @@ route handler, service or component changes.
 Prisma is already installed. Put both URLs in `.env.local` and run:
 
 ```bash
-npx prisma migrate deploy   # or: npx prisma db push, for a first run
-npm run db:seed             # loads the demo dataset
+DATA_PROVIDER=prisma npm run db:setup   # creates the tables, seeds if empty
 DATA_PROVIDER=prisma npm run dev
 ```
 
@@ -140,6 +139,20 @@ a freshly started server, since they mutate the state they act on.
 
 Point it at a deployment with `npm run smoke -- --base=https://…`.
 
+Run it against a real Postgres too, not only the in-memory store — three bugs
+lived in the Prisma path alone and none of them were visible on `memory`:
+
+```bash
+export DATA_PROVIDER=prisma DATABASE_URL=… DIRECT_URL=…
+npm run db:setup && npm run build && npm run smoke
+```
+
+`npm run smoke` first checks `src/lib/data/prisma/fields.ts` against
+`prisma/schema.prisma`. That map tells the adapter which columns hold dates:
+Postgres returns `Date` objects where the rest of the app expects the date
+strings the memory store gives it, so a date column missing from the map
+breaks one screen on the real database and nowhere else.
+
 ## Deploying
 
 `npm run build` runs `prisma generate` first, because the generated Prisma
@@ -164,11 +177,24 @@ the same time can see different data, and every save disappears when the
 instance is recycled. It is meant for local work and the smoke suite. The
 app warns about this at boot in production.
 
-Run the migration and the seed once, from a machine that has `DIRECT_URL`:
+Nothing else to run. On a host like Vercel there is no shell — you push, it
+builds, it serves — so the build prepares the database itself
+(`prisma/setup.ts`). It is safe on every deploy:
 
-```bash
-npx prisma db push && npm run db:seed
-```
+- it does nothing unless `DATA_PROVIDER=prisma`;
+- `prisma db push` brings the tables in line with the schema, and is a no-op
+  once they match. If a change would lose data it refuses and fails the
+  build rather than dropping the column;
+- the starter data is loaded **only into a database with no accounts in it**.
+  A database with your real customers in it is never touched — a redeploy
+  logs `already has N accounts — leaving the data alone`.
+
+Set `SKIP_DB_SEED=true` to get the tables without the starter data. To load
+it by hand, or to reset a database on purpose, `npm run db:seed` still does
+that (it clears every table first).
+
+The starter data includes the owner account `owner@carzz.app` / `owner123`.
+**Change that password before the address is public.**
 
 ## Mobile
 
@@ -198,13 +224,14 @@ prisma/schema.prisma
 
 | Command             | Does                                    |
 | ------------------- | --------------------------------------- |
-| `npm run dev`       | Development server                      |
-| `npm run build`     | Production build                        |
-| `npm run smoke`     | End-to-end checks (needs a build first) |
-| `npm run typecheck` | Types, app and Node scripts alike       |
-| `npm run lint`      | ESLint                                  |
-| `npm run db:push`   | Push the Prisma schema                  |
-| `npm run cap:sync`  | Build and sync the native shell         |
+| `npm run dev` | Development server |
+| `npm run build` | Production build (prepares the database first) |
+| `npm run smoke` | End-to-end checks (needs a build first) |
+| `npm run typecheck` | Types, app and Node scripts alike |
+| `npm run lint` | ESLint |
+| `npm run db:setup` | Create the tables; seed only if empty |
+| `npm run db:seed` | Reload the starter data (clears every table) |
+| `npm run cap:sync` | Build and sync the native shell |
 
 ## Notes
 
