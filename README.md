@@ -1,5 +1,6 @@
 # Carz Management
 
+
 Car wash operations for a multi-area business: schedules, photo-verified
 proof of work, payments, staff payout and stock — one Next.js PWA serving
 five different audiences.
