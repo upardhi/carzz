@@ -4,7 +4,6 @@ import {
   ButtonLink,
   Card,
   CardHeading,
-  Note,
   Progress,
   Row,
   Stat,
@@ -148,10 +147,6 @@ export default async function CustomerHome() {
         </Card>
       )}
 
-      <Note tone="brand">
-        Every wash is photographed before and after. Open a car to see the proof
-        for each visit, and how any missed wash was returned to your count.
-      </Note>
     </div>
   );
 }

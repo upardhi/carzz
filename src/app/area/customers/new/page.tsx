@@ -1,5 +1,5 @@
 import { PageHeader } from '@/components/shell/ConsoleShell';
-import { AddCustomerWizard } from '@/components/console/AddCustomerWizard';
+import { AddCustomerForm } from '@/components/console/AddCustomerForm';
 import { scopeAreaFilter } from '@/lib/auth/rbac';
 import { requirePermission } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
@@ -28,9 +28,9 @@ export default async function AreaAddCustomer() {
     <>
       <PageHeader
         title="Add customer"
-        description="Five steps. Saving creates this month's wash visits straight away."
+        description="Saving creates this month's wash visits straight away."
       />
-      <AddCustomerWizard
+      <AddCustomerForm
         onSavedHref="/area/customers"
         options={{
           areas: scopedAreas.map((a) => ({ id: a.id, name: a.name })),
