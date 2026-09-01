@@ -225,9 +225,41 @@ export async function loadRedAlerts(
     });
   }
 
+  // Both lookups are done once for the whole set rather than twice per
+  // customer inside the loop. This function feeds the sidebar badges, which
+  // are computed in the console layout — so every page in every console paid
+  // for two round trips per indebted customer, in series. Against a hosted
+  // database that was ~150 round trips, and it put roughly forty seconds in
+  // front of every screen. The memory provider hid it: there a lookup is a
+  // Map read, so the loop cost nothing.
+  //
+  // Both are narrowed by area rather than by a list of customer ids: the
+  // invoices above were already filtered to these areas, and `in` over a list
+  // that grows with the customer count would not survive the Firestore
+  // adapter, which caps that operator at thirty values. Area ids are at most a
+  // handful, and the rest of this file already scopes that way.
+  const areaFilter = areaIds ? { areaId: { in: areaIds } } : {};
+  const [customers, confirmedPayments] = await Promise.all([
+    store.customers.find({ where: { ...areaFilter } }),
+    store.payments.find({
+      where: { status: 'CONFIRMED', ...areaFilter },
+      orderBy: [{ field: 'createdAt', dir: 'desc' }],
+    }),
+  ]);
+  const customerById = new Map(customers.map((c) => [c.id, c]));
+
+  // Newest first, so the first row seen for a customer is their latest payment
+  // — the same one `findOne` with this ordering returned.
+  const lastPaymentOnByCustomer = new Map<Id, string>();
+  for (const payment of confirmedPayments) {
+    if (!lastPaymentOnByCustomer.has(payment.customerId)) {
+      lastPaymentOnByCustomer.set(payment.customerId, payment.createdAt);
+    }
+  }
+
   const alerts: RedAlert[] = [];
   for (const [customerId, agg] of byCustomer) {
-    const customer = await store.customers.get(customerId);
+    const customer = customerById.get(customerId);
     if (!customer || customer.status === 'INACTIVE') continue;
 
     const daysOverdue = Math.floor(
@@ -235,11 +267,6 @@ export async function loadRedAlerts(
         86400000,
     );
     if (daysOverdue < 0) continue;
-
-    const lastPayment = await store.payments.findOne({
-      where: { customerId, status: 'CONFIRMED' },
-      orderBy: [{ field: 'createdAt', dir: 'desc' }],
-    });
 
     alerts.push({
       customer,
@@ -253,7 +280,7 @@ export async function loadRedAlerts(
             : agg.amount > 0 && daysOverdue > 0
               ? 'Payment overdue'
               : 'Month end, no payment',
-      lastPaymentOn: lastPayment?.createdAt ?? null,
+      lastPaymentOn: lastPaymentOnByCustomer.get(customerId) ?? null,
     });
   }
 
