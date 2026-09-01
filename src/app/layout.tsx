@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import { InstallPrompt } from '@/components/pwa/InstallPrompt';
 import { OnlineStatus } from '@/components/pwa/OnlineStatus';
 import { ServiceWorkerRegistrar } from '@/components/pwa/ServiceWorker';
+import { ConfirmProvider } from '@/components/ui/ConfirmProvider';
+import { ToastProvider } from '@/components/ui/ToastProvider';
 import './globals.css';
 
 const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME ?? 'Carz Management';
@@ -65,10 +67,14 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable}`}
     >
       <body>
-        <OnlineStatus />
-        {children}
-        <InstallPrompt />
-        <ServiceWorkerRegistrar />
+        <ConfirmProvider>
+          <ToastProvider>
+            <OnlineStatus />
+            {children}
+            <InstallPrompt />
+            <ServiceWorkerRegistrar />
+          </ToastProvider>
+        </ConfirmProvider>
       </body>
     </html>
   );

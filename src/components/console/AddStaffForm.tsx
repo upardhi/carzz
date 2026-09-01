@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Button, Note } from '@/components/ui/primitives';
+import { toast } from '@/components/ui/ToastProvider';
 import { money } from '@/lib/util/format';
 
 export function AddStaffForm({
@@ -39,15 +40,20 @@ export function AddStaffForm({
       });
       const data = (await response.json()) as { message?: string; error?: string };
       if (!response.ok) {
-        setState({ error: data.error ?? 'Could not add that staff member.' });
+        const err = data.error ?? 'Could not add that staff member.';
+        setState({ error: err });
+        toast.error(err);
         return;
       }
-      setState({ ok: data.message ?? 'Added.' });
+      const msg = data.message ?? 'Added.';
+      setState({ ok: msg });
+      toast.success(msg);
       setName(''); setPhone(''); setEmail(''); setPassword('');
       setReferredByStaffId('');
       router.refresh();
     } catch {
       setState({ error: 'No connection.' });
+      toast.error('No connection.');
     } finally {
       setPending(false);
     }

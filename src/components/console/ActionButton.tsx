@@ -3,15 +3,14 @@
 import { useRouter } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/primitives';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
+import { useToast } from '@/components/ui/ToastProvider';
+import type { ConfirmTone } from '@/components/ui/ConfirmDialog';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'gold';
 
 /**
- * A button that posts a JSON action and refreshes the page.
- *
- * Nearly every console control is this shape, so keeping it in one place means
- * consistent pending, error and confirmation behaviour rather than each screen
- * inventing its own.
+ * A button that posts a JSON action, shows a toast notification, and refreshes the page.
  */
 export function ActionButton({
   endpoint,
@@ -19,7 +18,13 @@ export function ActionButton({
   children,
   variant = 'primary',
   size = 'sm',
+  className,
+  block,
   confirm,
+  confirmTitle,
+  confirmTone,
+  confirmText,
+  cancelText,
   onDone,
 }: {
   endpoint: string;
@@ -27,56 +32,76 @@ export function ActionButton({
   children: ReactNode;
   variant?: Variant;
   size?: 'sm' | 'md' | 'lg';
-  /** Shown in a confirm dialog for anything hard to undo. */
+  className?: string;
+  block?: boolean;
+  /** Shown in a confirm modal for anything hard to undo. */
   confirm?: string;
+  confirmTitle?: string;
+  confirmTone?: ConfirmTone;
+  confirmText?: string;
+  cancelText?: string;
   onDone?: (result: { message?: string }) => void;
 }) {
   const router = useRouter();
+  const showConfirm = useConfirm();
+  const { toast } = useToast();
   const [pending, setPending] = useState(false);
-  const [feedback, setFeedback] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
 
   async function run() {
-    if (confirm && !window.confirm(confirm)) return;
+    if (confirm) {
+      const ok = await showConfirm({
+        title: confirmTitle,
+        message: confirm,
+        tone: confirmTone || (variant === 'danger' ? 'danger' : undefined),
+        confirmText,
+        cancelText,
+      });
+      if (!ok) return;
+    }
     setPending(true);
-    setFeedback(null);
-    setFailed(false);
     try {
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      const data = (await response.json()) as { message?: string; error?: string };
+      let data: { message?: string; error?: string } = {};
+      try {
+        data = (await response.json()) as { message?: string; error?: string };
+      } catch {
+        data = {
+          error:
+            response.status === 401
+              ? 'Session expired. Please sign in again.'
+              : response.statusText || 'That did not work.',
+        };
+      }
       if (!response.ok) {
-        setFailed(true);
-        setFeedback(data.error ?? 'That did not work.');
+        toast.error(data.error ?? 'That did not work.');
         return;
       }
-      setFeedback(data.message ?? null);
+      if (data.message) {
+        toast.success(data.message);
+      }
       onDone?.(data);
       router.refresh();
     } catch {
-      setFailed(true);
-      setFeedback('No connection. Try again.');
+      toast.error('No connection. Try again.');
     } finally {
       setPending(false);
     }
   }
 
   return (
-    <span className="inline-flex flex-col items-start gap-1">
-      <Button variant={variant} size={size} disabled={pending} onClick={run}>
-        {pending ? 'Working…' : children}
-      </Button>
-      {feedback ? (
-        <span
-          role="status"
-          className={`text-[11px] font-semibold ${failed ? 'text-danger-500' : 'text-success-600'}`}
-        >
-          {feedback}
-        </span>
-      ) : null}
-    </span>
+    <Button
+      variant={variant}
+      size={size}
+      block={block}
+      className={className}
+      disabled={pending}
+      onClick={run}
+    >
+      {pending ? 'Working…' : children}
+    </Button>
   );
 }

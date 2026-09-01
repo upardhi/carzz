@@ -1,4 +1,4 @@
-﻿@tailwind base;
+@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
@@ -136,12 +136,9 @@
     outline-offset: 2px;
     border-radius: 6px;
   }
-
-  /* While the install banner is showing, keep the bottom of the page clear */
-  :root[data-install-banner] main {
-    padding-bottom: 11rem;
-  }
 }
+
+
 
 /* =============================================================================
    Component classes
@@ -228,9 +225,18 @@
     animation: pulse-ring 2s infinite;
   }
 
-  /* Slide-in for sidebar drawers and panels */
-  .slide-in {
-    animation: slide-in-right 220ms ease-out both;
+  /* Slide-in for sidebar drawers, panels, and toasts */
+  .slide-in,
+  .animate-slide-in {
+    animation: slide-in-right 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .animate-scale-in {
+    animation: scale-in 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .animate-fade-in {
+    animation: fade-in 150ms ease-out both;
   }
 
   /* Hide from screen, show in print */
@@ -243,6 +249,37 @@
     -webkit-appearance: none !important;
     -moz-appearance: none !important;
     background-image: none !important;
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(20px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }
 
