@@ -196,6 +196,26 @@ that (it clears every table first).
 The starter data includes the owner account `owner@carzz.app` / `owner123`.
 **Change that password before the address is public.**
 
+### When a deployment misbehaves
+
+`/api/health` says what is wrong in one line: which store is in use, whether
+`AUTH_SECRET` is usable, whether the database answers, and how many accounts
+it holds. It reports states, never values — no connection string, no secret.
+
+A serverless host ships each function with only the files Next traced as
+needed, so a module imported in a way tracing cannot follow is simply absent
+at runtime — a failure that appears on the deployment and nowhere else. To
+reproduce that locally:
+
+```bash
+STANDALONE_BUILD=1 npm run build
+cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/
+cd .next/standalone && node server.js
+```
+
+That runs the traced bundle and nothing else. Point the checks at it with
+`npm run smoke -- --base=http://localhost:3000`.
+
 ## Mobile
 
 The PWA is installable and works offline — see [MOBILE.md](./MOBILE.md) for
