@@ -12,7 +12,7 @@ import {
   IconGrid,
   IconList,
   IconMapPin,
-  IconMoreVertical,
+
   IconTrendingUp,
   IconUser,
 } from '@/components/shell/icons';
