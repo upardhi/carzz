@@ -4,7 +4,6 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { Button, Card, CardHeading, Note, Tag } from '@/components/ui/primitives';
 import { toast } from '@/components/ui/ToastProvider';
-import { IconClose } from '@/components/shell/icons';
 import type { SiteContent } from '@/lib/data/types';
 
 /**
