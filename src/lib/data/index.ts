@@ -33,11 +33,28 @@ export async function getStore(): Promise<DataStore> {
       // the deployed bundle entirely, and every request that touched the
       // database failed with "the Prisma packages are not installed" — on the
       // host only, never locally, where node_modules is right there.
-      const [{ PrismaStore }, prismaModule, adapterModule] = await Promise.all([
-        import('./prisma/store'),
-        import('@prisma/client').catch(() => null),
-        import('@prisma/adapter-pg').catch(() => null),
-      ]);
+      let prismaModule = await import('@prisma/client').catch(() => null);
+      if (!prismaModule) {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          prismaModule = require('@prisma/client');
+        } catch {
+          // ignore
+        }
+      }
+
+      let adapterModule = await import('@prisma/adapter-pg').catch(() => null);
+      if (!adapterModule) {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          adapterModule = require('@prisma/adapter-pg');
+        } catch {
+          // ignore
+        }
+      }
+
+      const { PrismaStore } = await import('./prisma/store');
+
       if (!prismaModule || !adapterModule) {
         throw new Error(
           'DATA_PROVIDER=prisma but the Prisma packages are not installed.\n' +

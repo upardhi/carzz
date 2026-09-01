@@ -1,8 +1,6 @@
 'use client';
 
-import { useState } from 'react';
 import {
-  IconCalendar,
   IconCar,
   IconChart,
   IconClock,
@@ -33,8 +31,6 @@ export function AreasClient({
   cycle: _cycle,
   cycleLabel,
 }: AreasClientProps) {
-  const [selectedCycle, setSelectedCycle] = useState('2026-09');
-
   const totalCustomers = performance.reduce((s, p) => s + p.customers, 0);
   const totalCollected = performance.reduce((s, p) => s + p.collected, 0);
   const totalOutstanding = performance.reduce((s, p) => s + p.outstanding, 0);
@@ -88,7 +84,7 @@ export function AreasClient({
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `areas_report_${selectedCycle}.csv`);
+    link.setAttribute('download', `areas_report.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -96,7 +92,7 @@ export function AreasClient({
 
   return (
     <div className="space-y-6">
-      {/* Header Section with Month Picker and Export Button */}
+      {/* Header Section with Export Button */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black tracking-tight text-navy-950">
@@ -108,23 +104,6 @@ export function AreasClient({
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Month Selector Dropdown */}
-          <div className="relative">
-            <div className="flex items-center gap-2 rounded-xl border border-line-strong bg-white px-3 py-1.5 shadow-sm hover:border-navy-400">
-              <IconCalendar width={15} height={15} className="text-slate-400" />
-              <select
-                aria-label="Select billing cycle"
-                value={selectedCycle}
-                onChange={(e) => setSelectedCycle(e.target.value)}
-                className="cursor-pointer bg-transparent text-xs font-bold text-navy-950 focus:outline-none"
-              >
-                <option value="2026-09">September 2026</option>
-                <option value="2026-08">August 2026</option>
-                <option value="2026-07">July 2026</option>
-              </select>
-            </div>
-          </div>
-
           {/* Export Report Button */}
           <button
             type="button"
@@ -152,8 +131,8 @@ export function AreasClient({
               <div className="text-2xl font-black text-navy-950">{totalCustomers}</div>
             </div>
           </div>
-          <div className="mt-2 text-[11px] font-semibold text-emerald-600">
-            ↗ 12% <span className="font-normal text-ink-faint">vs Aug 2026</span>
+          <div className="mt-2 text-[11px] font-medium text-ink-mute">
+            Across {performance.length} areas
           </div>
         </div>
 
@@ -173,7 +152,9 @@ export function AreasClient({
             </div>
           </div>
           <div className="mt-2 text-[11px] font-semibold text-emerald-600">
-            ↗ 8% <span className="font-normal text-ink-faint">vs Aug 2026</span>
+            {totalCollected + totalOutstanding > 0
+              ? `${Math.round((totalCollected / (totalCollected + totalOutstanding)) * 100)}%`
+              : '100%'} efficiency
           </div>
         </div>
 
@@ -193,7 +174,7 @@ export function AreasClient({
             </div>
           </div>
           <div className="mt-2 text-[11px] font-semibold text-amber-600">
-            ↘ 5% <span className="font-normal text-ink-faint">vs Aug 2026</span>
+            Pending recovery
           </div>
         </div>
 
@@ -210,8 +191,8 @@ export function AreasClient({
               <div className="text-2xl font-black text-navy-950">{totalWashesDone}</div>
             </div>
           </div>
-          <div className="mt-2 text-[11px] font-semibold text-emerald-600">
-            ↗ 10% <span className="font-normal text-ink-faint">vs Aug 2026</span>
+          <div className="mt-2 text-[11px] font-medium text-sky-600">
+            This month
           </div>
         </div>
 
@@ -229,7 +210,7 @@ export function AreasClient({
             </div>
           </div>
           <div className="mt-2 text-[11px] font-semibold text-rose-600">
-            ↘ 13% <span className="font-normal text-ink-faint">vs Aug 2026</span>
+            {totalWashesMissed > 0 ? `${totalWashesMissed} missed` : 'Zero missed'}
           </div>
         </div>
 
@@ -246,8 +227,8 @@ export function AreasClient({
               <div className="text-2xl font-black text-navy-950">{totalStaff}</div>
             </div>
           </div>
-          <div className="mt-2 text-[11px] font-semibold text-emerald-600">
-            ↗ 11% <span className="font-normal text-ink-faint">vs Aug 2026</span>
+          <div className="mt-2 text-[11px] font-medium text-purple-600">
+            Active staff
           </div>
         </div>
       </div>

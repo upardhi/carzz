@@ -1,10 +1,8 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import {
   IconAlert,
-  IconCalendar,
   IconRupee,
   IconTrendingUp,
   IconUser,
@@ -30,8 +28,6 @@ export function ManagersClient({
   cycleLabel: _cycleLabel,
   canAddManager = false,
 }: ManagersClientProps) {
-  const [selectedCycle, setSelectedCycle] = useState('2026-09');
-
   const performanceByArea = new Map(performance.map((p) => [p.area.id, p]));
   const userByStaff = new Map(
     users.filter((u) => u.staffId).map((u) => [u.staffId!, u]),
@@ -107,21 +103,6 @@ export function ManagersClient({
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Month Selector Dropdown */}
-          <div className="flex items-center gap-2 rounded-xl border border-line-strong bg-white px-3 py-1.5 shadow-sm hover:border-navy-400">
-            <IconCalendar width={15} height={15} className="text-slate-400" />
-            <select
-              aria-label="Select billing cycle"
-              value={selectedCycle}
-              onChange={(e) => setSelectedCycle(e.target.value)}
-              className="cursor-pointer bg-transparent text-xs font-bold text-navy-950 focus:outline-none"
-            >
-              <option value="2026-09">September 2026</option>
-              <option value="2026-08">August 2026</option>
-              <option value="2026-07">July 2026</option>
-            </select>
-          </div>
-
           {/* Add Manager Button (shown only if user has access) */}
           {canAddManager ? (
             <Link
@@ -149,7 +130,7 @@ export function ManagersClient({
               <div className="text-2xl font-black text-navy-950">{totalManagers}</div>
             </div>
           </div>
-          <div className="mt-2 text-[11px] font-medium text-ink-faint">
+          <div className="mt-2 text-[11px] font-medium text-ink-mute">
             Active in this region
           </div>
         </div>
@@ -167,7 +148,7 @@ export function ManagersClient({
               <div className="text-2xl font-black text-navy-950">{totalCustomers}</div>
             </div>
           </div>
-          <div className="mt-2 text-[11px] font-medium text-ink-faint">
+          <div className="mt-2 text-[11px] font-medium text-ink-mute">
             Across all areas
           </div>
         </div>
@@ -188,7 +169,9 @@ export function ManagersClient({
             </div>
           </div>
           <div className="mt-2 text-[11px] font-semibold text-emerald-600">
-            ↑ 8% <span className="font-normal text-ink-faint">vs Aug 2026</span>
+            {totalCollected + totalOutstanding > 0
+              ? `${Math.round((totalCollected / (totalCollected + totalOutstanding)) * 100)}%`
+              : '100%'} efficiency
           </div>
         </div>
 
@@ -208,7 +191,7 @@ export function ManagersClient({
             </div>
           </div>
           <div className="mt-2 text-[11px] font-semibold text-amber-600">
-            ↓ 5% <span className="font-normal text-ink-faint">vs Aug 2026</span>
+            Pending collection
           </div>
         </div>
 
@@ -226,7 +209,7 @@ export function ManagersClient({
             </div>
           </div>
           <div className="mt-2 text-[11px] font-semibold text-rose-600">
-            ↑ 13% <span className="font-normal text-ink-faint">vs Aug 2026</span>
+            {totalMissed > 0 ? `${totalMissed} missed washes` : 'Zero missed washes'}
           </div>
         </div>
 
@@ -243,8 +226,8 @@ export function ManagersClient({
               <div className="text-2xl font-black text-navy-950">{totalStaff}</div>
             </div>
           </div>
-          <div className="mt-2 text-[11px] font-semibold text-emerald-600">
-            ↑ 11% <span className="font-normal text-ink-faint">vs Aug 2026</span>
+          <div className="mt-2 text-[11px] font-medium text-purple-600">
+            Assigned staff
           </div>
         </div>
       </div>
@@ -466,46 +449,16 @@ export function ManagersClient({
 
           {canAddManager ? (
             <div className="mt-4 pt-3">
-              <button
-                type="button"
-                onClick={() => setShowAddModal(true)}
+              <Link
+                href="/admin/users"
                 className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition-colors hover:bg-blue-700"
               >
                 + Add new manager
-              </button>
+              </Link>
             </div>
           ) : null}
         </div>
       </div>
-
-      {/* Add Manager Info Modal */}
-      {showAddModal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-950/40 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl border border-line-soft bg-white p-6 shadow-xl">
-            <div className="flex items-center gap-3 text-navy-950">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-                <IconUser width={20} height={20} />
-              </div>
-              <div>
-                <h3 className="text-base font-extrabold">Add Area Manager</h3>
-                <p className="text-xs text-ink-mute">Super Admin Authority Required</p>
-              </div>
-            </div>
-            <p className="mt-4 text-sm leading-relaxed text-slate-600">
-              Manager accounts are provisioned by the <strong>Super Admin</strong> to ensure centralized role and area assignments. Please contact your administrator to create a new manager profile.
-            </p>
-            <div className="mt-6 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setShowAddModal(false)}
-                className="rounded-xl bg-navy-900 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-navy-800"
-              >
-                Understood
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }
