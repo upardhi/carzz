@@ -27,7 +27,13 @@ import type {
   UserCredential,
   WashVisit,
 } from '../types';
-import { PrismaRepository, type PrismaDelegate } from './repository';
+import { DATE_FIELDS } from './fields';
+import {
+  PrismaRepository,
+  fromDbRow,
+  toDbData,
+  type PrismaDelegate,
+} from './repository';
 
 /**
  * The shape of a generated `PrismaClient` this adapter relies on. Typing it
@@ -104,27 +110,27 @@ export class PrismaStore implements DataStore {
   readonly enquiries;
 
   constructor(private readonly prisma: PrismaClientLike) {
-    this.users = new PrismaRepository<User>(prisma.user);
-    this.regions = new PrismaRepository<Region>(prisma.region);
-    this.areas = new PrismaRepository<Area>(prisma.area);
-    this.staff = new PrismaRepository<Staff>(prisma.staff);
-    this.attendance = new PrismaRepository<Attendance>(prisma.attendance);
-    this.pocketRequests = new PrismaRepository<PocketMoneyRequest>(prisma.pocketMoneyRequest);
-    this.customers = new PrismaRepository<Customer>(prisma.customer);
-    this.cars = new PrismaRepository<Car>(prisma.car);
-    this.packages = new PrismaRepository<ServicePackage>(prisma.servicePackage);
-    this.visits = new PrismaRepository<WashVisit>(prisma.washVisit);
-    this.payments = new PrismaRepository<Payment>(prisma.payment);
-    this.invoices = new PrismaRepository<Invoice>(prisma.invoice);
-    this.expenses = new PrismaRepository<Expense>(prisma.expense);
-    this.payouts = new PrismaRepository<StaffPayout>(prisma.staffPayout);
-    this.complaints = new PrismaRepository<Complaint>(prisma.complaint);
-    this.inventoryItems = new PrismaRepository<InventoryItem>(prisma.inventoryItem);
-    this.stockLevels = new PrismaRepository<StockLevel>(prisma.stockLevel);
-    this.purchaseRequests = new PrismaRepository<PurchaseRequest>(prisma.purchaseRequest);
-    this.stockIssues = new PrismaRepository<StockIssue>(prisma.stockIssue);
-    this.notifications = new PrismaRepository<Notification>(prisma.notification);
-    this.enquiries = new PrismaRepository<Enquiry>(prisma.enquiry);
+    this.users = new PrismaRepository<User>(prisma.user, DATE_FIELDS.user);
+    this.regions = new PrismaRepository<Region>(prisma.region, DATE_FIELDS.region);
+    this.areas = new PrismaRepository<Area>(prisma.area, DATE_FIELDS.area);
+    this.staff = new PrismaRepository<Staff>(prisma.staff, DATE_FIELDS.staff);
+    this.attendance = new PrismaRepository<Attendance>(prisma.attendance, DATE_FIELDS.attendance);
+    this.pocketRequests = new PrismaRepository<PocketMoneyRequest>(prisma.pocketMoneyRequest, DATE_FIELDS.pocketMoneyRequest);
+    this.customers = new PrismaRepository<Customer>(prisma.customer, DATE_FIELDS.customer);
+    this.cars = new PrismaRepository<Car>(prisma.car, DATE_FIELDS.car);
+    this.packages = new PrismaRepository<ServicePackage>(prisma.servicePackage, DATE_FIELDS.servicePackage);
+    this.visits = new PrismaRepository<WashVisit>(prisma.washVisit, DATE_FIELDS.washVisit);
+    this.payments = new PrismaRepository<Payment>(prisma.payment, DATE_FIELDS.payment);
+    this.invoices = new PrismaRepository<Invoice>(prisma.invoice, DATE_FIELDS.invoice);
+    this.expenses = new PrismaRepository<Expense>(prisma.expense, DATE_FIELDS.expense);
+    this.payouts = new PrismaRepository<StaffPayout>(prisma.staffPayout, DATE_FIELDS.staffPayout);
+    this.complaints = new PrismaRepository<Complaint>(prisma.complaint, DATE_FIELDS.complaint);
+    this.inventoryItems = new PrismaRepository<InventoryItem>(prisma.inventoryItem, DATE_FIELDS.inventoryItem);
+    this.stockLevels = new PrismaRepository<StockLevel>(prisma.stockLevel, DATE_FIELDS.stockLevel);
+    this.purchaseRequests = new PrismaRepository<PurchaseRequest>(prisma.purchaseRequest, DATE_FIELDS.purchaseRequest);
+    this.stockIssues = new PrismaRepository<StockIssue>(prisma.stockIssue, DATE_FIELDS.stockIssue);
+    this.notifications = new PrismaRepository<Notification>(prisma.notification, DATE_FIELDS.notification);
+    this.enquiries = new PrismaRepository<Enquiry>(prisma.enquiry, DATE_FIELDS.enquiry);
   }
 
   async getCredential(userId: Id): Promise<UserCredential | null> {
@@ -146,16 +152,17 @@ export class PrismaStore implements DataStore {
       where: { id: 'default' },
     });
     if (!row) throw new Error('App settings row missing — run the seed.');
-    return row as AppSettings;
+    return fromDbRow<AppSettings>(row, DATE_FIELDS.appSettings);
   }
 
   async saveAppSettings(patch: Partial<AppSettings>): Promise<AppSettings> {
     const current = await this.getAppSettings();
     const next = { ...current, ...patch, id: 'default' as const };
+    const row = toDbData(next, DATE_FIELDS.appSettings);
     await this.prisma.appSettings.upsert({
       where: { id: 'default' },
-      create: next,
-      update: next,
+      create: row,
+      update: row,
     });
     return next;
   }
@@ -165,7 +172,7 @@ export class PrismaStore implements DataStore {
       where: { id: 'default' },
     });
     if (!row) throw new Error('Payout settings row missing — run the seed.');
-    return row as PayoutSettings;
+    return fromDbRow<PayoutSettings>(row, DATE_FIELDS.payoutSettings);
   }
 
   async savePayoutSettings(
@@ -173,10 +180,11 @@ export class PrismaStore implements DataStore {
   ): Promise<PayoutSettings> {
     const current = await this.getPayoutSettings();
     const next = { ...current, ...patch, id: 'default' as const };
+    const row = toDbData(next, DATE_FIELDS.payoutSettings);
     await this.prisma.payoutSettings.upsert({
       where: { id: 'default' },
-      create: next,
-      update: next,
+      create: row,
+      update: row,
     });
     return next;
   }
@@ -186,7 +194,7 @@ export class PrismaStore implements DataStore {
       where: { id: 'default' },
     });
     if (!row) throw new Error('Site content row missing — run the seed.');
-    return row as SiteContent;
+    return fromDbRow<SiteContent>(row, DATE_FIELDS.siteContent);
   }
 
   async saveSiteContent(patch: Partial<SiteContent>): Promise<SiteContent> {
@@ -196,10 +204,11 @@ export class PrismaStore implements DataStore {
       id: 'default' as const,
       updatedAt: new Date().toISOString(),
     };
+    const row = toDbData(next, DATE_FIELDS.siteContent);
     await this.prisma.siteContent.upsert({
       where: { id: 'default' },
-      create: next,
-      update: next,
+      create: row,
+      update: row,
     });
     return next;
   }

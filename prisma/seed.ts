@@ -10,10 +10,23 @@
  *
  * Running it twice is safe: every table is cleared first.
  */
+import { PrismaPg } from '@prisma/adapter-pg';
 import { Prisma, PrismaClient } from '@prisma/client';
 import { buildSeed } from '../src/lib/data/memory/seed';
 
-const prisma = new PrismaClient();
+// Prisma 7 talks to the database through a driver adapter rather than its own
+// engine. Seeding uses the *direct* connection when there is one: it writes
+// tens of thousands of rows in a handful of long transactions, which is the
+// one workload a connection pooler handles worst.
+const connectionString = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
+if (!connectionString) {
+  console.error(
+    'Set DATABASE_URL (and DIRECT_URL, if your host has a pooler) before seeding.',
+  );
+  process.exit(1);
+}
+
+const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
 
 /** `2026-08-31` → a Date at UTC midnight, for a `@db.Date` column. */
 const day = (value: string) => new Date(`${value}T00:00:00.000Z`);

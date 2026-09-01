@@ -140,6 +140,20 @@ a freshly started server, since they mutate the state they act on.
 
 Point it at a deployment with `npm run smoke -- --base=https://…`.
 
+Run it against a real Postgres too, not only the in-memory store — three bugs
+lived in the Prisma path alone and none of them were visible on `memory`:
+
+```bash
+DATA_PROVIDER=prisma DATABASE_URL=… DIRECT_URL=… \
+  npm run db:push && npm run db:seed && npm run build && npm run smoke
+```
+
+`npm run smoke` first checks `src/lib/data/prisma/fields.ts` against
+`prisma/schema.prisma`. That map tells the adapter which columns hold dates:
+Postgres returns `Date` objects where the rest of the app expects the date
+strings the memory store gives it, so a date column missing from the map
+breaks one screen on the real database and nowhere else.
+
 ## Deploying
 
 `npm run build` runs `prisma generate` first, because the generated Prisma

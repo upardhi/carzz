@@ -91,8 +91,14 @@ export async function issueStock(
     where: { areaId: input.areaId, itemId: input.itemId },
   });
 
+  // Named field by field rather than spread: callers pass their whole request
+  // body in, and an extra key reaches the database as an unknown column.
   await store.stockIssues.create({
-    ...input,
+    areaId: input.areaId,
+    itemId: input.itemId,
+    staffId: input.staffId,
+    quantity: input.quantity,
+    issuedByUserId: input.issuedByUserId,
     createdAt: new Date().toISOString(),
   });
 
