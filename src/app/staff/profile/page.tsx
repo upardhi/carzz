@@ -1,4 +1,4 @@
-import { Button, Card, CardHeading, Note, Row } from '@/components/ui/primitives';
+import { Button, Card, CardHeading, Row } from '@/components/ui/primitives';
 import { requirePermission } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import {
@@ -88,10 +88,6 @@ export default async function StaffProfile() {
         />
       </Card>
 
-      <Note tone="success">
-        A tea break of {settings.teaBreakMinutes} minutes is allowed. Tell your
-        manager if you need longer.
-      </Note>
 
       <form action="/api/auth/logout" method="post">
         <Button type="submit" variant="secondary" block>

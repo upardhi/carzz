@@ -3,7 +3,6 @@ import {
   Card,
   CardHeading,
   EmptyState,
-  Note,
   Progress,
   Stat,
   Tag,
@@ -165,12 +164,6 @@ export default async function StaffToday() {
         );
       })}
 
-      {pending > 0 ? (
-        <Note tone="brand">
-          Take the before photo, tick what you did, then the after photo. A wash
-          cannot be closed without both photos.
-        </Note>
-      ) : null}
     </div>
   );
 }

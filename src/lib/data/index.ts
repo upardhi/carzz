@@ -101,12 +101,29 @@ export async function getStore(): Promise<DataStore> {
 
     case 'memory':
     default:
+      warnIfEphemeral();
       store = new MemoryStore();
       break;
   }
 
   globalForStore.__carzzStore = store;
   return store;
+}
+
+/**
+ * The memory store is a fresh copy of the demo seed in every process — right
+ * for local work and the smoke suite, wrong for a deployment. On a serverless
+ * host each instance holds its own copy, so two people see different data and
+ * every save is lost when an instance is recycled.
+ */
+function warnIfEphemeral(): void {
+  if (process.env.NODE_ENV !== 'production') return;
+  console.warn(
+    'Running on the in-memory demo store, so nothing is saved: each server ' +
+      'instance keeps its own copy and loses it when recycled. Set ' +
+      'DATA_PROVIDER=prisma with DATABASE_URL (the pooled connection string) ' +
+      'and DIRECT_URL before using this deployment for real work.',
+  );
 }
 
 /**

@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
-import { Button, Card, CardHeading, Note, Tag } from '@/components/ui/primitives';
+import { Button, Card, Note } from '@/components/ui/primitives';
 import { IconCamera, IconCheck } from '@/components/shell/icons';
 import { MISS_REASONS, type MissReason } from '@/lib/data/types';
 import { MISS_REASON_LABEL } from '@/lib/util/labels';
@@ -17,11 +17,16 @@ interface Props {
 }
 
 /**
- * The wash flow: before photo → work done → after photo → close.
+ * The wash, in as few taps as it can honestly be done.
  *
- * The close button stays disabled until both photos exist, and the server
- * refuses the same combination independently. That is the whole integrity
- * story in one screen — a paper register cannot enforce it, this can.
+ * A normal wash is now: before photo, after photo, done. The work list starts
+ * with the whole package already ticked, because doing the whole package is
+ * the normal case — the boy unticks the exception rather than ticking the
+ * rule. On a four-service package that alone saves three taps per car, and a
+ * boy does this six times a day.
+ *
+ * The close button is disabled until both photos exist, and the server
+ * refuses the same combination independently.
  */
 export function WashFlow({
   visitId,
@@ -34,7 +39,7 @@ export function WashFlow({
   const router = useRouter();
   const [before, setBefore] = useState<string | null>(initialBefore);
   const [after, setAfter] = useState<string | null>(initialAfter);
-  const [done, setDone] = useState<string[]>(services.slice(0, 1));
+  const [done, setDone] = useState<string[]>(services);
   const [uploading, setUploading] = useState<'before' | 'after' | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +48,7 @@ export function WashFlow({
   const beforeInput = useRef<HTMLInputElement>(null);
   const afterInput = useRef<HTMLInputElement>(null);
 
-  const canClose = requireBothPhotos
+  const ready = requireBothPhotos
     ? Boolean(before && after && done.length)
     : done.length > 0;
 
@@ -65,7 +70,7 @@ export function WashFlow({
       if (kind === 'before') setBefore(data.url);
       else setAfter(data.url);
     } catch {
-      setError('No connection. Move to where you have signal and try again.');
+      setError('No signal. Move somewhere with network and tap again.');
     } finally {
       setUploading(null);
     }
@@ -88,7 +93,7 @@ export function WashFlow({
       router.push('/staff');
       router.refresh();
     } catch {
-      setError('No connection. Try again when you have signal.');
+      setError('No signal. Try again when you have network.');
     } finally {
       setPending(false);
     }
@@ -105,115 +110,104 @@ export function WashFlow({
   }
 
   return (
-    <div className="space-y-3">
-      <ol className="flex gap-1.5" aria-label="Progress">
-        {[Boolean(before), done.length > 0, Boolean(after)].map((complete, i) => (
-          <li
-            key={i}
-            className={`h-1.5 flex-1 rounded-pill ${complete ? 'bg-navy-800' : 'bg-line-strong'}`}
+    <>
+      {/* Everything for the wash in one panel — no step cards to scroll past. */}
+      <Card className="p-4">
+        <div className="grid grid-cols-2 gap-3">
+          <input
+            ref={beforeInput}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="sr-only"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void upload('before', file);
+            }}
           />
-        ))}
-      </ol>
+          <input
+            ref={afterInput}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="sr-only"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void upload('after', file);
+            }}
+          />
 
-      <Card className="p-4">
-        <CardHeading>Step 1 — Before photo</CardHeading>
-        <input
-          ref={beforeInput}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          className="sr-only"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) void upload('before', file);
-          }}
-        />
-        <PhotoTile
-          label="Before"
-          url={before}
-          busy={uploading === 'before'}
-          onPick={() => beforeInput.current?.click()}
-        />
-      </Card>
+          <PhotoTile
+            label="Before"
+            url={before}
+            busy={uploading === 'before'}
+            onPick={() => beforeInput.current?.click()}
+          />
+          <PhotoTile
+            label="After"
+            url={after}
+            busy={uploading === 'after'}
+            disabled={!before}
+            onPick={() => afterInput.current?.click()}
+          />
+        </div>
 
-      <Card className="p-4">
-        <CardHeading>Step 2 — What you did</CardHeading>
-        {services.map((service) => {
-          const on = done.includes(service);
-          return (
-            <button
-              key={service}
-              type="button"
-              aria-pressed={on}
-              onClick={() =>
-                setDone((current) =>
-                  on
-                    ? current.filter((s) => s !== service)
-                    : [...current, service],
-                )
-              }
-              className="flex w-full items-center gap-3 border-b border-line-soft py-2.5 text-left text-sm last:border-0"
-            >
-              <span
-                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 ${
-                  on
-                    ? 'border-navy-800 bg-navy-800 text-white'
-                    : 'border-line-strong'
-                }`}
+        <div className="mt-4">
+          <p className="mb-1 text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">
+            Work done
+          </p>
+          {services.map((service) => {
+            const on = done.includes(service);
+            return (
+              <button
+                key={service}
+                type="button"
+                aria-pressed={on}
+                onClick={() =>
+                  setDone((current) =>
+                    on ? current.filter((s) => s !== service) : [...current, service],
+                  )
+                }
+                className="flex w-full items-center gap-3 border-b border-line-soft py-3 text-left text-[15px] last:border-0"
               >
-                {on ? <IconCheck width={13} height={13} strokeWidth={3} /> : null}
-              </span>
-              {service}
-            </button>
-          );
-        })}
-      </Card>
-
-      <Card className="p-4">
-        <CardHeading>Step 3 — After photo</CardHeading>
-        <input
-          ref={afterInput}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          className="sr-only"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) void upload('after', file);
-          }}
-        />
-        <PhotoTile
-          label="After"
-          url={after}
-          busy={uploading === 'after'}
-          disabled={!before}
-          disabledHint="Take the before photo first"
-          onPick={() => afterInput.current?.click()}
-        />
-
-        <div className="mt-3">
-          {before && after ? (
-            <Note tone="success">
-              Both photos saved. You can close this wash.
-            </Note>
-          ) : (
-            <Note>
-              Both photos are compulsory. The wash cannot be closed without them.
-            </Note>
-          )}
+                <span
+                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded border-2 ${
+                    on
+                      ? 'border-success-500 bg-success-500 text-white'
+                      : 'border-line-strong'
+                  }`}
+                >
+                  {on ? <IconCheck width={15} height={15} strokeWidth={3} /> : null}
+                </span>
+                <span className={on ? '' : 'text-ink-mute line-through'}>{service}</span>
+              </button>
+            );
+          })}
         </div>
       </Card>
 
-      {error ? <Note tone="danger">{error}</Note> : null}
+      {error ? (
+        <div className="mt-3">
+          <Note tone="danger">{error}</Note>
+        </div>
+      ) : null}
 
-      <Button block size="lg" disabled={!canClose || pending} onClick={closeWash}>
-        {pending ? 'Closing…' : 'Mark wash done'}
-      </Button>
-
-      <Button block variant="secondary" onClick={() => setMissOpen(true)}>
-        Could not do this wash
-      </Button>
-    </div>
+      {/* The action sits at the thumb, always reachable without scrolling. */}
+      <div className="sticky bottom-24 z-20 mt-3 space-y-2">
+        <Button block size="lg" disabled={!ready || pending} onClick={closeWash}>
+          {pending
+            ? 'Saving…'
+            : ready
+              ? 'Wash done'
+              : !before
+                ? 'Take the before photo'
+                : 'Take the after photo'}
+        </Button>
+        <Button block variant="secondary" onClick={() => setMissOpen(true)}>
+          Could not do this wash
+        </Button>
+      </div>
+    </>
   );
 }
 
@@ -222,14 +216,12 @@ function PhotoTile({
   url,
   busy,
   disabled,
-  disabledHint,
   onPick,
 }: {
   label: string;
   url: string | null;
   busy: boolean;
   disabled?: boolean;
-  disabledHint?: string;
   onPick: () => void;
 }) {
   return (
@@ -237,25 +229,27 @@ function PhotoTile({
       type="button"
       onClick={onPick}
       disabled={disabled || busy}
-      className={`flex aspect-[4/3] w-full max-w-[220px] flex-col items-center justify-center gap-1.5 rounded-lg border-2 text-sm font-bold transition-colors ${
+      className={`relative flex aspect-[4/3] w-full flex-col items-center justify-center gap-1.5 overflow-hidden rounded-lg border-2 text-sm font-bold transition-colors ${
         url
           ? 'border-success-500 bg-success-50 text-success-600'
           : disabled
             ? 'border-dashed border-line-strong bg-surface-raised text-ink-faint'
-            : 'border-dashed border-line-strong bg-surface-raised text-ink-mute hover:border-navy-400'
+            : 'border-dashed border-navy-400 bg-navy-50 text-navy-800'
       }`}
     >
       {url ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={url}
-          alt={`${label} photo`}
-          className="h-full w-full rounded-[6px] object-cover"
-        />
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={url} alt={`${label} photo`} className="h-full w-full object-cover" />
+          <span className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-success-500 py-1 text-xs font-extrabold text-white">
+            <IconCheck width={13} height={13} strokeWidth={3} />
+            {label}
+          </span>
+        </>
       ) : (
         <>
-          <IconCamera width={26} height={26} />
-          {busy ? 'Saving…' : disabled ? disabledHint : `Tap to take ${label.toLowerCase()}`}
+          <IconCamera width={28} height={28} />
+          {busy ? 'Saving…' : label}
         </>
       )}
     </button>
@@ -272,18 +266,12 @@ function MissWashForm({
   onCancel: () => void;
 }) {
   const router = useRouter();
-  const [reason, setReason] = useState<MissReason | null>(null);
-  const [note, setNote] = useState('');
-  const [rescheduleTo, setRescheduleTo] = useState(nextSlotDate);
-  const [pending, setPending] = useState(false);
+  const [pending, setPending] = useState<MissReason | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function submit() {
-    if (!reason) {
-      setError('Choose a reason — this cannot be skipped.');
-      return;
-    }
-    setPending(true);
+  /** One tap: choosing the reason is the submit. */
+  async function submit(reason: MissReason) {
+    setPending(reason);
     setError(null);
     try {
       const response = await fetch('/api/staff/wash', {
@@ -293,8 +281,7 @@ function MissWashForm({
           action: 'miss',
           visitId,
           reason,
-          note: note || undefined,
-          rescheduleTo,
+          rescheduleTo: nextSlotDate,
         }),
       });
       const data = (await response.json()) as { error?: string };
@@ -305,77 +292,50 @@ function MissWashForm({
       router.push('/staff');
       router.refresh();
     } catch {
-      setError('No connection. Try again when you have signal.');
+      setError('No signal. Try again when you have network.');
     } finally {
-      setPending(false);
+      setPending(null);
     }
   }
 
   return (
-    <div className="space-y-3">
+    <>
       <Card className="p-4">
-        <div className="mb-2 flex items-center justify-between">
-          <CardHeading>Reason</CardHeading>
-          <Tag tone="bad">Compulsory</Tag>
-        </div>
-        {MISS_REASONS.filter((r) => r !== 'STAFF_ABSENT').map((r) => (
+        <p className="mb-2 text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">
+          Why not?
+        </p>
+        {MISS_REASONS.filter((r) => r !== 'STAFF_ABSENT').map((reason) => (
           <button
-            key={r}
+            key={reason}
             type="button"
-            aria-pressed={reason === r}
-            onClick={() => setReason(r)}
-            className="flex w-full items-center gap-3 border-b border-line-soft py-2.5 text-left text-sm last:border-0"
+            disabled={pending !== null}
+            onClick={() => submit(reason)}
+            className="flex w-full items-center justify-between border-b border-line-soft py-3.5 text-left text-[15px] font-semibold last:border-0 disabled:opacity-50"
           >
-            <span
-              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
-                reason === r
-                  ? 'border-navy-800 bg-navy-800 text-white'
-                  : 'border-line-strong'
-              }`}
-            >
-              {reason === r ? (
-                <IconCheck width={12} height={12} strokeWidth={3} />
-              ) : null}
-            </span>
-            {MISS_REASON_LABEL[r]}
+            {MISS_REASON_LABEL[reason]}
+            {pending === reason ? (
+              <span className="text-xs font-bold text-ink-mute">Saving…</span>
+            ) : null}
           </button>
         ))}
-
-        <label className="field-label mt-3" htmlFor="miss-note">
-          Any detail (optional)
-        </label>
-        <textarea
-          id="miss-note"
-          className="field"
-          rows={2}
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-        />
       </Card>
 
-      <Card className="p-4">
-        <CardHeading>Reschedule to</CardHeading>
-        <input
-          type="date"
-          className="field"
-          value={rescheduleTo}
-          onChange={(e) => setRescheduleTo(e.target.value)}
-        />
-      </Card>
+      <div className="mt-3">
+        <Note tone="brand">
+          The wash goes back into the customer&rsquo;s count and is rescheduled.
+          He does not lose it.
+        </Note>
+      </div>
 
-      <Note tone="success">
-        The wash goes <b>back into the customer’s count</b> — he does not lose
-        it. The customer and your area manager are both told.
-      </Note>
+      {error ? (
+        <div className="mt-3">
+          <Note tone="danger">{error}</Note>
+        </div>
+      ) : null}
 
-      {error ? <Note tone="danger">{error}</Note> : null}
-
-      <Button block size="lg" disabled={pending} onClick={submit}>
-        {pending ? 'Sending…' : 'Submit'}
+      <Button block variant="secondary" className="mt-3" onClick={onCancel}>
+        Back
       </Button>
-      <Button block variant="secondary" onClick={onCancel}>
-        Back to the wash
-      </Button>
-    </div>
+    </>
   );
 }

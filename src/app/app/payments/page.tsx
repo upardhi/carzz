@@ -2,7 +2,6 @@ import { notFound } from 'next/navigation';
 import {
   Card,
   CardHeading,
-  Note,
   Row,
   SectionTitle,
   Stat,
@@ -115,10 +114,6 @@ export default async function CustomerPayments() {
         )}
       </Card>
 
-      <Note tone="brand">
-        You get a reminder {settings.reminderDaysBeforeDue} days before the due
-        date and a confirmation the moment a payment is recorded.
-      </Note>
     </div>
   );
 }

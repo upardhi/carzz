@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Card, Note, Progress, Row, Tag } from '@/components/ui/primitives';
+import { Card, Progress, Row, Tag } from '@/components/ui/primitives';
 import { requirePermission } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { loadCustomerAccount } from '@/lib/services/accounts';
@@ -66,10 +66,6 @@ export default async function CustomerCars() {
         </Card>
       ))}
 
-      <Note tone="brand">
-        All your cars share one payment account with a single balance and due
-        date, while each car keeps its own wash count and time slot.
-      </Note>
     </div>
   );
 }

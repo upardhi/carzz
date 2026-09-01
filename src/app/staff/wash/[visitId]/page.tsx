@@ -1,9 +1,8 @@
 import { notFound, redirect } from 'next/navigation';
-import { Card, Note, Row } from '@/components/ui/primitives';
+import { Card } from '@/components/ui/primitives';
 import { requirePermission } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { nextSlotAfter } from '@/lib/services/schedule';
-import { formatTime } from '@/lib/util/format';
 import { WashFlow } from './WashFlow';
 
 export const metadata = { title: 'Wash' };
@@ -47,31 +46,28 @@ export default async function WashPage({
 
   return (
     <div className="space-y-3">
+      {/* Only what he needs standing at the car: who, which car, where. */}
       <Card className="p-4">
         <h1 className="text-base font-extrabold">{customer.name}</h1>
-        <p className="text-xs text-ink-mute">
+        <p className="mt-0.5 text-sm text-ink-mute">
           {car.make} {car.model} · {car.colour} · {car.plate}
         </p>
-        <div className="mt-2.5">
-          <Row label="Slot" value={formatTime(visit.scheduledTime)} />
-          <Row label="Package" value={pkg?.name ?? '—'} />
-          <Row label="Address" value={customer.address} />
-          {customer.landmark ? (
-            <Row label="Landmark" value={customer.landmark} />
-          ) : null}
-        </div>
+        <p className="mt-1 text-sm text-ink-soft">
+          {customer.address}
+          {customer.landmark ? ` · ${customer.landmark}` : ''}
+        </p>
 
         {customer.note || car.specialInstructions ? (
-          <div className="mt-3">
-            <Note>{customer.note ?? car.specialInstructions}</Note>
-          </div>
+          <p className="mt-2 rounded-lg bg-gold-50 px-3 py-2 text-sm font-semibold text-gold-700">
+            {customer.note ?? car.specialInstructions}
+          </p>
         ) : null}
 
         <a
           href={mapsHref}
           target="_blank"
           rel="noreferrer"
-          className="mt-3 block rounded-lg border border-line-strong bg-white py-2.5 text-center text-sm font-bold text-ink hover:bg-surface-muted"
+          className="mt-3 block rounded-lg border border-line-strong bg-white py-2.5 text-center text-sm font-bold text-navy-800"
         >
           Open in Maps
         </a>
