@@ -45,7 +45,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#0f1e2a',
+  themeColor: '#081429',
   width: 'device-width',
   initialScale: 1,
   // Installed apps should not rubber-band or zoom on a double tap, but pinch

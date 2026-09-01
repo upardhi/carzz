@@ -74,6 +74,7 @@ export function LoginForm({ next }: { next?: string }) {
             type={show ? 'text' : 'password'}
             autoComplete="current-password"
             required
+            placeholder="••••••••"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />

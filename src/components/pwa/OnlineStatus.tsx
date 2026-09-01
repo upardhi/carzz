@@ -26,7 +26,7 @@ export function OnlineStatus() {
   return (
     <div
       role="status"
-      className="sticky top-0 z-50 bg-gold-500 px-3 py-1.5 text-center text-xs font-extrabold text-navy-900"
+      className="sticky top-0 z-50 bg-gold-500 px-3 py-1.5 text-center text-xs font-extrabold text-white"
     >
       No connection — showing your last loaded data
     </div>

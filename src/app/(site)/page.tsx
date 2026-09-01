@@ -79,7 +79,7 @@ export default async function HomePage() {
           <div className="mt-8 flex flex-wrap gap-3">
             <a
               href="#book"
-              className="rounded-lg bg-gold-500 px-6 py-3 text-[15px] font-extrabold text-navy-950 transition-colors hover:bg-gold-400"
+              className="rounded-lg bg-gold-500 px-6 py-3 text-[15px] font-extrabold text-white transition-colors hover:bg-gold-600"
             >
               {site.heroPrimaryCta}
             </a>
@@ -183,7 +183,7 @@ export default async function HomePage() {
                   }`}
                 >
                   {featured ? (
-                    <span className="absolute -top-3 left-6 rounded-pill bg-gold-500 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-navy-950">
+                    <span className="absolute -top-3 left-6 rounded-pill bg-gold-500 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-white">
                       Most popular
                     </span>
                   ) : null}
@@ -240,7 +240,7 @@ export default async function HomePage() {
                     href="#book"
                     className={`mt-6 rounded-lg py-2.5 text-center text-sm font-extrabold transition-colors ${
                       featured
-                        ? 'bg-gold-500 text-navy-950 hover:bg-gold-400'
+                        ? 'bg-gold-500 text-white hover:bg-gold-600'
                         : 'bg-navy-800 text-white hover:bg-navy-700'
                     }`}
                   >

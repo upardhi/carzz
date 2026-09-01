@@ -131,7 +131,7 @@ export default async function SiteLayout({
             </p>
             <Link
               href="/login"
-              className="mt-3 inline-block rounded-lg bg-gold-500 px-4 py-2 text-sm font-extrabold text-navy-950 hover:bg-gold-400"
+              className="mt-3 inline-block rounded-lg bg-gold-500 px-4 py-2 text-sm font-extrabold text-white hover:bg-gold-600"
             >
               Open my account
             </Link>

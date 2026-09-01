@@ -82,7 +82,7 @@ export function ConsoleShell({
                   className={clsx(
                     'mb-0.5 flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-semibold transition-colors',
                     active
-                      ? 'bg-gold-500 text-navy-950'
+                      ? 'bg-gold-500 text-white'
                       : 'text-navy-200/80 hover:bg-navy-700 hover:text-white',
                   )}
                 >
