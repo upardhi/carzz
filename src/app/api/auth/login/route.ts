@@ -18,6 +18,26 @@ const schema = z.object({
 });
 
 export async function POST(request: Request) {
+  try {
+    return await signIn(request);
+  } catch (error) {
+    // A misconfigured deployment — no database, no session secret — otherwise
+    // surfaces here as a bare 500 on the one screen everybody starts at. Say
+    // that it is the server's fault, and leave the cause in the logs, where
+    // /api/health will also name it.
+    console.error('Sign-in failed:', error);
+    return NextResponse.json(
+      {
+        error:
+          'Sign-in is not available right now. The server could not be ' +
+          'reached — please try again shortly.',
+      },
+      { status: 500 },
+    );
+  }
+}
+
+async function signIn(request: Request) {
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json(
