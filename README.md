@@ -131,14 +131,44 @@ it once decided; every unapproved payout recalculates, and no code changes.
 npm run build && npm run smoke
 ```
 
-76 end-to-end checks against the real production server, covering: which
-role can reach which of the 38 pages (and that a signed-out visitor reaches
+Around ninety end-to-end checks against the real production server, covering:
+which role can reach which of the pages (and that a signed-out visitor reaches
 none of them), sign-in, the whole wash flow including every way it can be
 refused, customer payments and complaints, intake, scheduling, pocket money,
 stock, and the owner's payout and settings controls. Each suite runs against
 a freshly started server, since they mutate the state they act on.
 
 Point it at a deployment with `npm run smoke -- --base=https://…`.
+
+## Deploying
+
+`npm run build` runs `prisma generate` first, because the generated Prisma
+Client lives in `node_modules` and is not committed — on a fresh checkout
+(any CI, and every Vercel build) it does not exist until that command runs.
+Nothing under `src/` imports it statically, so a build succeeds without a
+database; only the running app needs one.
+
+Set these on the host before the deployment is usable:
+
+| Variable        | Value                                                    |
+| --------------- | -------------------------------------------------------- |
+| `AUTH_SECRET`   | A generated secret (see Notes below)                      |
+| `DATA_PROVIDER` | `prisma`                                                  |
+| `DATABASE_URL`  | The **pooled** connection string                          |
+| `DIRECT_URL`    | The direct connection string, for migrations              |
+
+**`DATA_PROVIDER` must not be left unset in a deployment.** The default
+in-memory store is a fresh copy of the demo data in every process: on a
+serverless host each instance holds its own copy, so two people signed in at
+the same time can see different data, and every save disappears when the
+instance is recycled. It is meant for local work and the smoke suite. The
+app warns about this at boot in production.
+
+Run the migration and the seed once, from a machine that has `DIRECT_URL`:
+
+```bash
+npx prisma db push && npm run db:seed
+```
 
 ## Mobile
 
@@ -171,7 +201,7 @@ prisma/schema.prisma
 | `npm run dev`       | Development server                      |
 | `npm run build`     | Production build                        |
 | `npm run smoke`     | End-to-end checks (needs a build first) |
-| `npm run typecheck` | `tsc --noEmit`                          |
+| `npm run typecheck` | Types, app and Node scripts alike       |
 | `npm run lint`      | ESLint                                  |
 | `npm run db:push`   | Push the Prisma schema                  |
 | `npm run cap:sync`  | Build and sync the native shell         |

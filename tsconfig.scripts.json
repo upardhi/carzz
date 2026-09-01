@@ -1,0 +1,14 @@
+{
+  "//": "Node-side scripts (the Prisma seeder and prisma.config.ts). These are run by tsx, never bundled by Next, and they import the generated Prisma Client — which only exists after `prisma generate`. Keeping them out of tsconfig.json stops `next build` from typechecking them on a machine where the client has not been generated yet; `npm run typecheck` still covers them here.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["esnext"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "incremental": false,
+    "plugins": []
+  },
+  "include": ["prisma/**/*.ts", "prisma.config.ts"],
+  "exclude": ["node_modules"]
+}
