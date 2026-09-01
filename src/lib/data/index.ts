@@ -27,12 +27,16 @@ export async function getStore(): Promise<DataStore> {
 
   switch (provider) {
     case 'prisma': {
+      // Plain dynamic imports, deliberately: they are what Next's file
+      // tracing follows when it decides which files to ship in a serverless
+      // function. Hidden behind `webpackIgnore` the packages were left out of
+      // the deployed bundle entirely, and every request that touched the
+      // database failed with "the Prisma packages are not installed" — on the
+      // host only, never locally, where node_modules is right there.
       const [{ PrismaStore }, prismaModule, adapterModule] = await Promise.all([
         import('./prisma/store'),
-        // Not static imports: these are only installed when this provider is
-        // actually used, so the memory provider stays dependency-free.
-        import(/* webpackIgnore: true */ '@prisma/client' as string).catch(() => null),
-        import(/* webpackIgnore: true */ '@prisma/adapter-pg' as string).catch(() => null),
+        import('@prisma/client').catch(() => null),
+        import('@prisma/adapter-pg').catch(() => null),
       ]);
       if (!prismaModule || !adapterModule) {
         throw new Error(
