@@ -12,7 +12,6 @@ import {
   IconGrid,
   IconList,
   IconMapPin,
-
   IconTrendingUp,
   IconUser,
 } from '@/components/shell/icons';
@@ -30,6 +29,31 @@ const QUICK_SUGGESTIONS = [
   'Slot changed',
   'Spoken to the wash boy',
 ];
+
+function isWithinTimeFrame(
+  dateVal: string | Date,
+  filter: 'ALL' | 'TODAY' | 'WEEK' | 'MONTH',
+): boolean {
+  if (filter === 'ALL') return true;
+  const d = new Date(dateVal);
+  if (isNaN(d.getTime())) return true;
+
+  const now = new Date();
+  const dMidnight = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  const nowMidnight = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const diffDays = Math.round((nowMidnight - dMidnight) / 86400000);
+
+  if (filter === 'TODAY') {
+    return diffDays === 0 || Math.abs(now.getTime() - d.getTime()) <= 86400000;
+  }
+  if (filter === 'WEEK') {
+    return diffDays >= 0 && diffDays <= 7;
+  }
+  if (filter === 'MONTH') {
+    return diffDays >= 0 && diffDays <= 30;
+  }
+  return true;
+}
 
 interface ComplaintsClientProps {
   complaints: Complaint[];
@@ -93,25 +117,30 @@ export function ComplaintsClient({
     )[0];
   }, [complaints]);
 
+  // Filtered counts based on current time filter
+  const timeFilteredComplaints = useMemo(() => {
+    return complaints.filter((c) => isWithinTimeFrame(c.createdAt, timeFilter));
+  }, [complaints, timeFilter]);
+
+  const countAll = timeFilteredComplaints.length;
+  const countOpen = useMemo(() => timeFilteredComplaints.filter((c) => c.status === 'OPEN').length, [timeFilteredComplaints]);
+  const countEscalated = useMemo(() => timeFilteredComplaints.filter((c) => c.status === 'ESCALATED').length, [timeFilteredComplaints]);
+  const countResolved = useMemo(() => timeFilteredComplaints.filter((c) => c.status === 'RESOLVED').length, [timeFilteredComplaints]);
+
+  // Overall counts across all time
+  const totalAllTime = complaints.length;
+  const totalOpenAllTime = openComplaints.length;
+  const totalEscalatedAllTime = escalatedComplaints.length;
+  const totalResolvedAllTime = resolvedComplaints.length;
+
   // Filtered & Sorted complaints
   const filteredComplaints = useMemo(() => {
-    return complaints
+    return timeFilteredComplaints
       .filter((c) => {
         // Status filter
         if (statusFilter === 'OPEN' && c.status !== 'OPEN') return false;
         if (statusFilter === 'ESCALATED' && c.status !== 'ESCALATED') return false;
         if (statusFilter === 'RESOLVED' && c.status !== 'RESOLVED') return false;
-
-        // Time filter
-        if (timeFilter !== 'ALL') {
-          const created = new Date(c.createdAt).getTime();
-          const now = Date.now();
-          const oneDay = 86400000;
-          if (timeFilter === 'TODAY' && now - created > oneDay) return false;
-          if (timeFilter === 'WEEK' && now - created > 7 * oneDay) return false;
-          if (timeFilter === 'MONTH' && now - created > 30 * oneDay) return false;
-        }
-
         return true;
       })
       .sort((a, b) => {
@@ -119,7 +148,14 @@ export function ComplaintsClient({
         const timeB = new Date(b.createdAt).getTime();
         return sortBy === 'LATEST' ? timeB - timeA : timeA - timeB;
       });
-  }, [complaints, statusFilter, timeFilter, sortBy]);
+  }, [timeFilteredComplaints, statusFilter, sortBy]);
+
+  const timeFilterLabels: Record<'ALL' | 'TODAY' | 'WEEK' | 'MONTH', string> = {
+    ALL: 'All Time',
+    TODAY: 'Today',
+    WEEK: 'This Week',
+    MONTH: 'This Month',
+  };
 
   async function handleSend(complaintId: string, action: 'resolve' | 'escalate') {
     const resolution = replyText[complaintId] || '';
@@ -171,7 +207,12 @@ export function ComplaintsClient({
       {/* 5 KPI Metric Cards Header */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {/* Open */}
-        <div className="flex items-center gap-3.5 rounded-xl border border-line-soft bg-white p-4 shadow-sm">
+        <div
+          onClick={() => setStatusFilter(statusFilter === 'OPEN' ? 'ALL' : 'OPEN')}
+          className={`flex cursor-pointer items-center gap-3.5 rounded-xl border bg-white p-4 shadow-sm transition-all hover:shadow-md ${
+            statusFilter === 'OPEN' ? 'border-navy-900 ring-2 ring-navy-900/10' : 'border-line-soft'
+          }`}
+        >
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
             <IconFolder width={22} height={22} strokeWidth={2} />
           </div>
@@ -189,7 +230,12 @@ export function ComplaintsClient({
         </div>
 
         {/* Escalated */}
-        <div className="flex items-center gap-3.5 rounded-xl border border-line-soft bg-white p-4 shadow-sm">
+        <div
+          onClick={() => setStatusFilter(statusFilter === 'ESCALATED' ? 'ALL' : 'ESCALATED')}
+          className={`flex cursor-pointer items-center gap-3.5 rounded-xl border bg-white p-4 shadow-sm transition-all hover:shadow-md ${
+            statusFilter === 'ESCALATED' ? 'border-navy-900 ring-2 ring-navy-900/10' : 'border-line-soft'
+          }`}
+        >
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
             <IconTrendingUp width={22} height={22} strokeWidth={2} />
           </div>
@@ -207,7 +253,12 @@ export function ComplaintsClient({
         </div>
 
         {/* Resolved */}
-        <div className="flex items-center gap-3.5 rounded-xl border border-line-soft bg-white p-4 shadow-sm">
+        <div
+          onClick={() => setStatusFilter(statusFilter === 'RESOLVED' ? 'ALL' : 'RESOLVED')}
+          className={`flex cursor-pointer items-center gap-3.5 rounded-xl border bg-white p-4 shadow-sm transition-all hover:shadow-md ${
+            statusFilter === 'RESOLVED' ? 'border-navy-900 ring-2 ring-navy-900/10' : 'border-line-soft'
+          }`}
+        >
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
             <IconCheck width={22} height={22} strokeWidth={2.5} />
           </div>
@@ -276,7 +327,7 @@ export function ComplaintsClient({
                   : 'text-ink-mute hover:text-navy-900'
               }`}
             >
-              All ({complaints.length})
+              All ({countAll})
             </button>
             <button
               type="button"
@@ -287,7 +338,7 @@ export function ComplaintsClient({
                   : 'text-ink-mute hover:text-navy-900'
               }`}
             >
-              Open ({openComplaints.length})
+              Open ({countOpen})
             </button>
             <button
               type="button"
@@ -298,7 +349,7 @@ export function ComplaintsClient({
                   : 'text-ink-mute hover:text-navy-900'
               }`}
             >
-              Escalated ({escalatedComplaints.length})
+              Escalated ({countEscalated})
             </button>
             <button
               type="button"
@@ -309,12 +360,12 @@ export function ComplaintsClient({
                   : 'text-ink-mute hover:text-navy-900'
               }`}
             >
-              Resolved ({resolvedComplaints.length})
+              Resolved ({countResolved})
             </button>
           </div>
 
           {/* Time Filter Group */}
-          <div className="flex items-center rounded-lg border border-line-soft bg-white p-1">
+          <div className="flex items-center rounded-lg bg-surface-muted p-1">
             {(
               [
                 ['ALL', 'All Time'],
@@ -327,10 +378,10 @@ export function ComplaintsClient({
                 key={key}
                 type="button"
                 onClick={() => setTimeFilter(key)}
-                className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
+                className={`rounded-md px-3 py-1.5 text-xs font-bold transition-all ${
                   timeFilter === key
-                    ? 'bg-navy-100 font-bold text-navy-900'
-                    : 'text-ink-mute hover:text-navy-800'
+                    ? 'bg-navy-900 text-white shadow-sm'
+                    : 'text-ink-mute hover:text-navy-900'
                 }`}
               >
                 {label}
@@ -387,11 +438,43 @@ export function ComplaintsClient({
             <IconCheck width={28} height={28} strokeWidth={2.5} />
           </div>
           <h3 className="mt-4 text-base font-bold text-navy-950">
-            No complaints found
+            No {statusFilter !== 'ALL' ? statusFilter.toLowerCase() : ''} complaints found in {timeFilterLabels[timeFilter]}
           </h3>
           <p className="mt-1 text-sm text-ink-mute">
-            There are no complaints matching your selected filters.
+            {timeFilter !== 'ALL' && (
+              statusFilter === 'ESCALATED' && totalEscalatedAllTime > 0
+                ? `There is ${totalEscalatedAllTime} escalated complaint recorded in All Time.`
+                : statusFilter === 'OPEN' && totalOpenAllTime > 0
+                  ? `There are ${totalOpenAllTime} open complaints recorded in All Time.`
+                  : statusFilter === 'RESOLVED' && totalResolvedAllTime > 0
+                    ? `There are ${totalResolvedAllTime} resolved complaints recorded in All Time.`
+                    : totalAllTime > 0
+                      ? `There are ${totalAllTime} total complaints in All Time.`
+                      : 'No complaints match your selection.'
+            )}
           </p>
+          {timeFilter !== 'ALL' || statusFilter !== 'ALL' ? (
+            <div className="mt-4 flex justify-center gap-2">
+              {timeFilter !== 'ALL' ? (
+                <button
+                  type="button"
+                  onClick={() => setTimeFilter('ALL')}
+                  className="rounded-lg bg-navy-900 px-4 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-navy-800"
+                >
+                  View in All Time
+                </button>
+              ) : null}
+              {statusFilter !== 'ALL' ? (
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter('ALL')}
+                  className="rounded-lg border border-line-strong bg-white px-4 py-2 text-xs font-bold text-navy-900 shadow-sm transition-colors hover:bg-surface-muted"
+                >
+                  Show all statuses
+                </button>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       ) : (
         <div
@@ -406,12 +489,16 @@ export function ComplaintsClient({
             const area = areaById.get(complaint.areaId);
             const washBoy = complaint.staffId ? staffById.get(complaint.staffId) : null;
             const isReplying = replyingId === complaint.id;
-            const isPending = pendingAction[complaint.id];
+            const isEscalated = complaint.status === 'ESCALATED';
+            const isResolved = complaint.status === 'RESOLVED';
+
+            // In Option 1: Managers (canEscalate=true) cannot resolve escalated complaints, only owner (canEscalate=false) can.
+            const isManagerLocked = isEscalated && canEscalate;
 
             const borderAccent =
-              complaint.status === 'ESCALATED'
+              isEscalated
                 ? 'border-l-4 border-l-rose-500'
-                : complaint.status === 'RESOLVED'
+                : isResolved
                   ? 'border-l-4 border-l-emerald-500'
                   : 'border-l-4 border-l-amber-400';
 
@@ -428,16 +515,16 @@ export function ComplaintsClient({
                     </h3>
                     <span
                       className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${
-                        complaint.status === 'ESCALATED'
+                        isEscalated
                           ? 'bg-rose-100 text-rose-800'
-                          : complaint.status === 'RESOLVED'
+                          : isResolved
                             ? 'bg-emerald-100 text-emerald-800'
                             : 'bg-amber-100 text-amber-800'
                       }`}
                     >
-                      {complaint.status === 'ESCALATED'
+                      {isEscalated
                         ? 'Escalated'
-                        : complaint.status === 'RESOLVED'
+                        : isResolved
                           ? 'Resolved'
                           : 'Open'}
                     </span>
@@ -494,8 +581,34 @@ export function ComplaintsClient({
                     &ldquo;{complaint.body}&rdquo;
                   </div>
 
-                  {/* Quick Resolution Suggestion Chips (for open complaints) */}
-                  {complaint.status !== 'RESOLVED' ? (
+                  {/* Manager Escalation Info Banner (Option 1) */}
+                  {isManagerLocked ? (
+                    <div className="mb-3 flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-xs text-amber-900">
+                      <IconTrendingUp width={17} height={17} className="mt-0.5 shrink-0 text-amber-600" />
+                      <div>
+                        <p className="font-bold text-amber-950">Escalated to Owner</p>
+                        <p className="mt-0.5 text-amber-800">
+                          This complaint was escalated to the business owner for decision and resolution.
+                        </p>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {/* Owner Escalation Info Banner (Option 1) */}
+                  {isEscalated && !canEscalate ? (
+                    <div className="mb-3 flex items-start gap-2.5 rounded-xl border border-rose-200 bg-rose-50/80 p-3 text-xs text-rose-900">
+                      <IconTrendingUp width={17} height={17} className="mt-0.5 shrink-0 text-rose-600" />
+                      <div>
+                        <p className="font-bold text-rose-950">Escalated by Manager</p>
+                        <p className="mt-0.5 text-rose-800">
+                          Requires your owner decision and customer resolution.
+                        </p>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {/* Quick Resolution Suggestion Chips (only for active, un-escalated or owner view) */}
+                  {!isResolved && !isManagerLocked ? (
                     <div className="mb-3 flex flex-wrap gap-1.5">
                       {QUICK_SUGGESTIONS.map((text) => (
                         <button
@@ -517,7 +630,7 @@ export function ComplaintsClient({
                   ) : null}
 
                   {/* Resolution Notes for Resolved complaints */}
-                  {complaint.status === 'RESOLVED' && complaint.resolution ? (
+                  {isResolved && complaint.resolution ? (
                     <div className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50/60 p-2.5 text-xs text-emerald-900">
                       <span className="font-bold uppercase tracking-wider text-emerald-800">
                         Resolution:
@@ -527,7 +640,7 @@ export function ComplaintsClient({
                   ) : null}
 
                   {/* Inline Reply Box (when expanded) */}
-                  {isReplying && complaint.status !== 'RESOLVED' ? (
+                  {isReplying && !isResolved && !isManagerLocked ? (
                     <div className="mb-3 space-y-2 rounded-xl border border-navy-200 bg-navy-50/40 p-3">
                       <label className="block text-xs font-bold text-navy-950">
                         Resolution note for customer:
@@ -555,12 +668,12 @@ export function ComplaintsClient({
                         <Button
                           size="sm"
                           disabled={
-                            isPending !== null ||
+                            Boolean(pendingAction[complaint.id]) ||
                             (replyText[complaint.id] || '').trim().length < 3
                           }
                           onClick={() => handleSend(complaint.id, 'resolve')}
                         >
-                          {isPending === 'resolve' ? 'Closing…' : 'Submit & Close'}
+                          {pendingAction[complaint.id] === 'resolve' ? 'Closing…' : 'Submit & Close'}
                         </Button>
                       </div>
                     </div>
@@ -568,9 +681,9 @@ export function ComplaintsClient({
                 </div>
 
                 {/* Bottom Card Actions */}
-                {complaint.status !== 'RESOLVED' ? (
+                {!isResolved ? (
                   <div className="mt-2 flex items-center gap-2 pt-2">
-                    {!isReplying ? (
+                    {!isReplying && !isManagerLocked ? (
                       <Button
                         size="sm"
                         variant="secondary"
@@ -582,25 +695,21 @@ export function ComplaintsClient({
                       </Button>
                     ) : null}
 
-                    {canEscalate && complaint.status !== 'ESCALATED' ? (
+                    {canEscalate && !isEscalated ? (
                       <Button
                         size="sm"
                         variant="secondary"
-                        disabled={isPending !== null}
+                        disabled={Boolean(pendingAction[complaint.id])}
                         className="flex items-center gap-1.5"
                         onClick={() => handleSend(complaint.id, 'escalate')}
                       >
                         <IconArrowUp width={14} height={14} />
-                        {isPending === 'escalate' ? 'Sending…' : 'Escalate to owner'}
+                        {pendingAction[complaint.id] === 'escalate' ? 'Sending…' : 'Escalate to owner'}
                       </Button>
-                    ) : complaint.status === 'ESCALATED' ? (
-                      <button
-                        disabled
-                        className="flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-600"
-                      >
-                        <IconArrowUp width={14} height={14} />
-                        Escalated to owner
-                      </button>
+                    ) : isEscalated && canEscalate ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-800">
+                        ⏳ Awaiting Owner Action
+                      </span>
                     ) : null}
                   </div>
                 ) : (
