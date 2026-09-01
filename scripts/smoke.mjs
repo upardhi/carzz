@@ -13,7 +13,14 @@
  * environment instead (the server is then not started or stopped here).
  */
 import { spawn } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { setTimeout as sleep } from 'node:timers/promises';
+
+// The server is started as `node <next>/bin/next start` rather than through
+// `npm run start`. On Windows npm is `npm.cmd`, which `spawn` cannot execute
+// without a shell — and a shell would then swallow the kill signal below,
+// leaving the port held and every later suite talking to a stale server.
+const nextBin = createRequire(import.meta.url).resolve('next/dist/bin/next');
 
 const arg = (name, fallback) =>
   process.argv.find((a) => a.startsWith(`--${name}=`))?.split('=')[1] ?? fallback;
@@ -41,7 +48,7 @@ const check = (name, ok, detail = '') => {
 
 async function startServer() {
   if (externalBase) return null;
-  const server = spawn('npm', ['run', 'start', '--', '--port', String(PORT)], {
+  const server = spawn(process.execPath, [nextBin, 'start', '--port', String(PORT)], {
     stdio: ['ignore', 'pipe', 'pipe'],
     env: { ...process.env, PORT: String(PORT) },
   });

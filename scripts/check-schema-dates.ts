@@ -10,7 +10,10 @@
 import { readFileSync } from 'node:fs';
 import { DATE_FIELDS } from '../src/lib/data/prisma/fields';
 
-const schema = readFileSync('prisma/schema.prisma', 'utf8');
+// Normalised to LF: on a Windows checkout git hands this file back with CRLF,
+// and the `$` anchors below will not match with a `\r` still on the line — so
+// every date column read as absent and the check failed against itself.
+const schema = readFileSync('prisma/schema.prisma', 'utf8').replace(/\r\n/g, '\n');
 
 /** `ServicePackage` → `servicePackage`, the name of its Prisma delegate. */
 const delegateName = (model: string) => model[0].toLowerCase() + model.slice(1);

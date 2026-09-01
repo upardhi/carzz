@@ -1,11 +1,19 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/primitives';
 
+/**
+ * `next` arrives from the query string, so it is whatever the link said. Only a
+ * path on this site is allowed through — `//evil.example` and `https://…` are
+ * both absolute URLs to a browser, and would turn sign-in into an open redirect.
+ */
+function safeNext(value: string | undefined): string | null {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) return null;
+  return value;
+}
+
 export function LoginForm({ next }: { next?: string }) {
-  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [show, setShow] = useState(false);
@@ -32,10 +40,14 @@ export function LoginForm({ next }: { next?: string }) {
         setError(data.error ?? 'Could not sign you in.');
         return;
       }
-      // `refresh` first so the new session cookie is picked up by server
-      // components on the destination page.
-      router.refresh();
-      router.replace(next || data.redirect || '/');
+      // A full document load, not a client navigation. `refresh()` used to run
+      // first, but it re-fetches the *current* route — and middleware now
+      // bounces a signed-in visitor off `/login`, so that request came back a
+      // redirect, aborted, and took the navigation after it down with it: the
+      // sign-in simply appeared to do nothing. Loading the destination outright
+      // also guarantees every server component sees the new session cookie.
+      window.location.assign(safeNext(next) ?? data.redirect ?? '/');
+      return;
     } catch {
       setError('No connection. Check your network and try again.');
     } finally {
