@@ -4,12 +4,10 @@ import { scopeAreaFilter } from '@/lib/auth/rbac';
 import type { Session } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { LEAD_SOURCES, type Car, type Customer, type CustomerStatus } from '@/lib/data/types';
-import { currentCycle, formatTime, money, moneyShort } from '@/lib/util/format';
+import { currentCycle, formatTime, money } from '@/lib/util/format';
 import { LEAD_SOURCE_LABEL, PATTERN_SHORT } from '@/lib/util/labels';
 import {
   IconCalendar,
-  IconCar,
-  IconClock,
   IconEye,
   IconMapPin,
   IconPlus,
@@ -18,7 +16,6 @@ import {
   IconTag,
   IconUser,
   IconUsers,
-  IconUserX,
 } from '@/components/shell/icons';
 import { Filters, PageSizeSelect } from './Filters';
 import { DataTable } from '@/components/ui/DataTable';

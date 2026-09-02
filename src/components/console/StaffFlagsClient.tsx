@@ -1,15 +1,12 @@
-﻿'use client';
+'use client';
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import {
-  IconAlert,
-  IconClock,
   IconInfo,
   IconMapPin,
   IconRefresh,
   IconSearch,
-  IconUsers,
 } from '@/components/shell/icons';
 import { StatCard, StatGrid } from '@/components/ui/StatCard';
 import { DataTable, type Column } from '@/components/ui/DataTable';
@@ -69,7 +66,7 @@ export function StaffFlagsClient({ base }: StaffFlagsClientProps) {
   });
 
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const pageSize = 20;
   const [total, setTotal] = useState(0);
 
   const [typeFilter, setTypeFilter] = useState<string>('ALL');

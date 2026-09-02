@@ -81,7 +81,7 @@ export function PocketRequestsClient({ base }: PocketRequestsClientProps) {
   });
 
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const pageSize = 20;
   const [total, setTotal] = useState(0);
 
   const [statusFilter, setStatusFilter] = useState<string>('ALL');

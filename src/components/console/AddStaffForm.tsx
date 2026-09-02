@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { Button, Note } from '@/components/ui/primitives';
+import { Note } from '@/components/ui/primitives';
 import { toast } from '@/components/ui/ToastProvider';
 import { money } from '@/lib/util/format';
 

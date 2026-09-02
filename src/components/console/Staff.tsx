@@ -1,13 +1,8 @@
 import Link from 'next/link';
 import { PageHeader } from '@/components/shell/ConsoleShell';
 import {
-  Card,
-  CardHeading,
   Kpi,
   KpiGrid,
-  Note,
-  Row,
-  Tag,
 } from '@/components/ui/primitives';
 import { DataTable } from '@/components/ui/DataTable';
 import { scopeAreaFilter } from '@/lib/auth/rbac';
