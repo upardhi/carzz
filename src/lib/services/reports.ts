@@ -308,12 +308,45 @@ export interface MissedWashRow {
   costToDeliver: Rupees;
 }
 
+interface MissedWashCacheEntry {
+  data: Promise<{ rows: MissedWashRow[]; total: number; totalCost: Rupees }>;
+  expires: number;
+}
+const missedWashCache: Map<string, MissedWashCacheEntry> =
+  ((globalThis as unknown as { __missedWashCache?: Map<string, MissedWashCacheEntry> })
+    .__missedWashCache ??= new Map());
+
 /**
  * What missed washes cost. Each one returns to the customer's count, so the
  * business delivers it later at no extra charge — a real cost that never
  * appears on an invoice.
  */
-export async function missedWashReport(
+export function missedWashReport(
+  store: DataStore,
+  cycle: string,
+  areaIds: Id[] | null,
+): Promise<{ rows: MissedWashRow[]; total: number; totalCost: Rupees }> {
+  const cacheKey = `${cycle}:${areaIds ? areaIds.slice().sort().join(',') : 'all'}`;
+  const now = Date.now();
+  const cached = missedWashCache.get(cacheKey);
+  if (cached && cached.expires > now) {
+    return cached.data;
+  }
+
+  const promise = _computeMissedWashReport(store, cycle, areaIds).catch((err) => {
+    missedWashCache.delete(cacheKey);
+    throw err;
+  });
+
+  missedWashCache.set(cacheKey, {
+    data: promise,
+    expires: now + 60_000,
+  });
+
+  return promise;
+}
+
+async function _computeMissedWashReport(
   store: DataStore,
   cycle: string,
   areaIds: Id[] | null,
@@ -378,7 +411,40 @@ export interface StaffPerformanceRow {
   complaints: number;
 }
 
-export async function staffPerformance(
+interface StaffPerfCacheEntry {
+  data: Promise<StaffPerformanceRow[]>;
+  expires: number;
+}
+const staffPerfCache: Map<string, StaffPerfCacheEntry> =
+  ((globalThis as unknown as { __staffPerfCache?: Map<string, StaffPerfCacheEntry> })
+    .__staffPerfCache ??= new Map());
+
+export function staffPerformance(
+  store: DataStore,
+  cycle: string,
+  areaIds: Id[] | null,
+): Promise<StaffPerformanceRow[]> {
+  const cacheKey = `${cycle}:${areaIds ? areaIds.slice().sort().join(',') : 'all'}`;
+  const now = Date.now();
+  const cached = staffPerfCache.get(cacheKey);
+  if (cached && cached.expires > now) {
+    return cached.data;
+  }
+
+  const promise = _computeStaffPerformance(store, cycle, areaIds).catch((err) => {
+    staffPerfCache.delete(cacheKey);
+    throw err;
+  });
+
+  staffPerfCache.set(cacheKey, {
+    data: promise,
+    expires: now + 60_000,
+  });
+
+  return promise;
+}
+
+async function _computeStaffPerformance(
   store: DataStore,
   cycle: string,
   areaIds: Id[] | null,

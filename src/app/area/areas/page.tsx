@@ -10,21 +10,13 @@ export default async function AreaAdminAreas() {
   const session = await requirePermission('report:area');
   const store = await getStore();
   const cycle = currentCycle();
-  const performance = await areaPerformance(store, cycle, session.scope.areaIds);
-
-  const managerIds = [
-    ...new Set(
-      performance
-        .map((p) => p.area.managerId)
-        .filter(Boolean) as string[],
-    ),
-  ];
-  const managers = managerIds.length
-    ? await store.staff.find({ where: { id: { in: managerIds } } as never })
-    : [];
+  const [performance, allManagers] = await Promise.all([
+    areaPerformance(store, cycle, session.scope.areaIds),
+    store.staff.find({ where: { role: 'MANAGER' } }),
+  ]);
 
   const managerNames: Record<string, string> = {};
-  for (const m of managers) {
+  for (const m of allManagers) {
     managerNames[m.id] = m.name;
   }
 

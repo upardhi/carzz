@@ -181,14 +181,47 @@ export async function receivePurchase(
   await store.purchaseRequests.update(requestId, { status: 'RECEIVED' });
 }
 
+type ConsumptionResult = { areaId: Id; areaName: string; washes: number; goodsCost: Rupees; perWash: number }[];
+
+interface ConsumptionCacheEntry {
+  data: Promise<ConsumptionResult>;
+  expires: number;
+}
+const consumptionCache: Map<string, ConsumptionCacheEntry> =
+  ((globalThis as unknown as { __consumptionCache?: Map<string, ConsumptionCacheEntry> })
+    .__consumptionCache ??= new Map());
+
 /** Consumables cost per wash, by area — the over-pouring detector. */
-export async function consumptionByArea(
+export function consumptionByArea(
   store: DataStore,
   cycle: string,
   areaIds: Id[] | null,
-): Promise<
-  { areaId: Id; areaName: string; washes: number; goodsCost: Rupees; perWash: number }[]
-> {
+): Promise<ConsumptionResult> {
+  const cacheKey = `${cycle}:${areaIds ? areaIds.slice().sort().join(',') : 'all'}`;
+  const now = Date.now();
+  const cached = consumptionCache.get(cacheKey);
+  if (cached && cached.expires > now) {
+    return cached.data;
+  }
+
+  const promise = _computeConsumptionByArea(store, cycle, areaIds).catch((err) => {
+    consumptionCache.delete(cacheKey);
+    throw err;
+  });
+
+  consumptionCache.set(cacheKey, {
+    data: promise,
+    expires: now + 60_000,
+  });
+
+  return promise;
+}
+
+async function _computeConsumptionByArea(
+  store: DataStore,
+  cycle: string,
+  areaIds: Id[] | null,
+): Promise<ConsumptionResult> {
   const [areas, items] = await Promise.all([
     store.areas.find(),
     store.inventoryItems.find(),
@@ -202,17 +235,22 @@ export async function consumptionByArea(
   const areaFilter = areaIds ? { areaId: { in: scopedAreaIds } } : {};
 
   // Bulk queries for all areas in this cycle
-  const [allVisits, allStockIssues] = await Promise.all([
-    store.visits.find({
-      where: { cycle, status: 'DONE', ...areaFilter } as never,
-    }),
+  const [areaVisitCounts, allStockIssues] = await Promise.all([
+    Promise.all(
+      scopedAreaIds.map((areaId) =>
+        store.visits
+          .count({
+            cycle,
+            status: 'DONE',
+            areaId,
+          } as never)
+          .then((count) => [areaId, count] as const),
+      ),
+    ),
     store.stockIssues.find({ where: areaFilter as never }),
   ]);
 
-  const visitsByArea = new Map<Id, number>();
-  for (const v of allVisits) {
-    visitsByArea.set(v.areaId, (visitsByArea.get(v.areaId) ?? 0) + 1);
-  }
+  const visitsByArea = new Map<Id, number>(areaVisitCounts);
 
   const issuesByArea = new Map<Id, typeof allStockIssues>();
   for (const issue of allStockIssues) {

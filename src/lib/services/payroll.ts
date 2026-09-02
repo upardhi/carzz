@@ -230,8 +230,42 @@ export async function computePayout(
   });
 }
 
+interface PayoutRunCacheEntry {
+  data: Promise<StaffPayout[]>;
+  expires: number;
+}
+
+const payoutRunCache: Map<string, PayoutRunCacheEntry> =
+  ((globalThis as unknown as { __payoutRunCache?: Map<string, PayoutRunCacheEntry> })
+    .__payoutRunCache ??= new Map());
+
 /** Every employee's payout for a cycle, within an access scope. */
-export async function computePayoutRun(
+export function computePayoutRun(
+  store: DataStore,
+  cycle: string,
+  areaIds: Id[] | null,
+): Promise<StaffPayout[]> {
+  const cacheKey = `${cycle}:${areaIds ? areaIds.slice().sort().join(',') : 'all'}`;
+  const now = Date.now();
+  const cached = payoutRunCache.get(cacheKey);
+  if (cached && cached.expires > now) {
+    return cached.data;
+  }
+
+  const promise = _computePayoutRunInternal(store, cycle, areaIds).catch((err) => {
+    payoutRunCache.delete(cacheKey);
+    throw err;
+  });
+
+  payoutRunCache.set(cacheKey, {
+    data: promise,
+    expires: now + 60_000,
+  });
+
+  return promise;
+}
+
+async function _computePayoutRunInternal(
   store: DataStore,
   cycle: string,
   areaIds: Id[] | null,
