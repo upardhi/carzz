@@ -34,15 +34,17 @@ export default async function StaffToday() {
   const customerIds = [...new Set(visits.map((v) => v.customerId))];
   const carIds = [...new Set(visits.map((v) => v.carId))];
   const [customers, cars, payout] = await Promise.all([
-    Promise.all(customerIds.map((id) => store.customers.get(id))),
-    Promise.all(carIds.map((id) => store.cars.get(id))),
+    customerIds.length
+      ? store.customers.find({ where: { id: { in: customerIds } } as never })
+      : [],
+    carIds.length
+      ? store.cars.find({ where: { id: { in: carIds } } as never })
+      : [],
     computePayout(store, staffId, currentCycle()),
   ]);
 
-  const customerById = new Map(
-    customers.filter(Boolean).map((c) => [c!.id, c!]),
-  );
-  const carById = new Map(cars.filter(Boolean).map((c) => [c!.id, c!]));
+  const customerById = new Map(customers.map((c) => [c.id, c]));
+  const carById = new Map(cars.map((c) => [c.id, c]));
 
   const done = visits.filter((v) => v.status === 'DONE').length;
   const pending = visits.filter(

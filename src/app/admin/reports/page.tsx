@@ -30,21 +30,20 @@ export default async function AdminReports() {
   const store = await getStore();
   const cycle = currentCycle();
 
-  // businessSummary is derived from the area rows, so compute those once.
-  const areas = await areaPerformance(store, cycle, null);
-  const [summary, missed, staff, consumption, customers] = await Promise.all([
-    businessSummary(store, cycle, null, areas),
+  // Fetch independent reports and inactive churn customers in parallel
+  const [areas, missed, staff, consumption, lost] = await Promise.all([
+    areaPerformance(store, cycle, null),
     missedWashReport(store, cycle, null),
     staffPerformance(store, cycle, null),
     consumptionByArea(store, cycle, null),
-    store.customers.find(),
+    store.customers.find({ where: { status: 'INACTIVE' } as never }),
   ]);
+  const summary = await businessSummary(store, cycle, null, areas);
 
   const areaById = new Map(areas.map((a) => [a.area.id, a.area]));
 
   // Churn: how long the customers who left actually stayed. Losing people in
   // the first month points at the lead source, not the service.
-  const lost = customers.filter((c) => c.status === 'INACTIVE');
   const monthsOf = (joinedOn: string) =>
     Math.floor(
       (Date.now() - new Date(`${joinedOn}T00:00:00Z`).getTime()) /

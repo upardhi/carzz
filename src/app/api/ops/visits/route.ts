@@ -82,14 +82,18 @@ export async function POST(request: Request) {
       }
     }
 
-    let assigned = 0;
+    const updates: { visitId: string; staffId: string }[] = [];
     for (const visit of visits) {
       if (visit.staffId || visit.status !== 'PENDING') continue;
       const lightest = [...load.entries()].sort((a, b) => a[1] - b[1])[0];
-      await store.visits.update(visit.id, { staffId: lightest[0] });
+      updates.push({ visitId: visit.id, staffId: lightest[0] });
       load.set(lightest[0], lightest[1] + 1);
-      assigned += 1;
     }
+
+    await Promise.all(
+      updates.map((u) => store.visits.update(u.visitId, { staffId: u.staffId })),
+    );
+    const assigned = updates.length;
 
     return NextResponse.json({
       ok: true,

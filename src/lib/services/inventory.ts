@@ -14,60 +14,97 @@ export interface StockRow {
 }
 
 /**
+ * Bulk stock computation for multiple areas.
+ * Avoids N+1 query loops across areas by fetching active items, stock levels,
+ * and recent visits in 3 bulk queries.
+ */
+export async function stockForAreas(
+  store: DataStore,
+  areaIds: Id[],
+  lookbackDays = 14,
+): Promise<Map<Id, StockRow[]>> {
+  if (areaIds.length === 0) return new Map();
+
+  const since = new Date(Date.now() - lookbackDays * 86400000)
+    .toISOString()
+    .slice(0, 10);
+
+  const [items, levels, ...areaVisitCounts] = await Promise.all([
+    store.inventoryItems.find({ where: { active: true } }),
+    store.stockLevels.find({ where: { areaId: { in: areaIds } } as never }),
+    ...areaIds.map((areaId) =>
+      store.visits
+        .count({
+          areaId,
+          status: 'DONE',
+          scheduledDate: { gte: since },
+        } as never)
+        .then((count) => [areaId, count] as const),
+    ),
+  ]);
+
+  const visitsByArea = new Map<Id, number>(areaVisitCounts);
+
+  // Group stock levels by area -> item
+  const levelsByArea = new Map<Id, Map<Id, StockLevel>>();
+  for (const l of levels) {
+    let itemMap = levelsByArea.get(l.areaId);
+    if (!itemMap) {
+      itemMap = new Map<Id, StockLevel>();
+      levelsByArea.set(l.areaId, itemMap);
+    }
+    itemMap.set(l.itemId, l);
+  }
+
+  const order = { OUT: 0, CRITICAL: 1, LOW: 2, OK: 3 };
+  const out = new Map<Id, StockRow[]>();
+
+  for (const areaId of areaIds) {
+    const visitsCount = visitsByArea.get(areaId) ?? 0;
+    const washesPerDay = visitsCount / lookbackDays;
+    const levelByItem = levelsByArea.get(areaId) ?? new Map<Id, StockLevel>();
+
+    const rows: StockRow[] = items
+      .map((item) => {
+        const level = levelByItem.get(item.id) ?? null;
+        const quantity = level?.quantity ?? 0;
+        const usagePerDay = item.usagePerWash * washesPerDay;
+        const daysLeft = usagePerDay > 0 ? quantity / usagePerDay : null;
+
+        let status: StockRow['status'] = 'OK';
+        if (quantity <= 0) status = 'OUT';
+        else if (daysLeft !== null && daysLeft < 2) status = 'CRITICAL';
+        else if (quantity <= item.reorderLevel) status = 'LOW';
+
+        return {
+          item,
+          level,
+          quantity,
+          usagePerDay,
+          daysLeft,
+          status,
+          value: Math.round(quantity * item.unitCost),
+        };
+      })
+      .sort((a, b) => order[a.status] - order[b.status]);
+
+    out.set(areaId, rows);
+  }
+
+  return out;
+}
+
+/**
  * Stock for an area with days-of-cover projected from that area's real wash
- * volume — not a flat reorder point. An area running 70 cars a day burns
- * shampoo far faster than one running 30, and the reorder alert has to know it.
+ * volume — not a flat reorder point.
  */
 export async function stockForArea(
   store: DataStore,
   areaId: Id,
   lookbackDays = 14,
 ): Promise<StockRow[]> {
-  const since = new Date(Date.now() - lookbackDays * 86400000)
-    .toISOString()
-    .slice(0, 10);
-
-  const [items, levels, recentVisits] = await Promise.all([
-    store.inventoryItems.find({ where: { active: true } }),
-    store.stockLevels.find({ where: { areaId } }),
-    store.visits.find({
-      where: {
-        areaId,
-        status: 'DONE',
-        scheduledDate: { gte: since },
-      } as never,
-    }),
-  ]);
-
-  const washesPerDay = recentVisits.length / lookbackDays;
-  const levelByItem = new Map(levels.map((l) => [l.itemId, l]));
-
-  return items
-    .map((item) => {
-      const level = levelByItem.get(item.id) ?? null;
-      const quantity = level?.quantity ?? 0;
-      const usagePerDay = item.usagePerWash * washesPerDay;
-      const daysLeft = usagePerDay > 0 ? quantity / usagePerDay : null;
-
-      let status: StockRow['status'] = 'OK';
-      if (quantity <= 0) status = 'OUT';
-      else if (daysLeft !== null && daysLeft < 2) status = 'CRITICAL';
-      else if (quantity <= item.reorderLevel) status = 'LOW';
-
-      return {
-        item,
-        level,
-        quantity,
-        usagePerDay,
-        daysLeft,
-        status,
-        value: Math.round(quantity * item.unitCost),
-      };
-    })
-    .sort((a, b) => {
-      const order = { OUT: 0, CRITICAL: 1, LOW: 2, OK: 3 };
-      return order[a.status] - order[b.status];
-    });
+  const map = await stockForAreas(store, [areaId], lookbackDays);
+  return map.get(areaId) ?? [];
 }
 
 /**
@@ -159,26 +196,45 @@ export async function consumptionByArea(
   const cost = new Map(items.map((i) => [i.id, i.unitCost]));
 
   const scoped = areas.filter((a) => areaIds === null || areaIds.includes(a.id));
+  if (scoped.length === 0) return [];
 
-  return Promise.all(
-    scoped.map(async (area) => {
-      const [visits, issues] = await Promise.all([
-        store.visits.find({ where: { areaId: area.id, cycle, status: 'DONE' } }),
-        store.stockIssues.find({ where: { areaId: area.id } }),
-      ]);
+  const scopedAreaIds = scoped.map((a) => a.id);
+  const areaFilter = areaIds ? { areaId: { in: scopedAreaIds } } : {};
 
-      const goodsCost = issues.reduce(
-        (sum, i) => sum + i.quantity * (cost.get(i.itemId) ?? 0),
-        0,
-      );
-
-      return {
-        areaId: area.id,
-        areaName: area.name,
-        washes: visits.length,
-        goodsCost: Math.round(goodsCost),
-        perWash: visits.length ? goodsCost / visits.length : 0,
-      };
+  // Bulk queries for all areas in this cycle
+  const [allVisits, allStockIssues] = await Promise.all([
+    store.visits.find({
+      where: { cycle, status: 'DONE', ...areaFilter } as never,
     }),
-  );
+    store.stockIssues.find({ where: areaFilter as never }),
+  ]);
+
+  const visitsByArea = new Map<Id, number>();
+  for (const v of allVisits) {
+    visitsByArea.set(v.areaId, (visitsByArea.get(v.areaId) ?? 0) + 1);
+  }
+
+  const issuesByArea = new Map<Id, typeof allStockIssues>();
+  for (const issue of allStockIssues) {
+    const list = issuesByArea.get(issue.areaId) ?? [];
+    list.push(issue);
+    issuesByArea.set(issue.areaId, list);
+  }
+
+  return scoped.map((area) => {
+    const washes = visitsByArea.get(area.id) ?? 0;
+    const issues = issuesByArea.get(area.id) ?? [];
+    const goodsCost = issues.reduce(
+      (sum, i) => sum + i.quantity * (cost.get(i.itemId) ?? 0),
+      0,
+    );
+
+    return {
+      areaId: area.id,
+      areaName: area.name,
+      washes,
+      goodsCost: Math.round(goodsCost),
+      perWash: washes ? goodsCost / washes : 0,
+    };
+  });
 }

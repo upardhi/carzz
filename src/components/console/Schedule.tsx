@@ -35,12 +35,16 @@ export async function ConsoleSchedule({
   const customerIds = [...new Set(visits.map((v) => v.customerId))];
   const carIds = [...new Set(visits.map((v) => v.carId))];
   const [customers, cars] = await Promise.all([
-    Promise.all(customerIds.map((id) => store.customers.get(id))),
-    Promise.all(carIds.map((id) => store.cars.get(id))),
+    customerIds.length
+      ? store.customers.find({ where: { id: { in: customerIds } } as never })
+      : [],
+    carIds.length
+      ? store.cars.find({ where: { id: { in: carIds } } as never })
+      : [],
   ]);
 
-  const customerById = new Map(customers.filter(Boolean).map((c) => [c!.id, c!]));
-  const carById = new Map(cars.filter(Boolean).map((c) => [c!.id, c!]));
+  const customerById = new Map(customers.map((c) => [c.id, c]));
+  const carById = new Map(cars.map((c) => [c.id, c]));
   const staffById = new Map(staff.map((s) => [s.id, s]));
   const areaById = new Map(areas.map((a) => [a.id, a]));
 

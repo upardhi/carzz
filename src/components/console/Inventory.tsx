@@ -14,7 +14,7 @@ import {
 import { scopeAreaFilter } from '@/lib/auth/rbac';
 import type { Session } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
-import { stockForArea, type StockRow } from '@/lib/services/inventory';
+import { stockForAreas, type StockRow } from '@/lib/services/inventory';
 import { formatDateFull, money } from '@/lib/util/format';
 import { ActionButton } from './ActionButton';
 import { IssueStockForm, PurchaseRequestForm } from './InventoryForms';
@@ -41,13 +41,9 @@ export async function ConsoleInventory({ session }: { session: Session }) {
     (a) => session.scope.areaIds === null || session.scope.areaIds.includes(a.id),
   );
 
-  const [stockByArea, items, staff, requests] = await Promise.all([
-    Promise.all(
-      areas.map(async (area) => ({
-        area,
-        rows: await stockForArea(store, area.id),
-      })),
-    ),
+  const areaIds = areas.map((a) => a.id);
+  const [stockMap, items, staff, requests] = await Promise.all([
+    stockForAreas(store, areaIds),
     store.inventoryItems.find({ where: { active: true } }),
     store.staff.find({ where: { role: 'EMPLOYEE', active: true, ...areaFilter } as never }),
     store.purchaseRequests.find({
@@ -55,6 +51,11 @@ export async function ConsoleInventory({ session }: { session: Session }) {
       orderBy: [{ field: 'createdAt', dir: 'desc' }],
     }),
   ]);
+
+  const stockByArea = areas.map((area) => ({
+    area,
+    rows: stockMap.get(area.id) ?? [],
+  }));
 
   const itemById = new Map(items.map((i) => [i.id, i]));
   const areaById = new Map(areas.map((a) => [a.id, a]));

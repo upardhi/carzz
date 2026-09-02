@@ -46,12 +46,11 @@ export default async function CarDetail({
     .filter((v) => v.carId === carId && v.status !== 'PENDING')
     .slice(0, 20);
 
-  const staffIds = [...new Set(history.map((v) => v.staffId).filter(Boolean))];
-  const staff = new Map(
-    (await Promise.all(staffIds.map((id) => store.staff.get(id!))))
-      .filter(Boolean)
-      .map((s) => [s!.id, s!]),
-  );
+  const staffIds = [...new Set(history.map((v) => v.staffId).filter(Boolean))] as string[];
+  const staffList = staffIds.length
+    ? await store.staff.find({ where: { id: { in: staffIds } } as never })
+    : [];
+  const staff = new Map(staffList.map((s) => [s.id, s]));
 
   return (
     <div className="space-y-3">

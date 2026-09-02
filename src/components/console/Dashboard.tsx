@@ -29,18 +29,32 @@ export async function ConsoleDashboard({
   const today = todayISO();
   const areaFilter = scopeAreaFilter(session.scope);
 
-  const [visits, alerts, complaints, staff, performance] = await Promise.all([
+  const [
+    visits,
+    alerts,
+    complaintsCount,
+    escalatedComplaintsCount,
+    staff,
+    performance,
+    attendance,
+  ] = await Promise.all([
     store.visits.find({ where: { scheduledDate: today, ...areaFilter } as never }),
     loadRedAlerts(store, session.scope.areaIds),
-    store.complaints.find({
-      where: { status: { in: ['OPEN', 'ESCALATED'] }, ...areaFilter } as never,
-      orderBy: [{ field: 'createdAt' }],
-    }),
+    store.complaints.count({
+      status: { in: ['OPEN', 'ESCALATED'] },
+      ...areaFilter,
+    } as never),
+    store.complaints.count({
+      status: 'ESCALATED',
+      ...areaFilter,
+    } as never),
     store.staff.find({ where: { role: 'EMPLOYEE', ...areaFilter } as never }),
-    areaPerformance(store, cycle, session.scope.areaIds),
+    areaPerformance(store, cycle, session.scope.areaIds, undefined, {
+      skipPayoutsAndGoods: true,
+    }),
+    store.attendance.find({ where: { date: today } }),
   ]);
 
-  const attendance = await store.attendance.find({ where: { date: today } });
   const attendanceByStaff = new Map(attendance.map((a) => [a.staffId, a]));
 
   const unassigned = visits.filter((v) => !v.staffId && v.status === 'PENDING');
@@ -86,10 +100,8 @@ export async function ConsoleDashboard({
       outstanding={outstanding}
       alertsCount={alerts.length}
       oldestAlertDays={alerts[0]?.daysOverdue ?? 0}
-      complaintsCount={complaints.length}
-      escalatedComplaintsCount={
-        complaints.filter((c) => c.status === 'ESCALATED').length
-      }
+      complaintsCount={complaintsCount}
+      escalatedComplaintsCount={escalatedComplaintsCount}
       staffToday={staffTodayFormatted}
       performance={performance}
       cycleLabel={cycleLabel(cycle)}

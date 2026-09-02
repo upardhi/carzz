@@ -1,4 +1,5 @@
 import 'server-only';
+import { cache } from 'react';
 
 import type { DataStore } from '../data/ports/store';
 import type {
@@ -198,7 +199,7 @@ export interface RedAlert {
   lastPaymentOn: string | null;
 }
 
-export async function loadRedAlerts(
+async function _loadRedAlertsInternal(
   store: DataStore,
   areaIds: Id[] | null,
 ): Promise<RedAlert[]> {
@@ -231,33 +232,41 @@ export async function loadRedAlerts(
   const customerIds = [...byCustomer.keys()];
   if (customerIds.length === 0) return alerts;
 
-  // Two parallel batches replace the N queries × 2 sequential pattern.
-  const [allCustomers, allLastPayments] = await Promise.all([
-    Promise.all(customerIds.map((id) => store.customers.get(id))),
-    Promise.all(
-      customerIds.map((id) =>
-        store.payments.findOne({
-          where: { customerId: id, status: 'CONFIRMED' },
-          orderBy: [{ field: 'createdAt', dir: 'desc' }],
-        }),
-      ),
-    ),
+  // Two bulk queries replace the N*2 individual queries
+  const [allCustomers, allPayments] = await Promise.all([
+    store.customers.find({ where: { id: { in: customerIds } } as never }),
+    store.payments.find({
+      where: {
+        customerId: { in: customerIds },
+        status: 'CONFIRMED',
+      } as never,
+      orderBy: [{ field: 'createdAt', dir: 'desc' }],
+    }),
   ]);
 
-  for (let i = 0; i < customerIds.length; i++) {
-    const customerId = customerIds[i];
-    const customer = allCustomers[i];
-    const agg = byCustomer.get(customerId)!;
+  const customerMap = new Map(allCustomers.map((c) => [c.id, c]));
+  const lastPaymentMap = new Map<Id, Payment>();
+  for (const p of allPayments) {
+    if (!lastPaymentMap.has(p.customerId)) {
+      lastPaymentMap.set(p.customerId, p);
+    }
+  }
 
-    if (!customer || customer.status === 'INACTIVE') continue;
+  for (const customerId of customerIds) {
+    const customer = customerMap.get(customerId);
+    if (!customer) continue;
+    const agg = byCustomer.get(customerId);
+    if (!agg) continue;
 
+    if (customer.status === 'INACTIVE') continue;
+
+    const due = new Date(`${agg.earliestDue}T00:00:00Z`);
     const daysOverdue = Math.floor(
-      (today.getTime() - new Date(`${agg.earliestDue}T00:00:00Z`).getTime()) /
-        86400000,
+      (today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24),
     );
     if (daysOverdue < 0) continue;
 
-    const lastPayment = allLastPayments[i];
+    const lastPayment = lastPaymentMap.get(customerId);
 
     alerts.push({
       customer,
@@ -275,7 +284,19 @@ export async function loadRedAlerts(
     });
   }
 
-  return alerts.sort(
-    (a, b) => b.daysOverdue - a.daysOverdue || b.amount - a.amount,
-  );
+  return alerts.sort((a, b) => b.daysOverdue - a.daysOverdue || b.amount - a.amount);
+}
+
+const cachedRedAlertsByScope = cache(
+  async (scopeKey: string, areaIds: Id[] | null, store: DataStore) => {
+    return _loadRedAlertsInternal(store, areaIds);
+  },
+);
+
+export function loadRedAlerts(
+  store: DataStore,
+  areaIds: Id[] | null,
+): Promise<RedAlert[]> {
+  const scopeKey = areaIds ? areaIds.slice().sort().join(',') : 'all';
+  return cachedRedAlertsByScope(scopeKey, areaIds, store);
 }

@@ -27,8 +27,10 @@ export async function ConsoleAlerts({
   base: string;
 }) {
   const store = await getStore();
-  const alerts = await loadRedAlerts(store, session.scope.areaIds);
-  const areas = await store.areas.find();
+  const [alerts, areas] = await Promise.all([
+    loadRedAlerts(store, session.scope.areaIds),
+    store.areas.find(),
+  ]);
   const areaById = new Map(areas.map((a) => [a.id, a]));
 
   const total = alerts.reduce((sum, a) => sum + a.amount, 0);

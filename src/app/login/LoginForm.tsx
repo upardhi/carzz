@@ -32,10 +32,10 @@ export function LoginForm({ next }: { next?: string }) {
         setError(data.error ?? 'Could not sign you in.');
         return;
       }
-      // `refresh` first so the new session cookie is picked up by server
-      // components on the destination page.
-      router.refresh();
-      router.replace(next || data.redirect || '/');
+      // Full navigation ensures the new session cookie is sent cleanly
+      // and immediately displays the destination layout/skeleton without
+      // racing an unnecessary re-render of /login.
+      window.location.href = next || data.redirect || '/';
     } catch {
       setError('No connection. Check your network and try again.');
     } finally {

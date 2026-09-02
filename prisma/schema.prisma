@@ -365,6 +365,8 @@ model WashVisit {
   staff    Staff?   @relation(fields: [staffId], references: [id])
 
   @@index([areaId, scheduledDate])
+  @@index([scheduledDate, areaId])
+  @@index([scheduledDate])
   @@index([staffId, scheduledDate])
   @@index([customerId, scheduledDate])
   @@index([cycle, status])
@@ -375,7 +377,7 @@ model Payment {
   customerId       String
   areaId           String
   amount           Int
-  kind             PaymentKind
+  kind             PaymentKind   @default(PACKAGE)
   mode             PaymentMode
   status           PaymentStatus @default(PENDING)
   cycle            String
@@ -405,6 +407,7 @@ model Invoice {
 
   @@unique([customerId, cycle])
   @@index([areaId, status])
+  @@index([status, areaId])
 }
 
 model Expense {

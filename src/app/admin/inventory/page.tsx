@@ -14,7 +14,7 @@ import {
 import { ActionButton } from '@/components/console/ActionButton';
 import { requirePermission } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
-import { consumptionByArea, stockForArea } from '@/lib/services/inventory';
+import { consumptionByArea, stockForAreas } from '@/lib/services/inventory';
 import { currentCycle, formatDateFull, money, relativeDays } from '@/lib/util/format';
 
 export const metadata = { title: 'Inventory' };
@@ -33,9 +33,9 @@ export default async function AdminInventory() {
     consumptionByArea(store, cycle, null),
   ]);
 
-  const stock = await Promise.all(
-    areas.map(async (area) => ({ area, rows: await stockForArea(store, area.id) })),
-  );
+  const areaIds = areas.map((a) => a.id);
+  const stockMap = await stockForAreas(store, areaIds);
+  const stock = areas.map((area) => ({ area, rows: stockMap.get(area.id) ?? [] }));
 
   const itemById = new Map(items.map((i) => [i.id, i]));
   const areaById = new Map(areas.map((a) => [a.id, a]));

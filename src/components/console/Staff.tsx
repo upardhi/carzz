@@ -15,7 +15,7 @@ import {
 import { scopeAreaFilter } from '@/lib/auth/rbac';
 import type { Session } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
-import { computePayout, pocketAllowance } from '@/lib/services/payroll';
+import { computePayoutRun, pocketAllowance } from '@/lib/services/payroll';
 import { staffPerformance } from '@/lib/services/reports';
 import {
   currentCycle,
@@ -34,7 +34,7 @@ export async function ConsoleStaff({ session }: { session: Session }) {
   const today = todayISO();
   const areaFilter = scopeAreaFilter(session.scope);
 
-  const [staff, areas, rules, performance] = await Promise.all([
+  const [staff, areas, rules, performance, payoutList] = await Promise.all([
     store.staff.find({
       where: { role: 'EMPLOYEE', ...areaFilter } as never,
       orderBy: [{ field: 'name' }],
@@ -42,6 +42,7 @@ export async function ConsoleStaff({ session }: { session: Session }) {
     store.areas.find(),
     store.getPayoutSettings(),
     staffPerformance(store, cycle, session.scope.areaIds),
+    computePayoutRun(store, cycle, session.scope.areaIds),
   ]);
 
   const staffIds = new Set(staff.map((s) => s.id));
@@ -54,18 +55,22 @@ export async function ConsoleStaff({ session }: { session: Session }) {
     }),
   ]);
 
+  const payouts = new Map(payoutList.map((p) => [p.staffId, p]));
   const pending = allPocket.filter((r) => staffIds.has(r.staffId));
   const allowances = new Map(
     await Promise.all(
       pending.map(
         async (r) =>
-          [r.id, await pocketAllowance(store, r.staffId, cycle)] as const,
+          [
+            r.id,
+            await pocketAllowance(
+              store,
+              r.staffId,
+              cycle,
+              payouts.get(r.staffId),
+            ),
+          ] as const,
       ),
-    ),
-  );
-  const payouts = new Map(
-    await Promise.all(
-      staff.map(async (s) => [s.id, await computePayout(store, s.id, cycle)] as const),
     ),
   );
 

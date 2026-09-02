@@ -3,7 +3,7 @@ import clsx from 'clsx';
 import { scopeAreaFilter } from '@/lib/auth/rbac';
 import type { Session } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
-import { LEAD_SOURCES, type CustomerStatus } from '@/lib/data/types';
+import { LEAD_SOURCES, type Car, type CustomerStatus } from '@/lib/data/types';
 import { currentCycle, formatTime, money } from '@/lib/util/format';
 import { LEAD_SOURCE_LABEL, PATTERN_SHORT } from '@/lib/util/labels';
 import {
@@ -75,7 +75,7 @@ export async function ConsoleCustomers({
   const cycle = currentCycle();
   const areaFilter = scopeAreaFilter(session.scope);
 
-  const [all, areas, staff, packages] = await Promise.all([
+  const [all, areas, staff, packages, invoices] = await Promise.all([
     store.customers.find({
       where: areaFilter as never,
       orderBy: [{ field: 'name' }],
@@ -83,18 +83,16 @@ export async function ConsoleCustomers({
     store.areas.find(),
     store.staff.find({ where: { role: 'EMPLOYEE', ...areaFilter } as never }),
     store.packages.find(),
-  ]);
-
-  const [cars, invoices] = await Promise.all([
-    store.cars.find(),
     store.invoices.find({ where: { cycle, ...areaFilter } as never }),
   ]);
 
-  const customerIdSet = new Set(all.map((c) => c.id));
-  const scopedCars = cars.filter((c) => customerIdSet.has(c.customerId));
-  const scopedInvoices = invoices.filter((i) => customerIdSet.has(i.customerId));
+  const customerIds = all.map((c) => c.id);
+  const scopedCars = customerIds.length
+    ? await store.cars.find({ where: { customerId: { in: customerIds } } as never })
+    : [];
+  const scopedInvoices = invoices;
 
-  const carsByCustomer = new Map<string, typeof cars>();
+  const carsByCustomer = new Map<string, Car[]>();
   for (const car of scopedCars) {
     const list = carsByCustomer.get(car.customerId) ?? [];
     list.push(car);

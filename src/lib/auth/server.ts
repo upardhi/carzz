@@ -31,7 +31,9 @@ export const getSession = cache(async (): Promise<Session | null> => {
   // A cookie outliving its user (deactivated, deleted) must not grant access.
   if (!user || !user.active) return null;
 
-  const areas = await store.areas.find();
+  // Only AREA_ADMIN uses the areas table to map its region; other roles
+  // determine their scope directly from the user record.
+  const areas = user.role === 'AREA_ADMIN' ? await store.areas.find() : [];
   return { claims, user, scope: buildScope(user, areas) };
 });
 

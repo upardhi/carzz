@@ -11,15 +11,14 @@ export default async function AdminPackages() {
   await requirePermission('package:manage');
   const store = await getStore();
 
-  const [packages, cars] = await Promise.all([
-    store.packages.find(),
-    store.cars.find({ where: { active: true } }),
-  ]);
-
-  const countByPackage = new Map<string, number>();
-  for (const car of cars) {
-    countByPackage.set(car.packageId, (countByPackage.get(car.packageId) ?? 0) + 1);
-  }
+  const packages = await store.packages.find();
+  const counts = await Promise.all(
+    packages.map(async (pkg) => [
+      pkg.id,
+      await store.cars.count({ packageId: pkg.id, active: true } as never),
+    ] as const),
+  );
+  const countByPackage = new Map<string, number>(counts);
 
   return (
     <>

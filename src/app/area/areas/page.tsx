@@ -12,16 +12,20 @@ export default async function AreaAdminAreas() {
   const cycle = currentCycle();
   const performance = await areaPerformance(store, cycle, session.scope.areaIds);
 
-  const managerIds = performance
-    .map((p) => p.area.managerId)
-    .filter(Boolean) as string[];
-  const managers = (await Promise.all(managerIds.map((id) => store.staff.get(id)))).filter(
-    Boolean,
-  );
+  const managerIds = [
+    ...new Set(
+      performance
+        .map((p) => p.area.managerId)
+        .filter(Boolean) as string[],
+    ),
+  ];
+  const managers = managerIds.length
+    ? await store.staff.find({ where: { id: { in: managerIds } } as never })
+    : [];
 
   const managerNames: Record<string, string> = {};
   for (const m of managers) {
-    if (m) managerNames[m.id] = m.name;
+    managerNames[m.id] = m.name;
   }
 
   return (
