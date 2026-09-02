@@ -1,24 +1,66 @@
 import Link from 'next/link';
-import { PageHeader } from '@/components/shell/ConsoleShell';
-import {
-  ButtonLink,
-  Kpi,
-  KpiGrid,
-  Table,
-  TableWrap,
-  Tag,
-  Td,
-  Th,
-} from '@/components/ui/primitives';
+import clsx from 'clsx';
 import { scopeAreaFilter } from '@/lib/auth/rbac';
 import type { Session } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
-import { LEAD_SOURCES } from '@/lib/data/types';
+import { LEAD_SOURCES, type CustomerStatus } from '@/lib/data/types';
 import { currentCycle, formatTime, money } from '@/lib/util/format';
 import { LEAD_SOURCE_LABEL, PATTERN_SHORT } from '@/lib/util/labels';
-import { Filters } from './Filters';
+import {
+  IconCalendar,
+  IconCar,
+  IconClock,
+  IconEye,
+  IconMapPin,
+  IconPlus,
+  IconRupee,
+  IconSliders,
+  IconTag,
+  IconUser,
+  IconUsers,
+  IconUserX,
+} from '@/components/shell/icons';
+import { Filters, PageSizeSelect } from './Filters';
 
-const PAGE_SIZE = 25;
+const AVATAR_PALETTES = [
+  { bg: 'bg-[#EFF6FF]', text: 'text-[#2563EB]' }, // soft blue
+  { bg: 'bg-[#ECFDF5]', text: 'text-[#059669]' }, // soft emerald
+  { bg: 'bg-[#FFFBEB]', text: 'text-[#D97706]' }, // soft amber
+  { bg: 'bg-[#F5F3FF]', text: 'text-[#7C3AED]' }, // soft purple
+  { bg: 'bg-[#F0FDF4]', text: 'text-[#16A34A]' }, // soft green
+  { bg: 'bg-[#FFF1F2]', text: 'text-[#E11D48]' }, // soft rose
+  { bg: 'bg-[#ECFEFF]', text: 'text-[#0891B2]' }, // soft cyan
+  { bg: 'bg-[#EEF2FF]', text: 'text-[#4F46E5]' }, // soft indigo
+];
+
+function getAvatarPalette(name: string) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return AVATAR_PALETTES[Math.abs(hash) % AVATAR_PALETTES.length];
+}
+
+function getInitials(name: string) {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  return name.slice(0, 2).toUpperCase();
+}
+
+function getPagination(currentPage: number, totalPages: number): (number | string)[] {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1);
+  }
+  if (currentPage <= 4) {
+    return [1, 2, 3, 4, 5, '...', totalPages];
+  }
+  if (currentPage >= totalPages - 3) {
+    return [1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+  }
+  return [1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages];
+}
 
 export async function ConsoleCustomers({
   session,
@@ -48,17 +90,88 @@ export async function ConsoleCustomers({
     store.invoices.find({ where: { cycle, ...areaFilter } as never }),
   ]);
 
+  const customerIdSet = new Set(all.map((c) => c.id));
+  const scopedCars = cars.filter((c) => customerIdSet.has(c.customerId));
+  const scopedInvoices = invoices.filter((i) => customerIdSet.has(i.customerId));
+
   const carsByCustomer = new Map<string, typeof cars>();
-  for (const car of cars) {
+  for (const car of scopedCars) {
     const list = carsByCustomer.get(car.customerId) ?? [];
     list.push(car);
     carsByCustomer.set(car.customerId, list);
   }
-  const invoiceByCustomer = new Map(invoices.map((i) => [i.customerId, i]));
+
+  const invoiceByCustomer = new Map(scopedInvoices.map((i) => [i.customerId, i]));
   const staffById = new Map(staff.map((s) => [s.id, s]));
   const areaById = new Map(areas.map((a) => [a.id, a]));
   const packageById = new Map(packages.map((p) => [p.id, p]));
 
+  // Dynamic KPI calculations - 100% dynamic from scoped data
+  const totalCustomers = all.length;
+  const activeCustomers = all.filter((c) => c.status === 'ACTIVE').length;
+  const holdCustomers = all.filter((c) => c.status === 'HOLD').length;
+  const inactiveCustomers = all.filter((c) => c.status === 'INACTIVE').length;
+
+  const activePercent = totalCustomers > 0 ? ((activeCustomers / totalCustomers) * 100).toFixed(1) : '0.0';
+  const holdPercent = totalCustomers > 0 ? ((holdCustomers / totalCustomers) * 100).toFixed(1) : '0.0';
+  const inactivePercent = totalCustomers > 0 ? ((inactiveCustomers / totalCustomers) * 100).toFixed(1) : '0.0';
+
+  const totalCarsCount = scopedCars.length;
+
+  const unpaidInvoices = scopedInvoices.filter((i) => i.status !== 'PAID' && i.amount - i.paidAmount > 0);
+  const unpaidCount = unpaidInvoices.length;
+  const unpaidAmount = unpaidInvoices.reduce((sum, i) => sum + (i.amount - i.paidAmount), 0);
+
+  // Dynamic Filter Options: "if there is not data then dont show that option"
+  const statusesInUse = new Set(all.map((c) => c.status));
+  const statusOptions = [
+    { value: 'ACTIVE', label: 'Active' },
+    { value: 'HOLD', label: 'On hold' },
+    { value: 'INACTIVE', label: 'Inactive' },
+  ].filter((o) => statusesInUse.has(o.value as CustomerStatus));
+
+  const paymentsInUse = new Set<string>();
+  for (const c of all) {
+    const inv = invoiceByCustomer.get(c.id);
+    if (!inv) paymentsInUse.add('NONE');
+    else if (inv.status === 'PAID' || inv.amount <= inv.paidAmount) paymentsInUse.add('PAID');
+    else if (inv.paidAmount > 0) paymentsInUse.add('PARTIAL');
+    else paymentsInUse.add('PENDING');
+  }
+  const paymentOptions = [
+    { value: 'PAID', label: 'Paid' },
+    { value: 'PARTIAL', label: 'Partial' },
+    { value: 'PENDING', label: 'Pending' },
+    { value: 'NONE', label: 'No bill' },
+  ].filter((o) => paymentsInUse.has(o.value));
+
+  const patternsInUse = new Set<string>();
+  for (const car of scopedCars) {
+    if (car.schedulePattern) patternsInUse.add(car.schedulePattern);
+  }
+  const patternOptions = Object.entries(PATTERN_SHORT)
+    .filter(([val]) => patternsInUse.has(val))
+    .map(([value, label]) => ({ value, label }));
+
+  const assignedStaffIds = new Set<string>();
+  for (const car of scopedCars) {
+    if (car.assignedStaffId) assignedStaffIds.add(car.assignedStaffId);
+  }
+  const staffOptions = staff
+    .filter((s) => assignedStaffIds.has(s.id))
+    .map((s) => ({ value: s.id, label: s.name }));
+
+  const sourcesInUse = new Set(all.map((c) => c.source).filter(Boolean));
+  const sourceOptions = LEAD_SOURCES
+    .filter((s) => sourcesInUse.has(s))
+    .map((s) => ({ value: s, label: LEAD_SOURCE_LABEL[s] || s }));
+
+  const areasInUse = new Set(all.map((c) => c.areaId).filter(Boolean));
+  const areaOptions = areas
+    .filter((a) => areasInUse.has(a.id))
+    .map((a) => ({ value: a.id, label: a.name }));
+
+  // Filtering
   const query = (searchParams.q ?? '').trim().toLowerCase();
   const filtered = all.filter((customer) => {
     if (searchParams.status && customer.status !== searchParams.status) return false;
@@ -77,7 +190,7 @@ export async function ConsoleCustomers({
       const invoice = invoiceByCustomer.get(customer.id);
       const state = !invoice
         ? 'NONE'
-        : invoice.status === 'PAID'
+        : invoice.status === 'PAID' || invoice.amount <= invoice.paidAmount
           ? 'PAID'
           : invoice.paidAmount > 0
             ? 'PARTIAL'
@@ -100,97 +213,184 @@ export async function ConsoleCustomers({
     return true;
   });
 
+  const pageSize = Math.min(100, Math.max(5, Number(searchParams.limit ?? 20) || 20));
   const page = Math.max(1, Number(searchParams.page ?? 1) || 1);
-  const pageRows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const paginationPages = getPagination(page, totalPages);
+
+  const buildPageUrl = (targetPage: number) => {
+    const params = new URLSearchParams({
+      ...Object.fromEntries(
+        Object.entries(searchParams).filter(([, v]) => v !== undefined && v !== ''),
+      ),
+      page: String(targetPage),
+    } as Record<string, string>);
+    return `?${params.toString()}`;
+  };
 
   return (
-    <>
-      <PageHeader
-        title="Customers"
-        description={`${filtered.length} of ${all.length} customers`}
-        actions={
-          <ButtonLink href={`${base}/customers/new`} size="sm">
-            + Add customer
-          </ButtonLink>
-        }
-      />
+    <div className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-6 shadow-xs">
+      {/* Top Header */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+            <IconUsers width={22} height={22} />
+          </div>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Customers</h1>
+            <p className="text-xs text-slate-500 font-medium">
+              {filtered.length} of {all.length} customers
+            </p>
+          </div>
+        </div>
 
-      <KpiGrid>
-        <Kpi label="Total" value={all.length} />
-        <Kpi
-          label="Active"
-          value={all.filter((c) => c.status === 'ACTIVE').length}
-          tone="success"
-        />
-        <Kpi
-          label="On hold"
-          value={all.filter((c) => c.status === 'HOLD').length}
-          tone="gold"
-        />
-        <Kpi
-          label="Inactive"
-          value={all.filter((c) => c.status === 'INACTIVE').length}
-        />
-        <Kpi label="Cars" value={cars.filter((c) => c.active).length} />
-        <Kpi
-          label="Unpaid this month"
-          value={invoices.filter((i) => i.status !== 'PAID').length}
-          tone="gold"
-        />
-      </KpiGrid>
+        <Link
+          href={`${base}/customers/new`}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-[#0F2347] px-4 py-2 text-xs sm:text-sm font-semibold text-white shadow-xs hover:bg-[#163363] transition-colors"
+        >
+          <IconPlus width={15} height={15} />
+          Add customer
+        </Link>
+      </div>
 
-      <div className="mt-4">
+      {/* 6 Dynamic KPI Stat Cards */}
+      <div className="my-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+        {/* TOTAL */}
+        <div className="flex items-center gap-3 rounded-xl border border-slate-200/70 bg-white p-3.5 shadow-xs">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#EFF6FF] text-[#2563EB]">
+            <IconUsers width={20} height={20} />
+          </div>
+          <div className="min-w-0">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">TOTAL</div>
+            <div className="mt-0.5 text-xl sm:text-2xl font-black text-slate-900 leading-tight tracking-tight">
+              {totalCustomers}
+            </div>
+            <div className="truncate text-[11px] font-medium text-slate-400">All customers</div>
+          </div>
+        </div>
+
+        {/* ACTIVE */}
+        <div className="flex items-center gap-3 rounded-xl border border-slate-200/70 bg-white p-3.5 shadow-xs">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ECFDF5] text-[#10B981]">
+            <IconUser width={20} height={20} />
+          </div>
+          <div className="min-w-0">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">ACTIVE</div>
+            <div className="mt-0.5 text-xl sm:text-2xl font-black text-slate-900 leading-tight tracking-tight">
+              {activeCustomers}
+            </div>
+            <div className="truncate text-[11px] font-semibold text-emerald-600">
+              {activePercent}% of total
+            </div>
+          </div>
+        </div>
+
+        {/* ON HOLD */}
+        <div className="flex items-center gap-3 rounded-xl border border-slate-200/70 bg-white p-3.5 shadow-xs">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#FFF7ED] text-[#F97316]">
+            <IconClock width={20} height={20} />
+          </div>
+          <div className="min-w-0">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">ON HOLD</div>
+            <div className="mt-0.5 text-xl sm:text-2xl font-black text-slate-900 leading-tight tracking-tight">
+              {holdCustomers}
+            </div>
+            <div className="truncate text-[11px] font-semibold text-amber-600">
+              {holdPercent}% of total
+            </div>
+          </div>
+        </div>
+
+        {/* INACTIVE */}
+        <div className="flex items-center gap-3 rounded-xl border border-slate-200/70 bg-white p-3.5 shadow-xs">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#F5F3FF] text-[#8B5CF6]">
+            <IconUserX width={20} height={20} />
+          </div>
+          <div className="min-w-0">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">INACTIVE</div>
+            <div className="mt-0.5 text-xl sm:text-2xl font-black text-slate-900 leading-tight tracking-tight">
+              {inactiveCustomers}
+            </div>
+            <div className="truncate text-[11px] font-semibold text-purple-600">
+              {inactivePercent}% of total
+            </div>
+          </div>
+        </div>
+
+        {/* CARS */}
+        <div className="flex items-center gap-3 rounded-xl border border-slate-200/70 bg-white p-3.5 shadow-xs">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#EFF6FF] text-[#3B82F6]">
+            <IconCar width={20} height={20} />
+          </div>
+          <div className="min-w-0">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">CARS</div>
+            <div className="mt-0.5 text-xl sm:text-2xl font-black text-slate-900 leading-tight tracking-tight">
+              {totalCarsCount}
+            </div>
+            <div className="truncate text-[11px] font-medium text-slate-400">Total cars</div>
+          </div>
+        </div>
+
+        {/* UNPAID THIS MONTH */}
+        <div className="flex items-center gap-3 rounded-xl border border-slate-200/70 bg-white p-3.5 shadow-xs">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#FFF7ED] text-[#F97316]">
+            <IconRupee width={20} height={20} />
+          </div>
+          <div className="min-w-0">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">UNPAID THIS MONTH</div>
+            <div className="mt-0.5 text-xl sm:text-2xl font-black text-slate-900 leading-tight tracking-tight">
+              {unpaidCount}
+            </div>
+            <div className="truncate text-[11px] font-semibold text-amber-600">
+              {money(unpaidAmount)}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Filter and Search Bar */}
+      <div className="mb-4">
         <Filters
-          search={{ name: 'q', placeholder: 'Name, phone or car number' }}
+          search={{ name: 'q', placeholder: 'Search by name, phone or car number...' }}
           filters={[
             {
               name: 'status',
               label: 'Status — all',
-              options: [
-                { value: 'ACTIVE', label: 'Active' },
-                { value: 'HOLD', label: 'On hold' },
-                { value: 'INACTIVE', label: 'Inactive' },
-              ],
+              icon: <IconSliders width={13} height={13} />,
+              options: statusOptions,
             },
             {
               name: 'payment',
               label: 'Payment — all',
-              options: [
-                { value: 'PAID', label: 'Paid' },
-                { value: 'PARTIAL', label: 'Partial' },
-                { value: 'PENDING', label: 'Pending' },
-              ],
+              icon: <IconRupee width={13} height={13} />,
+              options: paymentOptions,
             },
             {
               name: 'pattern',
               label: 'Day — all',
-              options: Object.entries(PATTERN_SHORT).map(([value, label]) => ({
-                value,
-                label,
-              })),
+              icon: <IconCalendar width={13} height={13} />,
+              options: patternOptions,
             },
             {
               name: 'staff',
               label: 'Wash boy — all',
-              options: staff.map((s) => ({ value: s.id, label: s.name })),
+              icon: <IconUser width={13} height={13} />,
+              options: staffOptions,
             },
             {
               name: 'source',
               label: 'Source — all',
-              options: LEAD_SOURCES.map((s) => ({
-                value: s,
-                label: LEAD_SOURCE_LABEL[s],
-              })),
+              icon: <IconTag width={13} height={13} />,
+              options: sourceOptions,
             },
-            ...(session.scope.areaIds && session.scope.areaIds.length > 1
+            ...(areaOptions.length > 1
               ? [
                   {
                     name: 'area',
                     label: 'Area — all',
-                    options: areas
-                      .filter((a) => session.scope.areaIds!.includes(a.id))
-                      .map((a) => ({ value: a.id, label: a.name })),
+                    icon: <IconMapPin width={13} height={13} />,
+                    options: areaOptions,
                   },
                 ]
               : []),
@@ -198,21 +398,37 @@ export async function ConsoleCustomers({
         />
       </div>
 
-      <TableWrap>
-        <Table>
+      {/* Modern Customers Table */}
+      <div className="overflow-x-auto rounded-xl border border-slate-200/80 bg-white">
+        <table className="w-full border-collapse text-left text-sm">
           <thead>
-            <tr>
-              <Th>Customer</Th>
-              <Th>Cars</Th>
-              <Th>Schedule</Th>
-              <Th>Wash boy</Th>
-              <Th>Monthly</Th>
-              <Th>Payment</Th>
-              <Th>Status</Th>
-              <Th>Source</Th>
+            <tr className="border-b border-slate-200/80 bg-slate-50/60 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              <th className="px-4 py-3">
+                <span className="inline-flex items-center gap-1">
+                  Customer
+                  <svg className="h-3 w-3 text-slate-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M5 7l5-5 5 5H5zM5 13l5 5 5-5H5z" />
+                  </svg>
+                </span>
+              </th>
+              <th className="px-4 py-3">Cars</th>
+              <th className="px-4 py-3">
+                <span className="inline-flex items-center gap-1">
+                  Schedule
+                  <svg className="h-3 w-3 text-slate-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                  </svg>
+                </span>
+              </th>
+              <th className="px-4 py-3">Wash boy</th>
+              <th className="px-4 py-3">Monthly</th>
+              <th className="px-4 py-3">Payment</th>
+              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Source</th>
+              <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-slate-100">
             {pageRows.map((customer) => {
               const own = carsByCustomer.get(customer.id) ?? [];
               const invoice = invoiceByCustomer.get(customer.id);
@@ -222,108 +438,218 @@ export async function ConsoleCustomers({
               );
               const first = own[0];
               const owed = invoice ? invoice.amount - invoice.paidAmount : 0;
+              const palette = getAvatarPalette(customer.name);
+              const initials = getInitials(customer.name);
 
               return (
-                <tr key={customer.id} className="cursor-pointer hover:bg-navy-50">
-                  <Td>
-                    <Link
-                      href={`${base}/customers/${customer.id}`}
-                      className="font-bold text-ink hover:text-navy-800"
-                    >
-                      {customer.name}
-                    </Link>
-                    <div className="text-[11px] text-ink-faint">
-                      {areaById.get(customer.areaId)?.name}
+                <tr key={customer.id} className="transition-colors hover:bg-slate-50/70">
+                  {/* Customer */}
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2.5">
+                      <div
+                        className={clsx(
+                          'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold',
+                          palette.bg,
+                          palette.text
+                        )}
+                      >
+                        {initials}
+                      </div>
+                      <div className="min-w-0">
+                        <Link
+                          href={`${base}/customers/${customer.id}`}
+                          className="block font-semibold text-slate-900 text-xs sm:text-sm hover:text-blue-600 transition-colors"
+                        >
+                          {customer.name}
+                        </Link>
+                        <div className="text-[11px] font-medium text-slate-400">
+                          {areaById.get(customer.areaId)?.name ?? '—'}
+                        </div>
+                      </div>
                     </div>
-                  </Td>
-                  <Td>{own.length}</Td>
-                  <Td className="whitespace-nowrap">
-                    {first
-                      ? `${PATTERN_SHORT[first.schedulePattern]} · ${formatTime(first.scheduleTime)}`
-                      : '—'}
-                  </Td>
-                  <Td>
-                    {first?.assignedStaffId
-                      ? (staffById.get(first.assignedStaffId)?.name ?? '—')
-                      : <span className="font-bold text-danger-500">Unassigned</span>}
-                  </Td>
-                  <Td>{money(monthly)}</Td>
-                  <Td>
-                    {!invoice ? (
-                      <Tag tone="neutral">No bill</Tag>
-                    ) : owed <= 0 ? (
-                      <Tag tone="ok">Paid</Tag>
-                    ) : invoice.paidAmount > 0 ? (
-                      <Tag tone="warn">Partial · {money(owed)}</Tag>
+                  </td>
+
+                  {/* Cars */}
+                  <td className="px-4 py-3">
+                    <span className="text-xs sm:text-sm font-medium text-slate-700">
+                      {own.length}
+                    </span>
+                  </td>
+
+                  {/* Schedule */}
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {first ? (
+                      <div className="flex items-center gap-1.5 text-xs text-slate-600 font-medium">
+                        <IconCalendar width={13} height={13} className="text-slate-400 shrink-0" />
+                        <span>
+                          {PATTERN_SHORT[first.schedulePattern]} · {formatTime(first.scheduleTime)}
+                        </span>
+                      </div>
                     ) : (
-                      <Tag tone="bad">Due {money(owed)}</Tag>
+                      <span className="text-xs text-slate-400">—</span>
                     )}
-                  </Td>
-                  <Td>
-                    <Tag
-                      tone={
+                  </td>
+
+                  {/* Wash boy */}
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {first?.assignedStaffId ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#EFF6FF] text-[#2563EB]">
+                        <IconUser width={12} height={12} className="shrink-0 text-[#2563EB]" />
+                        <span>{staffById.get(first.assignedStaffId)?.name ?? '—'}</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#FEF2F2] text-[#EF4444]">
+                        Unassigned
+                      </span>
+                    )}
+                  </td>
+
+                  {/* Monthly */}
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <span className="text-xs sm:text-sm font-semibold text-slate-800">
+                      {money(monthly)}
+                    </span>
+                  </td>
+
+                  {/* Payment */}
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {!invoice ? (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
+                        No bill
+                      </span>
+                    ) : owed <= 0 ? (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#ECFDF5] text-[#059669]">
+                        Paid
+                      </span>
+                    ) : invoice.paidAmount > 0 ? (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#FFF7ED] text-[#D97706]">
+                        Partial · {money(owed)}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#FEF2F2] text-[#DC2626]">
+                        Due {money(owed)}
+                      </span>
+                    )}
+                  </td>
+
+                  {/* Status */}
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <span
+                      className={clsx(
+                        'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold',
                         customer.status === 'ACTIVE'
-                          ? 'ok'
+                          ? 'bg-[#ECFDF5] text-[#059669]'
                           : customer.status === 'HOLD'
-                            ? 'warn'
-                            : 'neutral'
-                      }
+                            ? 'bg-[#FFF7ED] text-[#D97706]'
+                            : 'bg-[#F1F5F9] text-[#475569]'
+                      )}
                     >
                       {customer.status === 'ACTIVE'
                         ? 'Active'
                         : customer.status === 'HOLD'
                           ? 'Hold'
                           : 'Inactive'}
-                    </Tag>
-                  </Td>
-                  <Td className="text-[11.5px] text-ink-mute">
-                    {LEAD_SOURCE_LABEL[customer.source]}
-                  </Td>
+                    </span>
+                  </td>
+
+                  {/* Source */}
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <span className="text-xs text-slate-500 font-medium">
+                      {LEAD_SOURCE_LABEL[customer.source] ?? customer.source}
+                    </span>
+                  </td>
+
+                  {/* Actions (View Details) */}
+                  <td className="px-4 py-3 text-right whitespace-nowrap">
+                    <Link
+                      href={`${base}/customers/${customer.id}`}
+                      className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 transition-colors shadow-2xs"
+                      title="View customer details"
+                    >
+                      <IconEye width={14} height={14} />
+                    </Link>
+                  </td>
                 </tr>
               );
             })}
+
             {pageRows.length === 0 ? (
               <tr>
-                <Td className="py-8 text-center text-ink-mute" colSpan={8}>
+                <td className="py-10 text-center text-xs sm:text-sm text-slate-500" colSpan={9}>
                   No customers match these filters.
-                </Td>
+                </td>
               </tr>
             ) : null}
           </tbody>
-        </Table>
-      </TableWrap>
+        </table>
+      </div>
 
-      {totalPages > 1 ? (
-        <nav className="mt-3 flex items-center gap-2" aria-label="Pagination">
-          {Array.from({ length: totalPages }, (_, i) => i + 1)
-            .filter(
-              (n) => n === 1 || n === totalPages || Math.abs(n - page) <= 2,
-            )
-            .map((n, index, list) => (
-              <span key={n} className="flex items-center gap-2">
-                {index > 0 && n - list[index - 1] > 1 ? (
-                  <span className="text-ink-faint">…</span>
-                ) : null}
+      {/* Pagination Footer */}
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-4 pt-2 text-xs text-slate-500">
+        <div>
+          Showing {filtered.length === 0 ? 0 : (page - 1) * pageSize + 1} to{' '}
+          {Math.min(page * pageSize, filtered.length)} of {filtered.length} customers
+        </div>
+
+        {totalPages > 1 ? (
+          <nav className="flex items-center gap-1" aria-label="Pagination">
+            <Link
+              href={buildPageUrl(page - 1)}
+              aria-disabled={page <= 1}
+              className={clsx(
+                'flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition-colors',
+                page <= 1 ? 'pointer-events-none opacity-40' : 'hover:bg-slate-50'
+              )}
+              aria-label="Previous page"
+            >
+              &lt;
+            </Link>
+
+            {paginationPages.map((p, idx) => {
+              if (p === '...') {
+                return (
+                  <span key={`ellipsis-${idx}`} className="flex h-8 w-8 items-center justify-center text-slate-400">
+                    …
+                  </span>
+                );
+              }
+              const isCurrent = p === page;
+              return (
                 <Link
-                  href={`?${new URLSearchParams({
-                    ...Object.fromEntries(
-                      Object.entries(searchParams).filter(([, v]) => v),
-                    ),
-                    page: String(n),
-                  } as Record<string, string>)}`}
-                  aria-current={n === page ? 'page' : undefined}
-                  className={`rounded-md px-2.5 py-1 text-[13px] font-bold ${
-                    n === page
-                      ? 'bg-navy-800 text-white'
-                      : 'border border-line-strong bg-white text-ink hover:bg-surface-muted'
-                  }`}
+                  key={p}
+                  href={buildPageUrl(p as number)}
+                  aria-current={isCurrent ? 'page' : undefined}
+                  className={clsx(
+                    'flex h-8 w-8 items-center justify-center rounded-lg text-xs font-semibold transition-colors',
+                    isCurrent
+                      ? 'bg-[#2563EB] text-white shadow-xs'
+                      : 'text-slate-600 hover:bg-slate-100'
+                  )}
                 >
-                  {n}
+                  {p}
                 </Link>
-              </span>
-            ))}
-        </nav>
-      ) : null}
-    </>
+              );
+            })}
+
+            <Link
+              href={buildPageUrl(page + 1)}
+              aria-disabled={page >= totalPages}
+              className={clsx(
+                'flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition-colors',
+                page >= totalPages ? 'pointer-events-none opacity-40' : 'hover:bg-slate-50'
+              )}
+              aria-label="Next page"
+            >
+              &gt;
+            </Link>
+          </nav>
+        ) : null}
+
+        <div className="ml-auto sm:ml-0">
+          <PageSizeSelect value={pageSize} />
+        </div>
+      </div>
+    </div>
   );
 }
+

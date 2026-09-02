@@ -17,6 +17,12 @@ import {
   IconUsers,
   IconWallet,
 } from '@/components/shell/icons';
+import {
+  EmptyTableRow,
+  StatCard,
+  StatGrid,
+  TablePagination,
+} from '@/components/ui/primitives';
 import { money, moneyShort } from '@/lib/util/format';
 import type { AreaPerformance } from '@/lib/services/reports';
 
@@ -72,7 +78,6 @@ export function AreaDashboardClient({
   const [staffPage, setStaffPage] = useState(1);
   const staffPerPage = 8;
 
-  const totalStaffPages = Math.max(1, Math.ceil(staffToday.length / staffPerPage));
   const currentStaffSlice = staffToday.slice(
     (staffPage - 1) * staffPerPage,
     staffPage * staffPerPage,
@@ -163,125 +168,56 @@ export function AreaDashboardClient({
       </div>
 
       {/* 6 Top KPI Summary Metric Cards */}
-      <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-6">
-        {/* Active Customers */}
-        <div className="flex flex-col justify-between rounded-xl border border-line-soft bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
-              <IconUsers width={20} height={20} strokeWidth={2} />
-            </div>
-            <div>
-              <div className="text-[10px] font-extrabold uppercase tracking-wider text-ink-mute">
-                ACTIVE CUSTOMERS
-              </div>
-              <div className="text-2xl font-black text-navy-950">
-                {totals.customers}
-              </div>
-            </div>
-          </div>
-          <div className="mt-2 text-[11px] font-medium text-ink-mute">
-            Registered in region
-          </div>
-        </div>
-
-        {/* Cars Today */}
-        <div className="flex flex-col justify-between rounded-xl border border-line-soft bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-              <IconCar width={20} height={20} strokeWidth={2} />
-            </div>
-            <div>
-              <div className="text-[10px] font-extrabold uppercase tracking-wider text-ink-mute">
-                CARS TODAY
-              </div>
-              <div className="text-2xl font-black text-navy-950">{carsToday}</div>
-            </div>
-          </div>
-          <div className="mt-2 text-[11px] font-medium text-blue-600">
-            Scheduled today
-          </div>
-        </div>
-
-        {/* Completed */}
-        <div className="flex flex-col justify-between rounded-xl border border-line-soft bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
-              <IconCheckCircle width={20} height={20} strokeWidth={2} />
-            </div>
-            <div>
-              <div className="text-[10px] font-extrabold uppercase tracking-wider text-ink-mute">
-                COMPLETED
-              </div>
-              <div className="text-2xl font-black text-navy-950">
-                {completedToday}
-              </div>
-            </div>
-          </div>
-          <div className="mt-2 text-[11px] font-semibold text-emerald-600">
-            {carsToday > 0 ? ((completedToday / carsToday) * 100).toFixed(0) : 0}% <span className="font-normal text-ink-faint">of today</span>
-          </div>
-        </div>
-
-        {/* Not Done */}
-        <div className="flex flex-col justify-between rounded-xl border border-line-soft bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
-              <IconClock width={20} height={20} strokeWidth={2} />
-            </div>
-            <div>
-              <div className="text-[10px] font-extrabold uppercase tracking-wider text-ink-mute">
-                NOT DONE
-              </div>
-              <div className="text-2xl font-black text-navy-950">
-                {notDoneToday}
-              </div>
-            </div>
-          </div>
-          <div className="mt-2 text-[11px] font-semibold text-amber-600">
-            {carsToday > 0 ? ((notDoneToday / carsToday) * 100).toFixed(0) : 0}% <span className="font-normal text-ink-faint">of today</span>
-          </div>
-        </div>
-
-        {/* Unassigned */}
-        <div className="flex flex-col justify-between rounded-xl border border-line-soft bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
-              <IconUser width={20} height={20} strokeWidth={2} />
-            </div>
-            <div>
-              <div className="text-[10px] font-extrabold uppercase tracking-wider text-ink-mute">
-                UNASSIGNED
-              </div>
-              <div className="text-2xl font-black text-navy-950">
-                {unassignedToday}
-              </div>
-            </div>
-          </div>
-          <div className="mt-2 text-[11px] font-medium text-ink-mute">
-            {unassignedToday > 0 ? `${unassignedToday} need wash boy` : 'All cars assigned'}
-          </div>
-        </div>
-
-        {/* Outstanding */}
-        <div className="flex flex-col justify-between rounded-xl border border-line-soft bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
-              <IconRupee width={20} height={20} strokeWidth={2.2} />
-            </div>
-            <div>
-              <div className="text-[10px] font-extrabold uppercase tracking-wider text-ink-mute">
-                OUTSTANDING
-              </div>
-              <div className="text-2xl font-black text-amber-600">
-                {moneyShort(outstanding)}
-              </div>
-            </div>
-          </div>
-          <div className="mt-2 text-[11px] font-semibold text-amber-600">
-            {alertsCount} pending accounts
-          </div>
-        </div>
-      </div>
+      <StatGrid columns={6}>
+        <StatCard
+          label="ACTIVE CUSTOMERS"
+          value={totals.customers}
+          icon={<IconUsers width={20} height={20} strokeWidth={2} />}
+          tone="purple"
+          subtext="Registered in region"
+          subtextTone="muted"
+        />
+        <StatCard
+          label="CARS TODAY"
+          value={carsToday}
+          icon={<IconCar width={20} height={20} strokeWidth={2} />}
+          tone="blue"
+          subtext="Scheduled today"
+          subtextTone="info"
+        />
+        <StatCard
+          label="COMPLETED"
+          value={completedToday}
+          icon={<IconCheckCircle width={20} height={20} strokeWidth={2} />}
+          tone="emerald"
+          subtext={`${carsToday > 0 ? ((completedToday / carsToday) * 100).toFixed(0) : 0}% of today`}
+          subtextTone="success"
+        />
+        <StatCard
+          label="NOT DONE"
+          value={notDoneToday}
+          icon={<IconClock width={20} height={20} strokeWidth={2} />}
+          tone="amber"
+          subtext={`${carsToday > 0 ? ((notDoneToday / carsToday) * 100).toFixed(0) : 0}% of today`}
+          subtextTone="warning"
+        />
+        <StatCard
+          label="UNASSIGNED"
+          value={unassignedToday}
+          icon={<IconUser width={20} height={20} strokeWidth={2} />}
+          tone="purple"
+          subtext={unassignedToday > 0 ? `${unassignedToday} need wash boy` : 'All cars assigned'}
+          subtextTone="muted"
+        />
+        <StatCard
+          label="OUTSTANDING"
+          value={moneyShort(outstanding)}
+          icon={<IconRupee width={20} height={20} strokeWidth={2.2} />}
+          tone="amber"
+          subtext={`${alertsCount} pending accounts`}
+          subtextTone="warning"
+        />
+      </StatGrid>
 
       {/* Middle Section: Needs you right now & Staff today */}
       <div className="grid gap-5 lg:grid-cols-12">
@@ -431,11 +367,7 @@ export function AreaDashboardClient({
                     );
                   })}
                   {currentStaffSlice.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="py-6 text-center text-ink-mute">
-                        No staff on duty today.
-                      </td>
-                    </tr>
+                    <EmptyTableRow colSpan={5} message="No staff on duty today." />
                   ) : null}
                 </tbody>
               </table>
@@ -443,46 +375,12 @@ export function AreaDashboardClient({
           </div>
 
           {/* Staff Pagination */}
-          <div className="mt-4 flex items-center justify-between border-t border-line-soft pt-3 text-xs text-ink-mute">
-            <div>
-              Showing {Math.min(1, staffToday.length)} to{' '}
-              {Math.min(staffPage * staffPerPage, staffToday.length)} of{' '}
-              {staffToday.length} staff
-            </div>
-
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                disabled={staffPage <= 1}
-                onClick={() => setStaffPage((p) => Math.max(1, p - 1))}
-                className="flex h-7 w-7 items-center justify-center rounded-lg border border-line-soft text-xs text-slate-500 disabled:opacity-40"
-              >
-                ‹
-              </button>
-              {Array.from({ length: totalStaffPages }).map((_, i) => (
-                <button
-                  key={i + 1}
-                  type="button"
-                  onClick={() => setStaffPage(i + 1)}
-                  className={`flex h-7 w-7 items-center justify-center rounded-lg text-xs font-bold ${
-                    staffPage === i + 1
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'border border-line-soft text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  {i + 1}
-                </button>
-              ))}
-              <button
-                type="button"
-                disabled={staffPage >= totalStaffPages}
-                onClick={() => setStaffPage((p) => Math.min(totalStaffPages, p + 1))}
-                className="flex h-7 w-7 items-center justify-center rounded-lg border border-line-soft text-xs text-slate-500 disabled:opacity-40"
-              >
-                ›
-              </button>
-            </div>
-          </div>
+          <TablePagination
+            page={staffPage}
+            totalItems={staffToday.length}
+            perPage={staffPerPage}
+            onPageChange={setStaffPage}
+          />
         </div>
       </div>
 

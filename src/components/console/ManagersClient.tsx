@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
 import {
   IconAlert,
   IconRupee,
@@ -9,6 +10,12 @@ import {
   IconUsers,
   IconWallet,
 } from '@/components/shell/icons';
+import {
+  EmptyTableRow,
+  StatCard,
+  StatGrid,
+  TablePagination,
+} from '@/components/ui/primitives';
 import { formatDateFull, money, percent } from '@/lib/util/format';
 import type { Staff, User } from '@/lib/data/types';
 import type { AreaPerformance } from '@/lib/services/reports';
@@ -39,6 +46,10 @@ export function ManagersClient({
   const totalOutstanding = performance.reduce((s, p) => s + p.outstanding, 0);
   const totalMissed = performance.reduce((s, p) => s + p.washesMissed, 0);
   const totalStaff = performance.reduce((s, p) => s + p.staff, 0);
+
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
+  const pagedManagers = managers.slice((page - 1) * perPage, page * perPage);
 
   // Initials generator
   function getInitials(name: string) {
@@ -116,121 +127,56 @@ export function ManagersClient({
       </div>
 
       {/* 6 Top KPI Summary Metric Cards */}
-      <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-6">
-        {/* Total Managers */}
-        <div className="flex flex-col justify-between rounded-xl border border-line-soft bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-              <IconUsers width={20} height={20} strokeWidth={2} />
-            </div>
-            <div>
-              <div className="text-[10px] font-extrabold uppercase tracking-wider text-ink-mute">
-                TOTAL MANAGERS
-              </div>
-              <div className="text-2xl font-black text-navy-950">{totalManagers}</div>
-            </div>
-          </div>
-          <div className="mt-2 text-[11px] font-medium text-ink-mute">
-            Active in this region
-          </div>
-        </div>
-
-        {/* Total Customers */}
-        <div className="flex flex-col justify-between rounded-xl border border-line-soft bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
-              <IconUsers width={20} height={20} strokeWidth={2} />
-            </div>
-            <div>
-              <div className="text-[10px] font-extrabold uppercase tracking-wider text-ink-mute">
-                TOTAL CUSTOMERS
-              </div>
-              <div className="text-2xl font-black text-navy-950">{totalCustomers}</div>
-            </div>
-          </div>
-          <div className="mt-2 text-[11px] font-medium text-ink-mute">
-            Across all areas
-          </div>
-        </div>
-
-        {/* Total Collected */}
-        <div className="flex flex-col justify-between rounded-xl border border-line-soft bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
-              <IconWallet width={20} height={20} strokeWidth={2} />
-            </div>
-            <div>
-              <div className="text-[10px] font-extrabold uppercase tracking-wider text-ink-mute">
-                TOTAL COLLECTED
-              </div>
-              <div className="text-xl font-black text-navy-950 sm:text-2xl">
-                {money(totalCollected)}
-              </div>
-            </div>
-          </div>
-          <div className="mt-2 text-[11px] font-semibold text-emerald-600">
-            {totalCollected + totalOutstanding > 0
-              ? `${Math.round((totalCollected / (totalCollected + totalOutstanding)) * 100)}%`
-              : '100%'} efficiency
-          </div>
-        </div>
-
-        {/* Total Outstanding */}
-        <div className="flex flex-col justify-between rounded-xl border border-line-soft bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
-              <IconRupee width={20} height={20} strokeWidth={2.2} />
-            </div>
-            <div>
-              <div className="text-[10px] font-extrabold uppercase tracking-wider text-ink-mute">
-                TOTAL OUTSTANDING
-              </div>
-              <div className="text-xl font-black text-navy-950 sm:text-2xl">
-                {money(totalOutstanding)}
-              </div>
-            </div>
-          </div>
-          <div className="mt-2 text-[11px] font-semibold text-amber-600">
-            Pending collection
-          </div>
-        </div>
-
-        {/* Total Missed Washes */}
-        <div className="flex flex-col justify-between rounded-xl border border-line-soft bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-600">
-              <IconAlert width={20} height={20} strokeWidth={2} />
-            </div>
-            <div>
-              <div className="text-[10px] font-extrabold uppercase tracking-wider text-ink-mute">
-                TOTAL MISSED WASHES
-              </div>
-              <div className="text-2xl font-black text-navy-950">{totalMissed}</div>
-            </div>
-          </div>
-          <div className="mt-2 text-[11px] font-semibold text-rose-600">
-            {totalMissed > 0 ? `${totalMissed} missed washes` : 'Zero missed washes'}
-          </div>
-        </div>
-
-        {/* Total Staff */}
-        <div className="flex flex-col justify-between rounded-xl border border-line-soft bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
-              <IconUser width={20} height={20} strokeWidth={2} />
-            </div>
-            <div>
-              <div className="text-[10px] font-extrabold uppercase tracking-wider text-ink-mute">
-                TOTAL STAFF
-              </div>
-              <div className="text-2xl font-black text-navy-950">{totalStaff}</div>
-            </div>
-          </div>
-          <div className="mt-2 text-[11px] font-medium text-purple-600">
-            Assigned staff
-          </div>
-        </div>
-      </div>
+      <StatGrid columns={6}>
+        <StatCard
+          label="TOTAL MANAGERS"
+          value={totalManagers}
+          icon={<IconUsers width={20} height={20} strokeWidth={2} />}
+          tone="blue"
+          subtext="Active in this region"
+          subtextTone="muted"
+        />
+        <StatCard
+          label="TOTAL CUSTOMERS"
+          value={totalCustomers}
+          icon={<IconUsers width={20} height={20} strokeWidth={2} />}
+          tone="emerald"
+          subtext="Across all areas"
+          subtextTone="muted"
+        />
+        <StatCard
+          label="TOTAL COLLECTED"
+          value={money(totalCollected)}
+          icon={<IconWallet width={20} height={20} strokeWidth={2} />}
+          tone="emerald"
+          subtext={`${totalCollected + totalOutstanding > 0 ? Math.round((totalCollected / (totalCollected + totalOutstanding)) * 100) : 100}% efficiency`}
+          subtextTone="success"
+        />
+        <StatCard
+          label="TOTAL OUTSTANDING"
+          value={money(totalOutstanding)}
+          icon={<IconRupee width={20} height={20} strokeWidth={2.2} />}
+          tone="amber"
+          subtext="Pending collection"
+          subtextTone="warning"
+        />
+        <StatCard
+          label="TOTAL MISSED WASHES"
+          value={totalMissed}
+          icon={<IconAlert width={20} height={20} strokeWidth={2} />}
+          tone="rose"
+          subtext={totalMissed > 0 ? `${totalMissed} missed washes` : 'Zero missed washes'}
+          subtextTone="danger"
+        />
+        <StatCard
+          label="TOTAL STAFF"
+          value={totalStaff}
+          icon={<IconUser width={20} height={20} strokeWidth={2} />}
+          tone="purple"
+          subtext="Assigned staff"
+          subtextTone="neutral"
+        />
+      </StatGrid>
 
       {/* Main Table Card: Area Managers Overview */}
       <div className="rounded-2xl border border-line-soft bg-white p-5 shadow-sm">
@@ -255,7 +201,7 @@ export function ManagersClient({
               </tr>
             </thead>
             <tbody className="divide-y divide-line-soft">
-              {managers.map((manager, idx) => {
+              {pagedManagers.map((manager, idx) => {
                 const stats = performanceByArea.get(manager.areaId);
                 const user = userByStaff.get(manager.id);
                 const areaName = stats?.area.name ?? '—';
@@ -327,33 +273,24 @@ export function ManagersClient({
                   </tr>
                 );
               })}
+              {pagedManagers.length === 0 ? (
+                <EmptyTableRow colSpan={10} message="No managers found in this region." />
+              ) : null}
             </tbody>
           </table>
         </div>
 
         {/* Pagination at bottom */}
-        <div className="mt-4 flex items-center justify-center gap-2 border-t border-line-soft pt-3">
-          <button
-            type="button"
-            disabled
-            className="flex h-7 w-7 items-center justify-center rounded-lg border border-line-soft text-xs text-slate-400 opacity-50"
-          >
-            ‹
-          </button>
-          <button
-            type="button"
-            className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600 text-xs font-bold text-white shadow-sm"
-          >
-            1
-          </button>
-          <button
-            type="button"
-            disabled
-            className="flex h-7 w-7 items-center justify-center rounded-lg border border-line-soft text-xs text-slate-400 opacity-50"
-          >
-            ›
-          </button>
-        </div>
+        <TablePagination
+          page={page}
+          totalItems={managers.length}
+          perPage={perPage}
+          onPageChange={setPage}
+          onPerPageChange={(newPerPage) => {
+            setPerPage(newPerPage);
+            setPage(1);
+          }}
+        />
       </div>
 
       {/* Bottom 2 Cards Grid */}

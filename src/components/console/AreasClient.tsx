@@ -15,6 +15,7 @@ import {
   IconWallet,
   IconXCircle,
 } from '@/components/shell/icons';
+import { StatCard, StatGrid } from '@/components/ui/primitives';
 import { money, percent } from '@/lib/util/format';
 import type { AreaPerformance } from '@/lib/services/reports';
 
@@ -117,121 +118,56 @@ export function AreasClient({
       </div>
 
       {/* 6 Top KPI Summary Metric Cards */}
-      <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-6">
-        {/* Customers */}
-        <div className="flex flex-col justify-between rounded-xl border border-line-soft bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-              <IconUsers width={20} height={20} strokeWidth={2} />
-            </div>
-            <div>
-              <div className="text-[10px] font-extrabold uppercase tracking-wider text-ink-mute">
-                CUSTOMERS
-              </div>
-              <div className="text-2xl font-black text-navy-950">{totalCustomers}</div>
-            </div>
-          </div>
-          <div className="mt-2 text-[11px] font-medium text-ink-mute">
-            Across {performance.length} areas
-          </div>
-        </div>
-
-        {/* Collected */}
-        <div className="flex flex-col justify-between rounded-xl border border-line-soft bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
-              <IconWallet width={20} height={20} strokeWidth={2} />
-            </div>
-            <div>
-              <div className="text-[10px] font-extrabold uppercase tracking-wider text-ink-mute">
-                COLLECTED
-              </div>
-              <div className="text-xl font-black text-navy-950 sm:text-2xl">
-                {money(totalCollected)}
-              </div>
-            </div>
-          </div>
-          <div className="mt-2 text-[11px] font-semibold text-emerald-600">
-            {totalCollected + totalOutstanding > 0
-              ? `${Math.round((totalCollected / (totalCollected + totalOutstanding)) * 100)}%`
-              : '100%'} efficiency
-          </div>
-        </div>
-
-        {/* Outstanding */}
-        <div className="flex flex-col justify-between rounded-xl border border-line-soft bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
-              <IconRupee width={20} height={20} strokeWidth={2.2} />
-            </div>
-            <div>
-              <div className="text-[10px] font-extrabold uppercase tracking-wider text-ink-mute">
-                OUTSTANDING
-              </div>
-              <div className="text-xl font-black text-navy-950 sm:text-2xl">
-                {money(totalOutstanding)}
-              </div>
-            </div>
-          </div>
-          <div className="mt-2 text-[11px] font-semibold text-amber-600">
-            Pending recovery
-          </div>
-        </div>
-
-        {/* Washes Done */}
-        <div className="flex flex-col justify-between rounded-xl border border-line-soft bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-600">
-              <IconDroplet width={20} height={20} strokeWidth={2} />
-            </div>
-            <div>
-              <div className="text-[10px] font-extrabold uppercase tracking-wider text-ink-mute">
-                WASHES DONE
-              </div>
-              <div className="text-2xl font-black text-navy-950">{totalWashesDone}</div>
-            </div>
-          </div>
-          <div className="mt-2 text-[11px] font-medium text-sky-600">
-            This month
-          </div>
-        </div>
-
-        {/* Washes Missed */}
-        <div className="flex flex-col justify-between rounded-xl border border-line-soft bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-600">
-              <IconXCircle width={20} height={20} strokeWidth={2} />
-            </div>
-            <div>
-              <div className="text-[10px] font-extrabold uppercase tracking-wider text-ink-mute">
-                WASHES MISSED
-              </div>
-              <div className="text-2xl font-black text-navy-950">{totalWashesMissed}</div>
-            </div>
-          </div>
-          <div className="mt-2 text-[11px] font-semibold text-rose-600">
-            {totalWashesMissed > 0 ? `${totalWashesMissed} missed` : 'Zero missed'}
-          </div>
-        </div>
-
-        {/* Staff */}
-        <div className="flex flex-col justify-between rounded-xl border border-line-soft bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
-              <IconUser width={20} height={20} strokeWidth={2} />
-            </div>
-            <div>
-              <div className="text-[10px] font-extrabold uppercase tracking-wider text-ink-mute">
-                STAFF
-              </div>
-              <div className="text-2xl font-black text-navy-950">{totalStaff}</div>
-            </div>
-          </div>
-          <div className="mt-2 text-[11px] font-medium text-purple-600">
-            Active staff
-          </div>
-        </div>
-      </div>
+      <StatGrid columns={6}>
+        <StatCard
+          label="CUSTOMERS"
+          value={totalCustomers}
+          icon={<IconUsers width={20} height={20} strokeWidth={2} />}
+          tone="blue"
+          subtext={`Across ${performance.length} areas`}
+          subtextTone="muted"
+        />
+        <StatCard
+          label="COLLECTED"
+          value={money(totalCollected)}
+          icon={<IconWallet width={20} height={20} strokeWidth={2} />}
+          tone="emerald"
+          subtext={`${totalCollected + totalOutstanding > 0 ? Math.round((totalCollected / (totalCollected + totalOutstanding)) * 100) : 100}% efficiency`}
+          subtextTone="success"
+        />
+        <StatCard
+          label="OUTSTANDING"
+          value={money(totalOutstanding)}
+          icon={<IconRupee width={20} height={20} strokeWidth={2.2} />}
+          tone="amber"
+          subtext="Pending recovery"
+          subtextTone="warning"
+        />
+        <StatCard
+          label="WASHES DONE"
+          value={totalWashesDone}
+          icon={<IconDroplet width={20} height={20} strokeWidth={2} />}
+          tone="sky"
+          subtext="This month"
+          subtextTone="info"
+        />
+        <StatCard
+          label="WASHES MISSED"
+          value={totalWashesMissed}
+          icon={<IconXCircle width={20} height={20} strokeWidth={2} />}
+          tone="rose"
+          subtext={totalWashesMissed > 0 ? `${totalWashesMissed} missed` : 'Zero missed'}
+          subtextTone="danger"
+        />
+        <StatCard
+          label="STAFF"
+          value={totalStaff}
+          icon={<IconUser width={20} height={20} strokeWidth={2} />}
+          tone="purple"
+          subtext="Active staff"
+          subtextTone="neutral"
+        />
+      </StatGrid>
 
       {/* 3 Area Performance Cards Grid */}
       <div className="grid gap-5 lg:grid-cols-3">

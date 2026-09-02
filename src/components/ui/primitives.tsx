@@ -436,5 +436,9 @@ export { ConfirmProvider, useConfirm } from './ConfirmProvider';
 export type { ConfirmOptions, ConfirmFunction } from './ConfirmProvider';
 export { ToastProvider, useToast, toast } from './ToastProvider';
 export type { ToastItem, ToastType } from './ToastProvider';
+export { StatCard, StatGrid } from './StatCard';
+export type { StatCardProps, StatTone, SubtextTone } from './StatCard';
+export { TableCard, TablePagination, EmptyTableRow } from './TableCard';
+export type { TableCardProps, TablePaginationProps } from './TableCard';
 
 

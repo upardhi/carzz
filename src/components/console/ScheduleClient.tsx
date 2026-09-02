@@ -14,6 +14,12 @@ import {
   IconUser,
   IconUserX,
 } from '@/components/shell/icons';
+import {
+  EmptyTableRow,
+  StatCard,
+  StatGrid,
+  TablePagination,
+} from '@/components/ui/primitives';
 import { formatClock, formatTime } from '@/lib/util/format';
 import { MISS_REASON_LABEL } from '@/lib/util/labels';
 import { AssignSelect } from './AssignSelect';
@@ -140,7 +146,6 @@ export function ScheduleClient({
   }, [visits, statusFilter, staffFilter, areaFilter, searchQuery]);
 
   // Pagination calculation
-  const totalPages = Math.max(1, Math.ceil(filteredVisits.length / perPage));
   const currentPageVisits = useMemo(() => {
     const start = (page - 1) * perPage;
     return filteredVisits.slice(start, start + perPage);
@@ -233,127 +238,56 @@ export function ScheduleClient({
       </div>
 
       {/* 6 Top KPI Summary Metric Cards (100% Dynamic) */}
-      <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-6">
-        {/* CARS */}
-        <div className="flex flex-col justify-between rounded-xl border border-line-soft bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-              <IconCar width={20} height={20} strokeWidth={2} />
-            </div>
-            <div>
-              <div className="text-[10px] font-extrabold uppercase tracking-wider text-ink-mute">
-                CARS
-              </div>
-              <div className="text-2xl font-black text-navy-950">
-                {totalCars}
-              </div>
-            </div>
-          </div>
-          <div className="mt-2 text-[11px] font-bold text-blue-600">
-            Total cars
-          </div>
-        </div>
-
-        {/* COMPLETED */}
-        <div className="flex flex-col justify-between rounded-xl border border-line-soft bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
-              <IconCheckCircle width={20} height={20} strokeWidth={2} />
-            </div>
-            <div>
-              <div className="text-[10px] font-extrabold uppercase tracking-wider text-ink-mute">
-                COMPLETED
-              </div>
-              <div className="text-2xl font-black text-navy-950">
-                {completedCount}
-              </div>
-            </div>
-          </div>
-          <div className="mt-2 text-[11px] font-semibold text-emerald-600">
-            {completedPercent}% <span className="font-normal text-ink-faint">of total</span>
-          </div>
-        </div>
-
-        {/* IN PROGRESS */}
-        <div className="flex flex-col justify-between rounded-xl border border-line-soft bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-600">
-              <IconClock width={20} height={20} strokeWidth={2} />
-            </div>
-            <div>
-              <div className="text-[10px] font-extrabold uppercase tracking-wider text-ink-mute">
-                IN PROGRESS
-              </div>
-              <div className="text-2xl font-black text-navy-950">
-                {inProgressCount}
-              </div>
-            </div>
-          </div>
-          <div className="mt-2 text-[11px] font-medium text-ink-faint">
-            {inProgressCount > 0 ? `${inProgressCount} active` : 'No ongoing'}
-          </div>
-        </div>
-
-        {/* NOT DONE */}
-        <div className="flex flex-col justify-between rounded-xl border border-line-soft bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
-              <IconClock width={20} height={20} strokeWidth={2} />
-            </div>
-            <div>
-              <div className="text-[10px] font-extrabold uppercase tracking-wider text-ink-mute">
-                NOT DONE
-              </div>
-              <div className="text-2xl font-black text-navy-950">
-                {missedCount}
-              </div>
-            </div>
-          </div>
-          <div className="mt-2 text-[11px] font-semibold text-amber-600">
-            {missedPercent}% <span className="font-normal text-ink-faint">of total</span>
-          </div>
-        </div>
-
-        {/* UNASSIGNED */}
-        <div className="flex flex-col justify-between rounded-xl border border-line-soft bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
-              <IconUser width={20} height={20} strokeWidth={2} />
-            </div>
-            <div>
-              <div className="text-[10px] font-extrabold uppercase tracking-wider text-ink-mute">
-                UNASSIGNED
-              </div>
-              <div className="text-2xl font-black text-navy-950">
-                {unassignedCount}
-              </div>
-            </div>
-          </div>
-          <div className="mt-2 text-[11px] font-semibold text-purple-600">
-            {unassignedPercent}% <span className="font-normal text-ink-faint">of total</span>
-          </div>
-        </div>
-
-        {/* ABSENT STAFF */}
-        <div className="flex flex-col justify-between rounded-xl border border-line-soft bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-600">
-              <IconUserX width={20} height={20} strokeWidth={2} />
-            </div>
-            <div>
-              <div className="text-[10px] font-extrabold uppercase tracking-wider text-ink-mute">
-                ABSENT STAFF
-              </div>
-              <div className="text-2xl font-black text-navy-950">
-                {absentStaffCount}
-              </div>
-            </div>
-          </div>
-          <div className="mt-2 text-[11px] font-semibold text-rose-600">
-            {absentPercent}% <span className="font-normal text-ink-faint">of staff</span>
-          </div>
-        </div>
-      </div>
+      <StatGrid columns={6}>
+        <StatCard
+          label="CARS"
+          value={totalCars}
+          icon={<IconCar width={20} height={20} strokeWidth={2} />}
+          tone="blue"
+          subtext="Total cars"
+          subtextTone="info"
+        />
+        <StatCard
+          label="COMPLETED"
+          value={completedCount}
+          icon={<IconCheckCircle width={20} height={20} strokeWidth={2} />}
+          tone="emerald"
+          subtext={`${completedPercent}% of total`}
+          subtextTone="success"
+        />
+        <StatCard
+          label="IN PROGRESS"
+          value={inProgressCount}
+          icon={<IconClock width={20} height={20} strokeWidth={2} />}
+          tone="sky"
+          subtext={inProgressCount > 0 ? `${inProgressCount} active` : 'No ongoing'}
+          subtextTone="muted"
+        />
+        <StatCard
+          label="NOT DONE"
+          value={missedCount}
+          icon={<IconClock width={20} height={20} strokeWidth={2} />}
+          tone="amber"
+          subtext={`${missedPercent}% of total`}
+          subtextTone="warning"
+        />
+        <StatCard
+          label="UNASSIGNED"
+          value={unassignedCount}
+          icon={<IconUser width={20} height={20} strokeWidth={2} />}
+          tone="purple"
+          subtext={`${unassignedPercent}% of total`}
+          subtextTone="neutral"
+        />
+        <StatCard
+          label="ABSENT STAFF"
+          value={absentStaffCount}
+          icon={<IconUserX width={20} height={20} strokeWidth={2} />}
+          tone="rose"
+          subtext={`${absentPercent}% of staff`}
+          subtextTone="danger"
+        />
+      </StatGrid>
 
       {/* Auto-assign Gap Card if unassigned visits exist */}
       {unassignedCount > 0 && areaWithGaps ? (
@@ -580,76 +514,27 @@ export function ScheduleClient({
               })}
 
               {currentPageVisits.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="py-10 text-center text-ink-mute">
-                    No schedules match the selected filters for {dateFormatted}.
-                  </td>
-                </tr>
+                <EmptyTableRow
+                  colSpan={6}
+                  message={`No schedules match the selected filters for ${dateFormatted}.`}
+                />
               ) : null}
             </tbody>
           </table>
         </div>
 
         {/* Table Footer with Pagination */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-soft bg-slate-50/40 px-4 py-3 text-xs text-ink-mute">
-          <div>
-            Showing {filteredVisits.length > 0 ? (page - 1) * perPage + 1 : 0} to{' '}
-            {Math.min(page * perPage, filteredVisits.length)} of {filteredVisits.length}{' '}
-            schedules
-          </div>
-
-          <div className="flex items-center gap-4">
-            {/* Pagination numbers */}
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="flex h-7 w-7 items-center justify-center rounded-lg border border-line-soft text-xs text-slate-500 hover:bg-white disabled:opacity-40"
-              >
-                ‹
-              </button>
-              {Array.from({ length: totalPages }).map((_, i) => (
-                <button
-                  key={i + 1}
-                  type="button"
-                  onClick={() => setPage(i + 1)}
-                  className={`flex h-7 w-7 items-center justify-center rounded-lg text-xs font-bold ${
-                    page === i + 1
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'border border-line-soft bg-white text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  {i + 1}
-                </button>
-              ))}
-              <button
-                type="button"
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                className="flex h-7 w-7 items-center justify-center rounded-lg border border-line-soft text-xs text-slate-500 hover:bg-white disabled:opacity-40"
-              >
-                ›
-              </button>
-            </div>
-
-            {/* Per page selector */}
-            <div className="flex items-center gap-1.5 border-l border-line-soft pl-4">
-              <select
-                aria-label="Items per page"
-                value={perPage}
-                onChange={(e) => {
-                  setPerPage(Number(e.target.value));
-                  setPage(1);
-                }}
-                className="cursor-pointer rounded-lg border border-line-soft bg-white px-2 py-1 text-xs font-bold text-navy-950 focus:outline-none"
-              >
-                <option value={10}>10 per page</option>
-                <option value={20}>20 per page</option>
-                <option value={50}>50 per page</option>
-              </select>
-            </div>
-          </div>
+        <div className="border-t border-line-soft bg-slate-50/40 px-4 py-3">
+          <TablePagination
+            page={page}
+            totalItems={filteredVisits.length}
+            perPage={perPage}
+            onPageChange={setPage}
+            onPerPageChange={(newPerPage) => {
+              setPerPage(newPerPage);
+              setPage(1);
+            }}
+          />
         </div>
       </div>
     </div>
