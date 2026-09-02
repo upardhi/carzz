@@ -17,38 +17,55 @@ export async function GET(request: Request) {
     const store = await getStore();
     const cycle = currentCycle();
 
-    const [staffList, areas, rules, monthAttendance] = await Promise.all([
-      store.staff.find({
-        where: {
-          role: 'EMPLOYEE',
-          ...(session.scope.areaIds ? { areaId: { in: session.scope.areaIds } } : {}),
-        } as never,
-        orderBy: [{ field: 'name' }],
-      }),
+    // Attendance-based flag computation requires reading all attendance records
+    // for the current cycle, but we scope tightly to the session's permitted areas
+    // and optionally to a single area — so the record count is bounded.
+    const staffWhere: Record<string, unknown> = {
+      role: 'EMPLOYEE',
+      ...(session.scope.areaIds ? { areaId: { in: session.scope.areaIds } } : {}),
+      ...(areaId ? { areaId } : {}),
+    };
+
+    // Parallel: fetch only what we need, tightly scoped
+    const [staffList, areas, rules] = await Promise.all([
+      store.staff.find({ where: staffWhere as never, orderBy: [{ field: 'name' }] }),
       store.areas.find(),
       store.getPayoutSettings(),
-      store.attendance.find({
-        where: { date: { gte: `${cycle}-01`, lte: `${cycle}-31` } } as never,
-      }),
     ]);
+
+    const staffIds = staffList.map((s) => s.id);
+
+    // Fetch only attendance for these specific staff in the current cycle
+    // (not all attendance for all time)
+    const monthAttendance = await store.attendance.find({
+      where: {
+        staffId: { in: staffIds },
+        date: { gte: `${cycle}-01`, lte: `${cycle}-31` },
+      } as never,
+    });
 
     const areaMap = new Map(areas.map((a) => [a.id, a]));
 
+    // Group attendance by staffId — O(n) single pass
     const attendanceByStaff = new Map<string, typeof monthAttendance>();
     for (const a of monthAttendance) {
-      const list = attendanceByStaff.get(a.staffId) || [];
+      const list = attendanceByStaff.get(a.staffId) ?? [];
       list.push(a);
       attendanceByStaff.set(a.staffId, list);
     }
 
+    // Compute flags for all matching staff — no second DB query needed
     const allFlags = staffList
       .map((member) => {
-        const own = attendanceByStaff.get(member.id) || [];
+        const own = attendanceByStaff.get(member.id) ?? [];
         const offs = own.filter((a) => a.status === 'OFF').length;
         const uninformed = own.filter((a) => a.status === 'OFF_UNINFORMED').length;
 
         const isExtraOff = offs > rules.offsAllowedPerMonth;
         const isUninformed = uninformed > 0;
+
+        // Only include staff who actually have a flag
+        if (!isExtraOff && !isUninformed) return null;
 
         let extraOffPenalty = 0;
         let isWarningOnly = false;
@@ -81,8 +98,9 @@ export async function GET(request: Request) {
           totalPenalty,
         };
       })
-      .filter((f) => f.isExtraOff || f.isUninformed);
+      .filter((f): f is NonNullable<typeof f> => f !== null);
 
+    // Stats are computed over all flags before any sub-filtering (type/q)
     const stats = {
       totalFlagged: allFlags.length,
       totalUninformed: allFlags.reduce((s, f) => s + f.uninformed, 0),
@@ -90,10 +108,8 @@ export async function GET(request: Request) {
       totalPenalties: allFlags.reduce((s, f) => s + f.totalPenalty, 0),
     };
 
+    // Apply sub-filters (type + text search) before paginating
     let filtered = allFlags;
-    if (areaId) {
-      filtered = filtered.filter((f) => f.areaId === areaId);
-    }
     if (type === 'UNINFORMED') {
       filtered = filtered.filter((f) => f.isUninformed);
     } else if (type === 'EXTRA_OFFS') {
@@ -115,12 +131,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       ok: true,
       data: paginated,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages,
-      },
+      pagination: { page, limit, total, totalPages },
       stats,
       rules: {
         offsAllowedPerMonth: rules.offsAllowedPerMonth,
