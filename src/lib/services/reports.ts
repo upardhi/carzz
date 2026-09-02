@@ -89,18 +89,12 @@ async function _computeAreaPerformance(
   precomputedPayouts?: StaffPayout[],
   options?: { skipPayoutsAndGoods?: boolean },
 ): Promise<AreaPerformance[]> {
-  const areas = (await store.areas.find({ orderBy: [{ field: 'name' }] })).filter(
-    (a) => areaIds === null || areaIds.includes(a.id),
-  );
-
-  if (areas.length === 0) return [];
-
-  const scopedAreaIds = areas.map((a) => a.id);
-  const areaFilter = areaIds ? { areaId: { in: scopedAreaIds } } : {};
+  const areaFilter = areaIds ? { areaId: { in: areaIds } } : {};
   const skipExtra = options?.skipPayoutsAndGoods === true;
 
-  // Bulk queries: instead of 6 queries x N areas, fetch all area data in one batch.
+  // Single batch parallelization: fetch all areas, payouts, items, customers, staff, visits, invoices, complaints, stock issues concurrently!
   const [
+    allAreas,
     payouts,
     items,
     allCustomers,
@@ -110,6 +104,10 @@ async function _computeAreaPerformance(
     allComplaints,
     allStockIssues,
   ] = await Promise.all([
+    store.areas.find({
+      where: (areaIds ? { id: { in: areaIds } } : undefined) as never,
+      orderBy: [{ field: 'name' }],
+    }),
     skipExtra
       ? Promise.resolve([])
       : (precomputedPayouts ?? computePayoutRun(store, cycle, areaIds)),
@@ -123,6 +121,10 @@ async function _computeAreaPerformance(
     }),
     skipExtra ? Promise.resolve([]) : store.stockIssues.find({ where: areaFilter as never }),
   ]);
+
+  if (allAreas.length === 0) return [];
+  const areas = areaIds ? allAreas.filter((a) => areaIds.includes(a.id)) : allAreas;
+  if (areas.length === 0) return [];
 
   const customerIds = allCustomers.map((c) => c.id);
   const allCars = skipExtra

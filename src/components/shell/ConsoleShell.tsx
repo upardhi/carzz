@@ -77,6 +77,7 @@ export function ConsoleShell({
                 <Link
                   key={item.href}
                   href={item.href}
+                  prefetch={true}
                   onClick={() => setOpen(false)}
                   aria-current={active ? 'page' : undefined}
                   className={clsx(
