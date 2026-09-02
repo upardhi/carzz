@@ -18,11 +18,10 @@ import {
   IconWallet,
 } from '@/components/shell/icons';
 import {
-  EmptyTableRow,
   StatCard,
   StatGrid,
-  TablePagination,
 } from '@/components/ui/primitives';
+import { WidgetTable } from '@/components/ui/WidgetTable';
 import { money, moneyShort } from '@/lib/util/format';
 import type { AreaPerformance } from '@/lib/services/reports';
 
@@ -77,11 +76,6 @@ export function AreaDashboardClient({
 }: AreaDashboardClientProps) {
   const [staffPage, setStaffPage] = useState(1);
   const staffPerPage = 8;
-
-  const currentStaffSlice = staffToday.slice(
-    (staffPage - 1) * staffPerPage,
-    staffPage * staffPerPage,
-  );
 
   // Initials generator
   function getInitials(name: string) {
@@ -289,99 +283,78 @@ export function AreaDashboardClient({
         </div>
 
         {/* Right Column: Staff today (~7 cols) */}
-        <div className="flex flex-col justify-between rounded-2xl border border-line-soft bg-white p-5 shadow-sm lg:col-span-7">
-          <div>
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-base font-extrabold text-navy-950">
-                Staff today
-              </h2>
-              <Link
-                href={`${base}/staff`}
-                className="text-xs font-bold text-blue-600 hover:text-blue-800"
-              >
-                View all staff
-              </Link>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-line-soft text-[11px] font-bold uppercase tracking-wider text-ink-mute">
-                    <th className="pb-2.5 font-extrabold">NAME</th>
-                    <th className="pb-2.5 font-extrabold">SIGNED IN</th>
-                    <th className="pb-2.5 text-center font-extrabold">CARS</th>
-                    <th className="pb-2.5 text-center font-extrabold">DONE</th>
-                    <th className="pb-2.5 text-center font-extrabold">STATUS</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line-soft">
-                  {currentStaffSlice.map((staff, idx) => {
-                    const avatarColor = avatarColors[idx % avatarColors.length];
-                    return (
-                      <tr
-                        key={staff.id}
-                        className="transition-colors hover:bg-slate-50/60"
-                      >
-                        {/* Name + Avatar */}
-                        <td className="py-2.5 pr-3">
-                          <div className="flex items-center gap-2.5">
-                            <div
-                              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-black ${avatarColor}`}
-                            >
-                              {getInitials(staff.name)}
-                            </div>
-                            <span className="font-bold text-navy-950">
-                              {staff.name}
-                            </span>
-                          </div>
-                        </td>
-
-                        {/* Signed In */}
-                        <td className="py-2.5 pr-3 text-slate-600">
-                          {staff.signedIn || '—'}
-                        </td>
-
-                        {/* Cars */}
-                        <td className="py-2.5 text-center font-semibold text-navy-950">
-                          {staff.cars}
-                        </td>
-
-                        {/* Done */}
-                        <td className="py-2.5 text-center font-semibold text-navy-950">
-                          {staff.done}
-                        </td>
-
-                        {/* Status */}
-                        <td className="py-2.5 text-center">
-                          <span
-                            className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
-                              staff.status === 'Working'
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
-                                : 'bg-rose-50 text-rose-700 border border-rose-100'
-                            }`}
-                          >
-                            {staff.status}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {currentStaffSlice.length === 0 ? (
-                    <EmptyTableRow colSpan={5} message="No staff on duty today." />
-                  ) : null}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Staff Pagination */}
-          <TablePagination
-            page={staffPage}
-            totalItems={staffToday.length}
-            perPage={staffPerPage}
-            onPageChange={setStaffPage}
-          />
-        </div>
+        <WidgetTable<StaffTodayItem>
+          className="lg:col-span-7"
+          title="Staff today"
+          action={
+            <Link
+              href={`${base}/staff`}
+              className="text-xs font-bold text-blue-600 hover:text-blue-800"
+            >
+              View all staff
+            </Link>
+          }
+          data={staffToday}
+          keyExtractor={(staff) => staff.id}
+          pageSize={staffPerPage}
+          page={staffPage}
+          onPageChange={setStaffPage}
+          emptyMessage="No staff on duty today."
+          columns={[
+            {
+              id: 'name',
+              header: 'NAME',
+              render: (staff, idx) => {
+                const avatarColor = avatarColors[idx % avatarColors.length];
+                return (
+                  <div className="flex items-center gap-2.5">
+                    <div
+                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-black ${avatarColor}`}
+                    >
+                      {getInitials(staff.name)}
+                    </div>
+                    <span className="font-bold text-navy-950">{staff.name}</span>
+                  </div>
+                );
+              },
+            },
+            {
+              id: 'signedIn',
+              header: 'SIGNED IN',
+              render: (staff) => staff.signedIn || '—',
+            },
+            {
+              id: 'cars',
+              header: 'CARS',
+              align: 'center',
+              className: 'font-semibold text-navy-950',
+              render: (staff) => staff.cars,
+            },
+            {
+              id: 'done',
+              header: 'DONE',
+              align: 'center',
+              className: 'font-semibold text-navy-950',
+              render: (staff) => staff.done,
+            },
+            {
+              id: 'status',
+              header: 'STATUS',
+              align: 'center',
+              render: (staff) => (
+                <span
+                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
+                    staff.status === 'Working'
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                      : 'bg-rose-50 text-rose-700 border border-rose-100'
+                  }`}
+                >
+                  {staff.status}
+                </span>
+              ),
+            },
+          ]}
+        />
       </div>
 
       {/* Bottom Section: This Month & Year Overview */}
@@ -453,74 +426,60 @@ export function AreaDashboardClient({
         </div>
 
         {/* Right Column: Year overview (~7 cols) */}
-        <div className="flex flex-col justify-between rounded-2xl border border-line-soft bg-white p-5 shadow-sm lg:col-span-7">
-          <div>
-            <h2 className="mb-4 text-base font-extrabold text-navy-950">
-              Year overview
-            </h2>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-line-soft text-[11px] font-bold uppercase tracking-wider text-ink-mute">
-                    <th className="pb-2.5 font-extrabold">AREA</th>
-                    <th className="pb-2.5 text-center font-extrabold">CUSTOMERS</th>
-                    <th className="pb-2.5 font-extrabold">COLLECTED</th>
-                    <th className="pb-2.5 font-extrabold">OUTSTANDING</th>
-                    <th className="pb-2.5 text-center font-extrabold">MISSED</th>
-                    <th className="pb-2.5 text-center font-extrabold">RATING</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line-soft">
-                  {performance.map((area) => (
-                    <tr
-                      key={area.area.id}
-                      className="transition-colors hover:bg-slate-50/60"
-                    >
-                      {/* Area Name */}
-                      <td className="py-2.5 font-bold text-navy-950">
-                        {area.area.name}
-                      </td>
-
-                      {/* Customers */}
-                      <td className="py-2.5 text-center font-semibold text-navy-950">
-                        {area.customers}
-                      </td>
-
-                      {/* Collected */}
-                      <td className="py-2.5 font-bold text-emerald-600">
-                        {money(area.collected)}
-                      </td>
-
-                      {/* Outstanding */}
-                      <td className="py-2.5 font-bold text-amber-600">
-                        {money(area.outstanding)}
-                      </td>
-
-                      {/* Missed */}
-                      <td className="py-2.5 text-center font-bold text-slate-700">
-                        {area.washesMissed}
-                      </td>
-
-                      {/* Rating */}
-                      <td className="py-2.5 text-center font-bold text-navy-950">
-                        {area.averageRating ? area.averageRating.toFixed(1) : '—'}{' '}
-                        <span className="text-amber-500">★</span>
-                      </td>
-                    </tr>
-                  ))}
-                  {performance.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="py-6 text-center text-ink-mute">
-                        No area performance data available.
-                      </td>
-                    </tr>
-                  ) : null}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+        <WidgetTable<AreaPerformance>
+          className="lg:col-span-7"
+          title="Year overview"
+          data={performance}
+          keyExtractor={(area) => area.area.id}
+          pageSize={10}
+          emptyMessage="No area performance data available."
+          columns={[
+            {
+              id: 'name',
+              header: 'AREA',
+              className: 'font-bold text-navy-950',
+              render: (area) => area.area.name,
+            },
+            {
+              id: 'customers',
+              header: 'CUSTOMERS',
+              align: 'center',
+              className: 'font-semibold text-navy-950',
+              render: (area) => area.customers,
+            },
+            {
+              id: 'collected',
+              header: 'COLLECTED',
+              className: 'font-bold text-emerald-600',
+              render: (area) => money(area.collected),
+            },
+            {
+              id: 'outstanding',
+              header: 'OUTSTANDING',
+              className: 'font-bold text-amber-600',
+              render: (area) => money(area.outstanding),
+            },
+            {
+              id: 'missed',
+              header: 'MISSED',
+              align: 'center',
+              className: 'font-bold text-slate-700',
+              render: (area) => area.washesMissed,
+            },
+            {
+              id: 'rating',
+              header: 'RATING',
+              align: 'center',
+              className: 'font-bold text-navy-950',
+              render: (area) => (
+                <>
+                  {area.averageRating ? area.averageRating.toFixed(1) : '—'}{' '}
+                  <span className="text-amber-500">★</span>
+                </>
+              ),
+            },
+          ]}
+        />
       </div>
 
       {/* Live Status Indicator Footer */}

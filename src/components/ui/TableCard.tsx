@@ -199,3 +199,7 @@ export function EmptyTableRow({
     </tr>
   );
 }
+
+export * from './WidgetTable';
+export * from './DataTable';
+

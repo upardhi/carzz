@@ -11,11 +11,10 @@ import {
   IconWallet,
 } from '@/components/shell/icons';
 import {
-  EmptyTableRow,
   StatCard,
   StatGrid,
-  TablePagination,
 } from '@/components/ui/primitives';
+import { DataTable } from '@/components/ui/DataTable';
 import { formatDateFull, money, percent } from '@/lib/util/format';
 import type { Staff, User } from '@/lib/data/types';
 import type { AreaPerformance } from '@/lib/services/reports';
@@ -178,118 +177,115 @@ export function ManagersClient({
         />
       </StatGrid>
 
-      {/* Main Table Card: Area Managers Overview */}
-      <div className="rounded-2xl border border-line-soft bg-white p-5 shadow-sm">
-        <h2 className="mb-4 text-base font-extrabold text-navy-950">
+      {/* Main Table Card: Area Managers Overview using DataTable */}
+      <div className="space-y-3">
+        <h2 className="text-base font-extrabold text-navy-950">
           Area managers overview
         </h2>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="border-b border-line-soft text-[11px] font-bold uppercase tracking-wider text-ink-mute">
-                <th className="pb-3 font-extrabold">MANAGER</th>
-                <th className="pb-3 font-extrabold">AREA</th>
-                <th className="pb-3 font-extrabold">LOGIN</th>
-                <th className="pb-3 text-center font-extrabold">CUSTOMERS</th>
-                <th className="pb-3 font-extrabold">COLLECTED</th>
-                <th className="pb-3 font-extrabold">OUTSTANDING</th>
-                <th className="pb-3 text-center font-extrabold">MISSED</th>
-                <th className="pb-3 text-center font-extrabold">COMPLAINTS</th>
-                <th className="pb-3 text-center font-extrabold">MARGIN</th>
-                <th className="pb-3 font-extrabold">SINCE</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line-soft">
-              {pagedManagers.map((manager, idx) => {
+        <DataTable<Staff>
+          data={pagedManagers}
+          keyExtractor={(m) => m.id}
+          itemLabel="managers"
+          page={page}
+          pageSize={perPage}
+          totalItems={managers.length}
+          onPageChange={setPage}
+          onPageSizeChange={(newPerPage) => {
+            setPerPage(newPerPage);
+            setPage(1);
+          }}
+          pageSizeOptions={[10, 20, 50]}
+          emptyMessage="No managers found in this region."
+          columns={[
+            {
+              id: 'manager',
+              header: 'MANAGER',
+              render: (manager, idx) => {
+                const avatarColor = avatarColors[idx % avatarColors.length];
+                return (
+                  <div className="flex items-center gap-2.5">
+                    <div
+                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-black ${avatarColor}`}
+                    >
+                      {getInitials(manager.name)}
+                    </div>
+                    <span className="font-bold text-navy-950">{manager.name}</span>
+                  </div>
+                );
+              },
+            },
+            {
+              id: 'area',
+              header: 'AREA',
+              render: (manager) => {
                 const stats = performanceByArea.get(manager.areaId);
-                const user = userByStaff.get(manager.id);
                 const areaName = stats?.area.name ?? '—';
                 const pillClass =
                   areaPillColors[areaName] ||
                   'bg-slate-100 text-slate-700 border border-slate-200';
-                const avatarColor = avatarColors[idx % avatarColors.length];
-
                 return (
-                  <tr key={manager.id} className="transition-colors hover:bg-slate-50/60">
-                    {/* Manager Name + Avatar */}
-                    <td className="py-3.5 pr-3">
-                      <div className="flex items-center gap-2.5">
-                        <div
-                          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-black ${avatarColor}`}
-                        >
-                          {getInitials(manager.name)}
-                        </div>
-                        <span className="font-bold text-navy-950">{manager.name}</span>
-                      </div>
-                    </td>
-
-                    {/* Area Pill */}
-                    <td className="py-3.5 pr-3">
-                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${pillClass}`}>
-                        {areaName}
-                      </span>
-                    </td>
-
-                    {/* Login */}
-                    <td className="py-3.5 pr-3 text-slate-600">
-                      {user?.email ?? '—'}
-                    </td>
-
-                    {/* Customers */}
-                    <td className="py-3.5 text-center font-semibold text-navy-950">
-                      {stats?.customers ?? 0}
-                    </td>
-
-                    {/* Collected */}
-                    <td className="py-3.5 font-bold text-emerald-600">
-                      {money(stats?.collected ?? 0)}
-                    </td>
-
-                    {/* Outstanding */}
-                    <td className="py-3.5 font-bold text-amber-600">
-                      {money(stats?.outstanding ?? 0)}
-                    </td>
-
-                    {/* Missed */}
-                    <td className="py-3.5 text-center font-bold text-rose-600">
-                      {stats?.washesMissed ?? 0}
-                    </td>
-
-                    {/* Complaints */}
-                    <td className="py-3.5 text-center font-semibold text-slate-700">
-                      {stats?.openComplaints ?? 0}
-                    </td>
-
-                    {/* Margin */}
-                    <td className="py-3.5 text-center font-bold text-emerald-600">
-                      {stats ? percent(stats.margin) : '—'}
-                    </td>
-
-                    {/* Since */}
-                    <td className="whitespace-nowrap py-3.5 text-slate-600">
-                      {formatDateFull(manager.joinedOn)}
-                    </td>
-                  </tr>
+                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${pillClass}`}>
+                    {areaName}
+                  </span>
                 );
-              })}
-              {pagedManagers.length === 0 ? (
-                <EmptyTableRow colSpan={10} message="No managers found in this region." />
-              ) : null}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination at bottom */}
-        <TablePagination
-          page={page}
-          totalItems={managers.length}
-          perPage={perPage}
-          onPageChange={setPage}
-          onPerPageChange={(newPerPage) => {
-            setPerPage(newPerPage);
-            setPage(1);
-          }}
+              },
+            },
+            {
+              id: 'login',
+              header: 'LOGIN',
+              className: 'text-slate-600',
+              render: (manager) => userByStaff.get(manager.id)?.email ?? '—',
+            },
+            {
+              id: 'customers',
+              header: 'CUSTOMERS',
+              align: 'center',
+              className: 'font-semibold text-navy-950',
+              render: (manager) => performanceByArea.get(manager.areaId)?.customers ?? 0,
+            },
+            {
+              id: 'collected',
+              header: 'COLLECTED',
+              className: 'font-bold text-emerald-600',
+              render: (manager) => money(performanceByArea.get(manager.areaId)?.collected ?? 0),
+            },
+            {
+              id: 'outstanding',
+              header: 'OUTSTANDING',
+              className: 'font-bold text-amber-600',
+              render: (manager) => money(performanceByArea.get(manager.areaId)?.outstanding ?? 0),
+            },
+            {
+              id: 'missed',
+              header: 'MISSED',
+              align: 'center',
+              className: 'font-bold text-rose-600',
+              render: (manager) => performanceByArea.get(manager.areaId)?.washesMissed ?? 0,
+            },
+            {
+              id: 'complaints',
+              header: 'COMPLAINTS',
+              align: 'center',
+              className: 'font-semibold text-slate-700',
+              render: (manager) => performanceByArea.get(manager.areaId)?.openComplaints ?? 0,
+            },
+            {
+              id: 'margin',
+              header: 'MARGIN',
+              align: 'center',
+              className: 'font-bold text-emerald-600',
+              render: (manager) => {
+                const stats = performanceByArea.get(manager.areaId);
+                return stats ? percent(stats.margin) : '—';
+              },
+            },
+            {
+              id: 'since',
+              header: 'SINCE',
+              className: 'whitespace-nowrap text-slate-600',
+              render: (manager) => formatDateFull(manager.joinedOn),
+            },
+          ]}
         />
       </div>
 

@@ -3,7 +3,7 @@ import clsx from 'clsx';
 import { scopeAreaFilter } from '@/lib/auth/rbac';
 import type { Session } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
-import { LEAD_SOURCES, type Car, type CustomerStatus } from '@/lib/data/types';
+import { LEAD_SOURCES, type Car, type Customer, type CustomerStatus } from '@/lib/data/types';
 import { currentCycle, formatTime, money } from '@/lib/util/format';
 import { LEAD_SOURCE_LABEL, PATTERN_SHORT } from '@/lib/util/labels';
 import {
@@ -20,7 +20,8 @@ import {
   IconUsers,
   IconUserX,
 } from '@/components/shell/icons';
-import { Filters, PageSizeSelect } from './Filters';
+import { Filters } from './Filters';
+import { DataTable } from '@/components/ui/DataTable';
 
 const AVATAR_PALETTES = [
   { bg: 'bg-[#EFF6FF]', text: 'text-[#2563EB]' }, // soft blue
@@ -47,19 +48,6 @@ function getInitials(name: string) {
     return (parts[0][0] + parts[1][0]).toUpperCase();
   }
   return name.slice(0, 2).toUpperCase();
-}
-
-function getPagination(currentPage: number, totalPages: number): (number | string)[] {
-  if (totalPages <= 7) {
-    return Array.from({ length: totalPages }, (_, i) => i + 1);
-  }
-  if (currentPage <= 4) {
-    return [1, 2, 3, 4, 5, '...', totalPages];
-  }
-  if (currentPage >= totalPages - 3) {
-    return [1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
-  }
-  return [1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages];
 }
 
 export async function ConsoleCustomers({
@@ -214,8 +202,6 @@ export async function ConsoleCustomers({
   const pageSize = Math.min(100, Math.max(5, Number(searchParams.limit ?? 20) || 20));
   const page = Math.max(1, Number(searchParams.page ?? 1) || 1);
   const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const paginationPages = getPagination(page, totalPages);
 
   const buildPageUrl = (targetPage: number) => {
     const params = new URLSearchParams({
@@ -396,257 +382,206 @@ export async function ConsoleCustomers({
         />
       </div>
 
-      {/* Modern Customers Table */}
-      <div className="overflow-x-auto rounded-xl border border-slate-200/80 bg-white">
-        <table className="w-full border-collapse text-left text-sm">
-          <thead>
-            <tr className="border-b border-slate-200/80 bg-slate-50/60 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              <th className="px-4 py-3">
-                <span className="inline-flex items-center gap-1">
-                  Customer
-                  <svg className="h-3 w-3 text-slate-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M5 7l5-5 5 5H5zM5 13l5 5 5-5H5z" />
-                  </svg>
-                </span>
-              </th>
-              <th className="px-4 py-3">Cars</th>
-              <th className="px-4 py-3">
-                <span className="inline-flex items-center gap-1">
-                  Schedule
-                  <svg className="h-3 w-3 text-slate-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
-                  </svg>
-                </span>
-              </th>
-              <th className="px-4 py-3">Wash boy</th>
-              <th className="px-4 py-3">Monthly</th>
-              <th className="px-4 py-3">Payment</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Source</th>
-              <th className="px-4 py-3 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {pageRows.map((customer) => {
+      {/* Modern Reusable Customers Table matching Image 2 */}
+      <DataTable<Customer>
+        data={pageRows}
+        keyExtractor={(c) => c.id}
+        itemLabel="customers"
+        page={page}
+        pageSize={pageSize}
+        totalItems={filtered.length}
+        buildPageUrl={buildPageUrl}
+        emptyMessage="No customers match these filters."
+        columns={[
+          {
+            id: 'customer',
+            header: (
+              <span className="inline-flex items-center gap-1">
+                Customer
+                <svg className="h-3 w-3 text-slate-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M5 7l5-5 5 5H5zM5 13l5 5 5-5H5z" />
+                </svg>
+              </span>
+            ),
+            render: (customer) => {
+              const palette = getAvatarPalette(customer.name);
+              const initials = getInitials(customer.name);
+              return (
+                <div className="flex items-center gap-2.5">
+                  <div
+                    className={clsx(
+                      'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold',
+                      palette.bg,
+                      palette.text,
+                    )}
+                  >
+                    {initials}
+                  </div>
+                  <div className="min-w-0">
+                    <Link
+                      href={`${base}/customers/${customer.id}`}
+                      className="block font-semibold text-slate-900 text-xs sm:text-sm hover:text-blue-600 transition-colors"
+                    >
+                      {customer.name}
+                    </Link>
+                    <div className="text-[11px] font-medium text-slate-400">
+                      {areaById.get(customer.areaId)?.name ?? '—'}
+                    </div>
+                  </div>
+                </div>
+              );
+            },
+          },
+          {
+            id: 'cars',
+            header: 'Cars',
+            render: (customer) => {
               const own = carsByCustomer.get(customer.id) ?? [];
-              const invoice = invoiceByCustomer.get(customer.id);
+              return (
+                <span className="text-xs sm:text-sm font-medium text-slate-700">
+                  {own.length}
+                </span>
+              );
+            },
+          },
+          {
+            id: 'schedule',
+            header: (
+              <span className="inline-flex items-center gap-1">
+                Schedule
+                <svg className="h-3 w-3 text-slate-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                </svg>
+              </span>
+            ),
+            className: 'whitespace-nowrap',
+            render: (customer) => {
+              const own = carsByCustomer.get(customer.id) ?? [];
+              const first = own[0];
+              return first ? (
+                <div className="flex items-center gap-1.5 text-xs text-slate-600 font-medium">
+                  <IconCalendar width={13} height={13} className="text-slate-400 shrink-0" />
+                  <span>
+                    {PATTERN_SHORT[first.schedulePattern]} · {formatTime(first.scheduleTime)}
+                  </span>
+                </div>
+              ) : (
+                <span className="text-xs text-slate-400">—</span>
+              );
+            },
+          },
+          {
+            id: 'washBoy',
+            header: 'Wash boy',
+            className: 'whitespace-nowrap',
+            render: (customer) => {
+              const own = carsByCustomer.get(customer.id) ?? [];
+              const first = own[0];
+              return first?.assignedStaffId ? (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#EFF6FF] text-[#2563EB]">
+                  <IconUser width={12} height={12} className="shrink-0 text-[#2563EB]" />
+                  <span>{staffById.get(first.assignedStaffId)?.name ?? '—'}</span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#FEF2F2] text-[#EF4444]">
+                  Unassigned
+                </span>
+              );
+            },
+          },
+          {
+            id: 'monthly',
+            header: 'Monthly',
+            className: 'whitespace-nowrap',
+            render: (customer) => {
+              const own = carsByCustomer.get(customer.id) ?? [];
               const monthly = own.reduce(
                 (sum, car) => sum + (packageById.get(car.packageId)?.price ?? 0),
                 0,
               );
-              const first = own[0];
+              return (
+                <span className="text-xs sm:text-sm font-semibold text-slate-800">
+                  {money(monthly)}
+                </span>
+              );
+            },
+          },
+          {
+            id: 'payment',
+            header: 'Payment',
+            className: 'whitespace-nowrap',
+            render: (customer) => {
+              const invoice = invoiceByCustomer.get(customer.id);
               const owed = invoice ? invoice.amount - invoice.paidAmount : 0;
-              const palette = getAvatarPalette(customer.name);
-              const initials = getInitials(customer.name);
-
-              return (
-                <tr key={customer.id} className="transition-colors hover:bg-slate-50/70">
-                  {/* Customer */}
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2.5">
-                      <div
-                        className={clsx(
-                          'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold',
-                          palette.bg,
-                          palette.text
-                        )}
-                      >
-                        {initials}
-                      </div>
-                      <div className="min-w-0">
-                        <Link
-                          href={`${base}/customers/${customer.id}`}
-                          className="block font-semibold text-slate-900 text-xs sm:text-sm hover:text-blue-600 transition-colors"
-                        >
-                          {customer.name}
-                        </Link>
-                        <div className="text-[11px] font-medium text-slate-400">
-                          {areaById.get(customer.areaId)?.name ?? '—'}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-
-                  {/* Cars */}
-                  <td className="px-4 py-3">
-                    <span className="text-xs sm:text-sm font-medium text-slate-700">
-                      {own.length}
-                    </span>
-                  </td>
-
-                  {/* Schedule */}
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    {first ? (
-                      <div className="flex items-center gap-1.5 text-xs text-slate-600 font-medium">
-                        <IconCalendar width={13} height={13} className="text-slate-400 shrink-0" />
-                        <span>
-                          {PATTERN_SHORT[first.schedulePattern]} · {formatTime(first.scheduleTime)}
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-slate-400">—</span>
-                    )}
-                  </td>
-
-                  {/* Wash boy */}
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    {first?.assignedStaffId ? (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#EFF6FF] text-[#2563EB]">
-                        <IconUser width={12} height={12} className="shrink-0 text-[#2563EB]" />
-                        <span>{staffById.get(first.assignedStaffId)?.name ?? '—'}</span>
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#FEF2F2] text-[#EF4444]">
-                        Unassigned
-                      </span>
-                    )}
-                  </td>
-
-                  {/* Monthly */}
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <span className="text-xs sm:text-sm font-semibold text-slate-800">
-                      {money(monthly)}
-                    </span>
-                  </td>
-
-                  {/* Payment */}
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    {!invoice ? (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
-                        No bill
-                      </span>
-                    ) : owed <= 0 ? (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#ECFDF5] text-[#059669]">
-                        Paid
-                      </span>
-                    ) : invoice.paidAmount > 0 ? (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#FFF7ED] text-[#D97706]">
-                        Partial · {money(owed)}
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#FEF2F2] text-[#DC2626]">
-                        Due {money(owed)}
-                      </span>
-                    )}
-                  </td>
-
-                  {/* Status */}
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <span
-                      className={clsx(
-                        'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold',
-                        customer.status === 'ACTIVE'
-                          ? 'bg-[#ECFDF5] text-[#059669]'
-                          : customer.status === 'HOLD'
-                            ? 'bg-[#FFF7ED] text-[#D97706]'
-                            : 'bg-[#F1F5F9] text-[#475569]'
-                      )}
-                    >
-                      {customer.status === 'ACTIVE'
-                        ? 'Active'
-                        : customer.status === 'HOLD'
-                          ? 'Hold'
-                          : 'Inactive'}
-                    </span>
-                  </td>
-
-                  {/* Source */}
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <span className="text-xs text-slate-500 font-medium">
-                      {LEAD_SOURCE_LABEL[customer.source] ?? customer.source}
-                    </span>
-                  </td>
-
-                  {/* Actions (View Details) */}
-                  <td className="px-4 py-3 text-right whitespace-nowrap">
-                    <Link
-                      href={`${base}/customers/${customer.id}`}
-                      className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 transition-colors shadow-2xs"
-                      title="View customer details"
-                    >
-                      <IconEye width={14} height={14} />
-                    </Link>
-                  </td>
-                </tr>
+              return !invoice ? (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
+                  No bill
+                </span>
+              ) : owed <= 0 ? (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#ECFDF5] text-[#059669]">
+                  Paid
+                </span>
+              ) : invoice.paidAmount > 0 ? (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#FFF7ED] text-[#D97706]">
+                  Partial · {money(owed)}
+                </span>
+              ) : (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#FEF2F2] text-[#DC2626]">
+                  Due {money(owed)}
+                </span>
               );
-            })}
-
-            {pageRows.length === 0 ? (
-              <tr>
-                <td className="py-10 text-center text-xs sm:text-sm text-slate-500" colSpan={9}>
-                  No customers match these filters.
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Pagination Footer */}
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-4 pt-2 text-xs text-slate-500">
-        <div>
-          Showing {filtered.length === 0 ? 0 : (page - 1) * pageSize + 1} to{' '}
-          {Math.min(page * pageSize, filtered.length)} of {filtered.length} customers
-        </div>
-
-        {totalPages > 1 ? (
-          <nav className="flex items-center gap-1" aria-label="Pagination">
-            <Link
-              href={buildPageUrl(page - 1)}
-              aria-disabled={page <= 1}
-              className={clsx(
-                'flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition-colors',
-                page <= 1 ? 'pointer-events-none opacity-40' : 'hover:bg-slate-50'
-              )}
-              aria-label="Previous page"
-            >
-              &lt;
-            </Link>
-
-            {paginationPages.map((p, idx) => {
-              if (p === '...') {
-                return (
-                  <span key={`ellipsis-${idx}`} className="flex h-8 w-8 items-center justify-center text-slate-400">
-                    …
-                  </span>
-                );
-              }
-              const isCurrent = p === page;
-              return (
-                <Link
-                  key={p}
-                  href={buildPageUrl(p as number)}
-                  aria-current={isCurrent ? 'page' : undefined}
-                  className={clsx(
-                    'flex h-8 w-8 items-center justify-center rounded-lg text-xs font-semibold transition-colors',
-                    isCurrent
-                      ? 'bg-[#2563EB] text-white shadow-xs'
-                      : 'text-slate-600 hover:bg-slate-100'
-                  )}
-                >
-                  {p}
-                </Link>
-              );
-            })}
-
-            <Link
-              href={buildPageUrl(page + 1)}
-              aria-disabled={page >= totalPages}
-              className={clsx(
-                'flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition-colors',
-                page >= totalPages ? 'pointer-events-none opacity-40' : 'hover:bg-slate-50'
-              )}
-              aria-label="Next page"
-            >
-              &gt;
-            </Link>
-          </nav>
-        ) : null}
-
-        <div className="ml-auto sm:ml-0">
-          <PageSizeSelect value={pageSize} />
-        </div>
-      </div>
+            },
+          },
+          {
+            id: 'status',
+            header: 'Status',
+            className: 'whitespace-nowrap',
+            render: (customer) => (
+              <span
+                className={clsx(
+                  'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold',
+                  customer.status === 'ACTIVE'
+                    ? 'bg-[#ECFDF5] text-[#059669]'
+                    : customer.status === 'HOLD'
+                      ? 'bg-[#FFF7ED] text-[#D97706]'
+                      : 'bg-[#F1F5F9] text-[#475569]',
+                )}
+              >
+                {customer.status === 'ACTIVE'
+                  ? 'Active'
+                  : customer.status === 'HOLD'
+                    ? 'Hold'
+                    : 'Inactive'}
+              </span>
+            ),
+          },
+          {
+            id: 'source',
+            header: 'Source',
+            className: 'whitespace-nowrap',
+            render: (customer) => (
+              <span className="text-xs text-slate-500 font-medium">
+                {LEAD_SOURCE_LABEL[customer.source as keyof typeof LEAD_SOURCE_LABEL] ?? customer.source}
+              </span>
+            ),
+          },
+          {
+            id: 'actions',
+            header: 'Actions',
+            align: 'right',
+            className: 'whitespace-nowrap',
+            render: (customer) => (
+              <Link
+                href={`${base}/customers/${customer.id}`}
+                className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 transition-colors shadow-2xs"
+                title="View customer details"
+              >
+                <IconEye width={14} height={14} />
+              </Link>
+            ),
+          },
+        ]}
+      />
     </div>
   );
 }

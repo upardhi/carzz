@@ -15,11 +15,10 @@ import {
   IconUserX,
 } from '@/components/shell/icons';
 import {
-  EmptyTableRow,
   StatCard,
   StatGrid,
-  TablePagination,
 } from '@/components/ui/primitives';
+import { DataTable } from '@/components/ui/DataTable';
 import { formatClock, formatTime } from '@/lib/util/format';
 import { MISS_REASON_LABEL } from '@/lib/util/labels';
 import { AssignSelect } from './AssignSelect';
@@ -405,138 +404,117 @@ export function ScheduleClient({
         </div>
       </div>
 
-      {/* Schedules Table */}
-      <div className="overflow-hidden rounded-2xl border border-line-soft bg-white shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="border-b border-line-soft bg-slate-50/50 text-[11px] font-bold uppercase tracking-wider text-ink-mute">
-                <th className="py-3 pl-4 pr-3 font-extrabold">TIME ⇅</th>
-                <th className="py-3 px-3 font-extrabold">CUSTOMER</th>
-                <th className="py-3 px-3 font-extrabold">CAR</th>
-                <th className="py-3 px-3 font-extrabold">AREA</th>
-                <th className="py-3 px-3 font-extrabold">WASH BOY</th>
-                <th className="py-3 px-3 font-extrabold">STATUS</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line-soft">
-              {currentPageVisits.map((visit) => {
-                const areaBadge =
-                  areaBadgeColors[visit.areaName] ||
-                  'bg-slate-50 text-slate-700 border-slate-200';
-
-                return (
-                  <tr
-                    key={visit.id}
-                    className="transition-colors hover:bg-slate-50/70"
-                  >
-                    {/* Time */}
-                    <td className="py-3 pl-4 pr-3 font-bold text-navy-950">
-                      <div className="flex items-center gap-1.5">
-                        <IconClock width={14} height={14} className="text-slate-400" />
-                        <span>{formatTime(visit.scheduledTime)}</span>
-                      </div>
-                    </td>
-
-                    {/* Customer */}
-                    <td className="py-3 px-3 font-bold text-navy-950">
-                      {visit.customerName}
-                    </td>
-
-                    {/* Car Model & Plate */}
-                    <td className="py-3 px-3">
-                      <span className="font-semibold text-navy-950">
-                        {visit.carModel}
-                      </span>{' '}
-                      <span className="text-slate-400">•</span>{' '}
-                      <span className="font-mono text-[11px] text-slate-600">
-                        {visit.carPlate}
-                      </span>
-                    </td>
-
-                    {/* Area Badge */}
-                    <td className="py-3 px-3">
-                      <span
-                        className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${areaBadge}`}
-                      >
-                        <IconMapPin width={11} height={11} />
-                        {visit.areaName}
-                      </span>
-                    </td>
-
-                    {/* Wash Boy */}
-                    <td className="py-3 px-3">
-                      {visit.status === 'DONE' || visit.status === 'MISSED' ? (
-                        <div className="flex items-center gap-1.5 font-semibold text-slate-700">
-                          <IconUser width={13} height={13} className="text-slate-400" />
-                          <span>{visit.staffName || '—'}</span>
-                        </div>
-                      ) : (
-                        <AssignSelect
-                          visitId={visit.id}
-                          current={visit.staffId}
-                          staff={staff
-                            .filter((s) => s.areaId === visit.areaId)
-                            .map((s) => ({ id: s.id, name: s.name }))}
-                        />
-                      )}
-                    </td>
-
-                    {/* Status Badge */}
-                    <td className="py-3 px-3">
-                      {visit.status === 'DONE' ? (
-                        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700">
-                          <IconCheckCircle width={12} height={12} />
-                          Done {visit.completedAt ? formatClock(visit.completedAt) : ''}
-                        </span>
-                      ) : visit.status === 'MISSED' ? (
-                        <span className="inline-flex items-center gap-1 rounded-full border border-amber-100 bg-amber-50 px-2.5 py-0.5 text-[11px] font-bold text-amber-700">
-                          {visit.missReason
-                            ? MISS_REASON_LABEL[visit.missReason as keyof typeof MISS_REASON_LABEL] || visit.missReason
-                            : 'Not done'}
-                        </span>
-                      ) : visit.status === 'IN_PROGRESS' ? (
-                        <span className="inline-flex items-center gap-1 rounded-full border border-sky-100 bg-sky-50 px-2.5 py-0.5 text-[11px] font-bold text-sky-700">
-                          In progress
-                        </span>
-                      ) : visit.staffId ? (
-                        <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[11px] font-bold text-slate-700">
-                          Pending
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 rounded-full border border-rose-100 bg-rose-50 px-2.5 py-0.5 text-[11px] font-bold text-rose-700">
-                          No staff
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-
-              {currentPageVisits.length === 0 ? (
-                <EmptyTableRow
-                  colSpan={6}
-                  message={`No schedules match the selected filters for ${dateFormatted}.`}
+      {/* Schedules Table using DataTable */}
+      <DataTable<ScheduleItem>
+        data={currentPageVisits}
+        keyExtractor={(v) => v.id}
+        itemLabel="schedules"
+        page={page}
+        pageSize={perPage}
+        totalItems={filteredVisits.length}
+        onPageChange={setPage}
+        onPageSizeChange={(newPerPage) => {
+          setPerPage(newPerPage);
+          setPage(1);
+        }}
+        pageSizeOptions={[10, 20, 50]}
+        emptyMessage={`No schedules match the selected filters for ${dateFormatted}.`}
+        columns={[
+          {
+            id: 'time',
+            header: 'TIME',
+            sortable: true,
+            render: (visit) => (
+              <div className="flex items-center gap-1.5 font-bold text-navy-950">
+                <IconClock width={14} height={14} className="text-slate-400" />
+                <span>{formatTime(visit.scheduledTime)}</span>
+              </div>
+            ),
+          },
+          {
+            id: 'customer',
+            header: 'CUSTOMER',
+            className: 'font-bold text-navy-950',
+            render: (visit) => visit.customerName,
+          },
+          {
+            id: 'car',
+            header: 'CAR',
+            render: (visit) => (
+              <>
+                <span className="font-semibold text-navy-950">{visit.carModel}</span>{' '}
+                <span className="text-slate-400">•</span>{' '}
+                <span className="font-mono text-[11px] text-slate-600">{visit.carPlate}</span>
+              </>
+            ),
+          },
+          {
+            id: 'area',
+            header: 'AREA',
+            render: (visit) => {
+              const areaBadge =
+                areaBadgeColors[visit.areaName] ||
+                'bg-slate-50 text-slate-700 border-slate-200';
+              return (
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${areaBadge}`}
+                >
+                  <IconMapPin width={11} height={11} />
+                  {visit.areaName}
+                </span>
+              );
+            },
+          },
+          {
+            id: 'washBoy',
+            header: 'WASH BOY',
+            render: (visit) =>
+              visit.status === 'DONE' || visit.status === 'MISSED' ? (
+                <div className="flex items-center gap-1.5 font-semibold text-slate-700">
+                  <IconUser width={13} height={13} className="text-slate-400" />
+                  <span>{visit.staffName || '—'}</span>
+                </div>
+              ) : (
+                <AssignSelect
+                  visitId={visit.id}
+                  current={visit.staffId}
+                  staff={staff
+                    .filter((s) => s.areaId === visit.areaId)
+                    .map((s) => ({ id: s.id, name: s.name }))}
                 />
-              ) : null}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Table Footer with Pagination */}
-        <div className="border-t border-line-soft bg-slate-50/40 px-4 py-3">
-          <TablePagination
-            page={page}
-            totalItems={filteredVisits.length}
-            perPage={perPage}
-            onPageChange={setPage}
-            onPerPageChange={(newPerPage) => {
-              setPerPage(newPerPage);
-              setPage(1);
-            }}
-          />
-        </div>
-      </div>
+              ),
+          },
+          {
+            id: 'status',
+            header: 'STATUS',
+            render: (visit) =>
+              visit.status === 'DONE' ? (
+                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700">
+                  <IconCheckCircle width={12} height={12} />
+                  Done {visit.completedAt ? formatClock(visit.completedAt) : ''}
+                </span>
+              ) : visit.status === 'MISSED' ? (
+                <span className="inline-flex items-center gap-1 rounded-full border border-amber-100 bg-amber-50 px-2.5 py-0.5 text-[11px] font-bold text-amber-700">
+                  {visit.missReason
+                    ? MISS_REASON_LABEL[visit.missReason as keyof typeof MISS_REASON_LABEL] || visit.missReason
+                    : 'Not done'}
+                </span>
+              ) : visit.status === 'IN_PROGRESS' ? (
+                <span className="inline-flex items-center gap-1 rounded-full border border-sky-100 bg-sky-50 px-2.5 py-0.5 text-[11px] font-bold text-sky-700">
+                  In progress
+                </span>
+              ) : visit.staffId ? (
+                <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[11px] font-bold text-slate-700">
+                  Pending
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-full border border-rose-100 bg-rose-50 px-2.5 py-0.5 text-[11px] font-bold text-rose-700">
+                  No staff
+                </span>
+              ),
+          },
+        ]}
+      />
     </div>
   );
 }
