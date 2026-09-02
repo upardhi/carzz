@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import Link from 'next/link';
 import { PageHeader } from '@/components/shell/ConsoleShell';
 import {
@@ -12,6 +13,12 @@ import {
   Td,
   Th,
 } from '@/components/ui/primitives';
+import {
+  CardRowSkeleton,
+  CardSkeleton,
+  KpiGridSkeleton,
+  TableSkeleton,
+} from '@/components/ui/Skeleton';
 import { requirePermission } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { computePayoutRun } from '@/lib/services/payroll';
@@ -31,15 +38,23 @@ import { LEAD_SOURCE_LABEL } from '@/lib/util/labels';
 
 export const metadata = { title: 'Business overview' };
 
-export default async function AdminOverview() {
+/* -------------------------------------------------------------------------- */
+/* Async content component — everything that touches the DB                   */
+/* -------------------------------------------------------------------------- */
+
+async function AdminDashboardContent() {
+  // requirePermission is memoised by React cache() so this is free — the
+  // layout already resolved the session for this request.
   await requirePermission('report:business');
   const store = await getStore();
   const cycle = currentCycle();
 
-  // The payout run is expensive, and both reports below need it — so compute
-  // it once and hand it down rather than letting each recalculate.
+  // The payout run is the most expensive step. areaPerformance re-uses it so
+  // we avoid computing it twice.
   const payouts = await computePayoutRun(store, cycle, null);
   const areas = await areaPerformance(store, cycle, null, payouts);
+
+  // Everything that can run in parallel after areas are known.
   const [summary, sources, purchases] = await Promise.all([
     businessSummary(store, cycle, null, areas),
     leadSourceReport(store, null),
@@ -50,18 +65,12 @@ export default async function AdminOverview() {
   const ranked = [...areas].sort((a, b) => b.margin - a.margin);
   const best = ranked[0];
   const worst = ranked[ranked.length - 1];
-  // The channel burning the most money per customer who actually stays.
   const worstSource = [...sources]
     .filter((s) => s.cost > 0)
     .sort((a, b) => b.costPerActiveCar - a.costPerActiveCar)[0];
 
   return (
     <>
-      <PageHeader
-        title="Business overview"
-        description={`${cycleLabel(cycle)} · every area`}
-      />
-
       <KpiGrid>
         <Kpi label="Customers" value={summary.customers} />
         <Kpi label="Active cars" value={summary.activeCars} />
@@ -240,6 +249,64 @@ export default async function AdminOverview() {
           <Row label="Margin" value={percent(summary.margin)} />
         </Card>
       </div>
+    </>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Skeleton for the Suspense fallback                                          */
+/* -------------------------------------------------------------------------- */
+
+function AdminDashboardSkeleton() {
+  return (
+    <>
+      <KpiGridSkeleton count={6} />
+      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+        <CardSkeleton>
+          <TableSkeleton rows={4} cols={6} />
+        </CardSkeleton>
+        <CardSkeleton>
+          <div className="space-y-2">
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="h-14 animate-pulse rounded-lg bg-surface-raised"
+              />
+            ))}
+          </div>
+        </CardSkeleton>
+        <CardRowSkeleton rows={7} />
+        <CardRowSkeleton rows={7} />
+      </div>
+    </>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Page export — synchronous shell + streamed content                         */
+/* -------------------------------------------------------------------------- */
+
+export default function AdminOverview() {
+  const cycle = currentCycle(); // pure computation — no await needed
+
+  return (
+    <>
+      {/* PageHeader renders immediately — no DB dependency */}
+      <PageHeader
+        title="Business overview"
+        description={`${cycleLabel(cycle)} · every area`}
+      />
+
+      {/*
+       * AdminDashboardContent streams in while the skeleton is visible.
+       * The loading.tsx at this segment level shows the full skeleton
+       * (header + cards) during client-side navigation; this inner Suspense
+       * handles the streaming on a hard-refresh or first load so the header
+       * is visible while data loads.
+       */}
+      <Suspense fallback={<AdminDashboardSkeleton />}>
+        <AdminDashboardContent />
+      </Suspense>
     </>
   );
 }

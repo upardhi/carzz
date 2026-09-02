@@ -226,8 +226,29 @@ export async function loadRedAlerts(
   }
 
   const alerts: RedAlert[] = [];
-  for (const [customerId, agg] of byCustomer) {
-    const customer = await store.customers.get(customerId);
+
+  // --- Batch fetch to eliminate the N+1 loop ---
+  const customerIds = [...byCustomer.keys()];
+  if (customerIds.length === 0) return alerts;
+
+  // Two parallel batches replace the N queries × 2 sequential pattern.
+  const [allCustomers, allLastPayments] = await Promise.all([
+    Promise.all(customerIds.map((id) => store.customers.get(id))),
+    Promise.all(
+      customerIds.map((id) =>
+        store.payments.findOne({
+          where: { customerId: id, status: 'CONFIRMED' },
+          orderBy: [{ field: 'createdAt', dir: 'desc' }],
+        }),
+      ),
+    ),
+  ]);
+
+  for (let i = 0; i < customerIds.length; i++) {
+    const customerId = customerIds[i];
+    const customer = allCustomers[i];
+    const agg = byCustomer.get(customerId)!;
+
     if (!customer || customer.status === 'INACTIVE') continue;
 
     const daysOverdue = Math.floor(
@@ -236,10 +257,7 @@ export async function loadRedAlerts(
     );
     if (daysOverdue < 0) continue;
 
-    const lastPayment = await store.payments.findOne({
-      where: { customerId, status: 'CONFIRMED' },
-      orderBy: [{ field: 'createdAt', dir: 'desc' }],
-    });
+    const lastPayment = allLastPayments[i];
 
     alerts.push({
       customer,

@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { cache } from 'react';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getStore } from '../data';
@@ -20,7 +21,7 @@ export interface Session {
 }
 
 /** Reads and validates the session cookie. Null when signed out. */
-export async function getSession(): Promise<Session | null> {
+export const getSession = cache(async (): Promise<Session | null> => {
   const jar = await cookies();
   const claims = await verifySession(jar.get(SESSION_COOKIE)?.value);
   if (!claims) return null;
@@ -32,7 +33,7 @@ export async function getSession(): Promise<Session | null> {
 
   const areas = await store.areas.find();
   return { claims, user, scope: buildScope(user, areas) };
-}
+});
 
 /** Session or redirect to sign-in. Use at the top of every protected page. */
 export async function requireSession(): Promise<Session> {

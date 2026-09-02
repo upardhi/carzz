@@ -26,6 +26,7 @@ export default async function StaffLayout({
   const session = await requireSession();
   if (!session.user.staffId) redirect('/');
 
+  // Fetch the area name in parallel — it's a fast single-row lookup.
   const store = await getStore();
   const area = session.user.areaId
     ? await store.areas.get(session.user.areaId)
