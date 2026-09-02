@@ -1,6 +1,5 @@
 import 'server-only';
 
-import { unstable_cache } from 'next/cache';
 import type { AccessScope } from '@/lib/auth/rbac';
 import { getStore } from '@/lib/data';
 import { loadRedAlerts } from '@/lib/services/accounts';
