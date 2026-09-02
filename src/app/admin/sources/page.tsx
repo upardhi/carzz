@@ -3,12 +3,9 @@ import {
   Card,
   CardHeading,
   Note,
-  Table,
-  TableWrap,
   Tag,
-  Td,
-  Th,
 } from '@/components/ui/primitives';
+import { DataTable } from '@/components/ui/DataTable';
 import { requirePermission } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { leadSourceReport } from '@/lib/services/reports';
@@ -40,21 +37,63 @@ export default async function AdminSources() {
         </p>
       </Card>
 
-      <TableWrap>
-        <Table>
-          <thead>
-            <tr>
-              <Th>Source</Th>
-              <Th>Customers joined</Th>
-              <Th>Still active</Th>
-              <Th>Retention</Th>
-              <Th>Cost</Th>
-              <Th>Cost per active customer</Th>
-              <Th>Verdict</Th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => {
+      <DataTable<(typeof rows)[number]>
+        data={rows}
+        keyExtractor={(row) => row.source}
+        itemLabel="lead sources"
+        emptyMessage="No lead source data available."
+        columns={[
+          {
+            id: 'source',
+            header: 'SOURCE',
+            className: 'font-bold text-navy-950',
+            render: (row) => LEAD_SOURCE_LABEL[row.source],
+          },
+          {
+            id: 'joined',
+            header: 'CUSTOMERS JOINED',
+            align: 'center',
+            render: (row) => row.joined,
+          },
+          {
+            id: 'stillActive',
+            header: 'STILL ACTIVE',
+            align: 'center',
+            render: (row) => row.stillActive,
+          },
+          {
+            id: 'retention',
+            header: 'RETENTION',
+            align: 'center',
+            render: (row) => (
+              <span
+                className={
+                  row.retention >= 0.85
+                    ? 'font-bold text-emerald-600'
+                    : row.retention < 0.5
+                      ? 'font-bold text-rose-600'
+                      : 'text-gold-600'
+                }
+              >
+                {percent(row.retention)}
+              </span>
+            ),
+          },
+          {
+            id: 'cost',
+            header: 'COST',
+            render: (row) => money(row.cost),
+          },
+          {
+            id: 'costPerActiveCar',
+            header: 'COST PER ACTIVE CUSTOMER',
+            className: 'font-bold text-slate-900',
+            render: (row) => money(row.costPerActiveCar),
+          },
+          {
+            id: 'verdict',
+            header: 'VERDICT',
+            render: (row) => {
               const verdict =
                 row.cost === 0 && row.stillActive > 0
                   ? { tone: 'ok' as const, label: 'Free' }
@@ -65,34 +104,11 @@ export default async function AdminSources() {
                       : row.costPerActiveCar > 1500 || row.retention < 0.5
                         ? { tone: 'bad' as const, label: 'Stop' }
                         : { tone: 'warn' as const, label: 'Expensive' };
-
-              return (
-                <tr key={row.source}>
-                  <Td className="font-bold">{LEAD_SOURCE_LABEL[row.source]}</Td>
-                  <Td>{row.joined}</Td>
-                  <Td>{row.stillActive}</Td>
-                  <Td
-                    className={
-                      row.retention >= 0.85
-                        ? 'font-bold text-success-600'
-                        : row.retention < 0.5
-                          ? 'font-bold text-danger-500'
-                          : 'text-gold-600'
-                    }
-                  >
-                    {percent(row.retention)}
-                  </Td>
-                  <Td>{money(row.cost)}</Td>
-                  <Td className="font-bold">{money(row.costPerActiveCar)}</Td>
-                  <Td>
-                    <Tag tone={verdict.tone}>{verdict.label}</Tag>
-                  </Td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </Table>
-      </TableWrap>
+              return <Tag tone={verdict.tone}>{verdict.label}</Tag>;
+            },
+          },
+        ]}
+      />
 
       {cheapest && dearest && cheapest.source !== dearest.source ? (
         <div className="mt-4 grid gap-3 lg:grid-cols-2">

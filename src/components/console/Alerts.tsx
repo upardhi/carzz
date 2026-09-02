@@ -6,12 +6,9 @@ import {
   Kpi,
   KpiGrid,
   Note,
-  Table,
-  TableWrap,
   Tag,
-  Td,
-  Th,
 } from '@/components/ui/primitives';
+import { DataTable } from '@/components/ui/DataTable';
 import type { Session } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { loadRedAlerts } from '@/lib/services/accounts';
@@ -73,83 +70,99 @@ export async function ConsoleAlerts({
             </p>
           </Card>
 
-          <TableWrap>
-            <Table>
-              <thead>
-                <tr>
-                  <Th>Customer</Th>
-                  <Th>Area</Th>
-                  <Th>Reason</Th>
-                  <Th>Amount</Th>
-                  <Th>Days</Th>
-                  <Th>Last payment</Th>
-                  <Th>Action</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {alerts.slice(0, 60).map((alert) => (
-                  <tr key={alert.customer.id}>
-                    <Td>
-                      <Link
-                        href={`${base}/customers/${alert.customer.id}`}
-                        className="font-bold text-ink hover:text-navy-800"
-                      >
-                        {alert.customer.name}
-                      </Link>
-                      <div className="text-[11px] text-ink-faint">
-                        {alert.customer.phone}
-                      </div>
-                    </Td>
-                    <Td>{areaById.get(alert.customer.areaId)?.name ?? '—'}</Td>
-                    <Td>{alert.reason}</Td>
-                    <Td className="font-bold">{money(alert.amount)}</Td>
-                    <Td
-                      className={
-                        alert.daysOverdue > 14 ? 'font-extrabold text-danger-500' : ''
-                      }
+          <DataTable<Awaited<ReturnType<typeof loadRedAlerts>>[number]>
+            data={alerts}
+            keyExtractor={(a) => a.customer.id}
+            itemLabel="alerts"
+            emptyMessage="Nobody to chase. Every customer is paid up to date."
+            columns={[
+              {
+                id: 'customer',
+                header: 'CUSTOMER',
+                render: (alert) => (
+                  <div>
+                    <Link
+                      href={`${base}/customers/${alert.customer.id}`}
+                      className="font-bold text-navy-950 hover:text-blue-600 transition-colors"
                     >
-                      {alert.daysOverdue}
-                    </Td>
-                    <Td>
-                      {alert.lastPaymentOn
-                        ? formatDateFull(alert.lastPaymentOn)
-                        : 'Never'}
-                    </Td>
-                    <Td>
-                      <div className="flex gap-1.5">
-                        <a
-                          href={`https://wa.me/91${alert.customer.phone.replace(/\D/g, '').slice(-10)}?text=${encodeURIComponent(
-                            `Hello ${alert.customer.name}, this is a reminder that ${money(alert.amount)} is pending on your Carz car wash account. Please pay at your convenience. Thank you.`,
-                          )}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center rounded-lg bg-navy-800 px-3 py-1.5 text-xs font-bold text-white hover:bg-navy-700"
-                        >
-                          Remind
-                        </a>
-                        {alert.customer.status === 'ACTIVE' ? (
-                          <ActionButton
-                            endpoint="/api/ops/customers"
-                            variant="secondary"
-                            payload={{
-                              action: 'setStatus',
-                              customerId: alert.customer.id,
-                              status: 'HOLD',
-                            }}
-                            confirm={`Put ${alert.customer.name} on hold until they pay?`}
-                          >
-                            Hold
-                          </ActionButton>
-                        ) : (
-                          <Tag tone="warn">{alert.customer.status}</Tag>
-                        )}
-                      </div>
-                    </Td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          </TableWrap>
+                      {alert.customer.name}
+                    </Link>
+                    <div className="text-[11px] text-slate-400">
+                      {alert.customer.phone}
+                    </div>
+                  </div>
+                ),
+              },
+              {
+                id: 'area',
+                header: 'AREA',
+                render: (alert) => areaById.get(alert.customer.areaId)?.name ?? '—',
+              },
+              {
+                id: 'reason',
+                header: 'REASON',
+                render: (alert) => alert.reason,
+              },
+              {
+                id: 'amount',
+                header: 'AMOUNT',
+                className: 'font-bold text-slate-900',
+                render: (alert) => money(alert.amount),
+              },
+              {
+                id: 'days',
+                header: 'DAYS',
+                render: (alert) => (
+                  <span className={alert.daysOverdue > 14 ? 'font-extrabold text-rose-600' : 'font-semibold text-slate-700'}>
+                    {alert.daysOverdue}
+                  </span>
+                ),
+              },
+              {
+                id: 'lastPayment',
+                header: 'LAST PAYMENT',
+                className: 'whitespace-nowrap text-slate-600',
+                render: (alert) =>
+                  alert.lastPaymentOn
+                    ? formatDateFull(alert.lastPaymentOn)
+                    : 'Never',
+              },
+              {
+                id: 'action',
+                header: 'ACTION',
+                render: (alert) => (
+                  <div className="flex gap-1.5">
+                    <a
+                      href={`https://wa.me/91${alert.customer.phone.replace(/\D/g, '').slice(-10)}?text=${encodeURIComponent(
+                        `Hello ${alert.customer.name}, this is a reminder that ${money(alert.amount)} is pending on your Carz car wash account. Please pay at your convenience. Thank you.`,
+                      )}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center rounded-lg bg-navy-800 px-3 py-1.5 text-xs font-bold text-white hover:bg-navy-700 transition-colors shadow-2xs"
+                    >
+                      Remind
+                    </a>
+                    {alert.customer.status === 'ACTIVE' ? (
+                      <ActionButton
+                        endpoint="/api/ops/customers"
+                        variant="secondary"
+                        payload={{
+                          action: 'setStatus',
+                          customerId: alert.customer.id,
+                          status: 'HOLD',
+                        }}
+                        confirm={`Put ${alert.customer.name} on hold until they pay?`}
+                      >
+                        Hold
+                      </ActionButton>
+                    ) : (
+                      <Tag tone="warn">{alert.customer.status}</Tag>
+                    )}
+                  </div>
+                ),
+              },
+            ]}
+          />
 
           <div className="mt-3">
             <Note>

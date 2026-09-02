@@ -6,12 +6,9 @@ import {
   KpiGrid,
   Note,
   Row,
-  Table,
-  TableWrap,
   Tag,
-  Td,
-  Th,
 } from '@/components/ui/primitives';
+import { DataTable } from '@/components/ui/DataTable';
 import { scopeAreaFilter } from '@/lib/auth/rbac';
 import type { Session } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
@@ -135,87 +132,107 @@ export async function ConsoleStaff({ session }: { session: Session }) {
       </KpiGrid>
 
       <div className="mt-4">
-        <TableWrap>
-          <Table>
-            <thead>
-              <tr>
-                <Th>Name</Th>
-                <Th>Area</Th>
-                <Th>Signed in</Th>
-                <Th>Cars today</Th>
-                <Th>Washes</Th>
-                <Th>On-time</Th>
-                <Th>Rating</Th>
-                <Th>Earned</Th>
-                <Th>Action</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {staff.map((member) => {
+        <DataTable<(typeof staff)[number]>
+          data={staff}
+          keyExtractor={(member) => member.id}
+          itemLabel="wash boys"
+          emptyMessage="No wash boys added yet."
+          columns={[
+            {
+              id: 'name',
+              header: 'NAME',
+              className: 'font-bold text-navy-950',
+              render: (member) => member.name,
+            },
+            {
+              id: 'area',
+              header: 'AREA',
+              render: (member) => areaById.get(member.areaId)?.name ?? '—',
+            },
+            {
+              id: 'signedIn',
+              header: 'SIGNED IN',
+              render: (member) => {
                 const record = attendanceByStaff.get(member.id);
                 const absent = !record?.loginAt && record?.status !== 'PRESENT';
-                const stats = performanceById.get(member.id);
-                const own = todayVisits.filter((v) => v.staffId === member.id);
-
                 return (
-                  <tr key={member.id}>
-                    <Td className="font-bold">{member.name}</Td>
-                    <Td>{areaById.get(member.areaId)?.name ?? '—'}</Td>
-                    <Td className={absent ? 'font-bold text-danger-500' : ''}>
-                      {record?.loginAt ? formatClock(record.loginAt) : 'Absent'}
-                    </Td>
-                    <Td>
-                      {own.filter((v) => v.status === 'DONE').length}/{own.length}
-                    </Td>
-                    <Td>{stats?.washes ?? 0}</Td>
-                    <Td
-                      className={
-                        stats && stats.onTimeRate < 0.7
-                          ? 'font-bold text-danger-500'
-                          : ''
-                      }
-                    >
-                      {percent(stats?.onTimeRate ?? 0)}
-                    </Td>
-                    <Td>
-                      {stats?.averageRating
-                        ? `${stats.averageRating.toFixed(1)} ★`
-                        : '—'}
-                    </Td>
-                    <Td className="font-bold">
-                      {money(payouts.get(member.id)?.net ?? 0)}
-                    </Td>
-                    <Td>
-                      <ActionButton
-                        endpoint="/api/ops/staff"
-                        variant={member.active ? 'secondary' : 'primary'}
-                        payload={{
-                          action: 'setActive',
-                          staffId: member.id,
-                          active: !member.active,
-                        }}
-                        confirm={
-                          member.active
-                            ? `Deactivate ${member.name}? Their upcoming cars become unassigned and their login stops working.`
-                            : undefined
-                        }
-                      >
-                        {member.active ? 'Deactivate' : 'Reactivate'}
-                      </ActionButton>
-                    </Td>
-                  </tr>
+                  <span className={absent ? 'font-bold text-rose-600' : 'text-slate-700'}>
+                    {record?.loginAt ? formatClock(record.loginAt) : 'Absent'}
+                  </span>
                 );
-              })}
-              {staff.length === 0 ? (
-                <tr>
-                  <Td className="py-8 text-center text-ink-mute" colSpan={9}>
-                    No wash boys added yet.
-                  </Td>
-                </tr>
-              ) : null}
-            </tbody>
-          </Table>
-        </TableWrap>
+              },
+            },
+            {
+              id: 'carsToday',
+              header: 'CARS TODAY',
+              render: (member) => {
+                const own = todayVisits.filter((v) => v.staffId === member.id);
+                return `${own.filter((v) => v.status === 'DONE').length}/${own.length}`;
+              },
+            },
+            {
+              id: 'washes',
+              header: 'WASHES',
+              render: (member) => performanceById.get(member.id)?.washes ?? 0,
+            },
+            {
+              id: 'onTime',
+              header: 'ON-TIME',
+              render: (member) => {
+                const stats = performanceById.get(member.id);
+                return (
+                  <span
+                    className={
+                      stats && stats.onTimeRate < 0.7
+                        ? 'font-bold text-rose-600'
+                        : 'text-slate-700'
+                    }
+                  >
+                    {percent(stats?.onTimeRate ?? 0)}
+                  </span>
+                );
+              },
+            },
+            {
+              id: 'rating',
+              header: 'RATING',
+              render: (member) => {
+                const stats = performanceById.get(member.id);
+                return stats?.averageRating
+                  ? `${stats.averageRating.toFixed(1)} ★`
+                  : '—';
+              },
+            },
+            {
+              id: 'earned',
+              header: 'EARNED',
+              className: 'font-bold text-slate-900',
+              render: (member) => money(payouts.get(member.id)?.net ?? 0),
+            },
+            {
+              id: 'action',
+              header: 'ACTION',
+              render: (member) => (
+                <ActionButton
+                  endpoint="/api/ops/staff"
+                  variant={member.active ? 'secondary' : 'primary'}
+                  payload={{
+                    action: 'setActive',
+                    staffId: member.id,
+                    active: !member.active,
+                  }}
+                  confirm={
+                    member.active
+                      ? `Deactivate ${member.name}? Their upcoming cars become unassigned and their login stops working.`
+                      : undefined
+                  }
+                >
+                  {member.active ? 'Deactivate' : 'Reactivate'}
+                </ActionButton>
+              ),
+            },
+          ]}
+        />
       </div>
 
       <div className="mt-4 grid gap-3 lg:grid-cols-2 xl:grid-cols-3">

@@ -5,12 +5,10 @@ import {
   Kpi,
   KpiGrid,
   Note,
-  Table,
-  TableWrap,
   Tag,
-  Td,
-  Th,
 } from '@/components/ui/primitives';
+import { DataTable } from '@/components/ui/DataTable';
+import { WidgetTable } from '@/components/ui/WidgetTable';
 import { ActionButton } from '@/components/console/ActionButton';
 import { requirePermission } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
@@ -113,178 +111,201 @@ export default async function AdminInventory() {
       ) : null}
 
       <div className="mt-4">
-        <TableWrap>
-          <Table>
-            <thead>
-              <tr>
-                <Th>Request</Th>
-                <Th>Area</Th>
-                <Th>Item</Th>
-                <Th>Quantity</Th>
-                <Th>Cost</Th>
-                <Th>Needed by</Th>
-                <Th>Status</Th>
-                <Th>Action</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {requests.slice(0, 20).map((request) => {
+        <DataTable<(typeof requests)[number]>
+          data={requests.slice(0, 20)}
+          keyExtractor={(request) => request.id}
+          itemLabel="purchase requests"
+          emptyMessage="No purchase requests yet."
+          columns={[
+            {
+              id: 'request',
+              header: 'REQUEST',
+              className: 'font-bold text-navy-950',
+              render: (request) => request.code,
+            },
+            {
+              id: 'area',
+              header: 'AREA',
+              render: (request) => areaById.get(request.areaId)?.name ?? '—',
+            },
+            {
+              id: 'item',
+              header: 'ITEM',
+              render: (request) => itemById.get(request.itemId)?.name ?? '—',
+            },
+            {
+              id: 'quantity',
+              header: 'QUANTITY',
+              render: (request) => {
                 const item = itemById.get(request.itemId);
+                return `${request.quantity} ${item?.unit ?? ''}`;
+              },
+            },
+            {
+              id: 'cost',
+              header: 'COST',
+              className: 'font-bold text-slate-900',
+              render: (request) => money(request.estimatedCost),
+            },
+            {
+              id: 'neededBy',
+              header: 'NEEDED BY',
+              render: (request) => {
                 const urgent =
-                  new Date(`${request.neededBy}T00:00:00Z`).getTime() -
-                    Date.now() <
+                  new Date(`${request.neededBy}T00:00:00Z`).getTime() - Date.now() <
                   3 * 86400000;
-
                 return (
-                  <tr key={request.id}>
-                    <Td className="font-bold">{request.code}</Td>
-                    <Td>{areaById.get(request.areaId)?.name ?? '—'}</Td>
-                    <Td>{item?.name ?? '—'}</Td>
-                    <Td>
-                      {request.quantity} {item?.unit}
-                    </Td>
-                    <Td className="font-bold">{money(request.estimatedCost)}</Td>
-                    <Td
-                      className={
-                        urgent && request.status === 'PENDING'
-                          ? 'font-bold text-danger-500'
-                          : ''
-                      }
-                    >
-                      {formatDateFull(request.neededBy)}
-                      <span className="ml-1 text-[11px] text-ink-faint">
-                        {relativeDays(request.neededBy)}
-                      </span>
-                    </Td>
-                    <Td>
-                      <Tag
-                        tone={
-                          request.status === 'PENDING'
-                            ? 'warn'
-                            : request.status === 'APPROVED'
-                              ? 'ok'
-                              : request.status === 'RECEIVED'
-                                ? 'neutral'
-                                : 'bad'
-                        }
-                      >
-                        {request.status === 'PENDING' ? 'Awaiting you' : request.status}
-                      </Tag>
-                    </Td>
-                    <Td>
-                      {request.status === 'PENDING' ? (
-                        <div className="flex gap-1.5">
-                          <ActionButton
-                            endpoint="/api/ops/inventory"
-                            payload={{
-                              action: 'decide',
-                              requestId: request.id,
-                              decision: 'APPROVED',
-                            }}
-                          >
-                            Approve
-                          </ActionButton>
-                          <ActionButton
-                            endpoint="/api/ops/inventory"
-                            variant="secondary"
-                            payload={{
-                              action: 'decide',
-                              requestId: request.id,
-                              decision: 'REJECTED',
-                            }}
-                          >
-                            Reject
-                          </ActionButton>
-                        </div>
-                      ) : (
-                        <span className="text-ink-faint">—</span>
-                      )}
-                    </Td>
-                  </tr>
+                  <span
+                    className={
+                      urgent && request.status === 'PENDING'
+                        ? 'font-bold text-rose-600'
+                        : 'text-slate-700'
+                    }
+                  >
+                    {formatDateFull(request.neededBy)}
+                    <span className="ml-1 text-[11px] text-slate-400">
+                      {relativeDays(request.neededBy)}
+                    </span>
+                  </span>
                 );
-              })}
-              {requests.length === 0 ? (
-                <tr>
-                  <Td className="py-8 text-center text-ink-mute" colSpan={8}>
-                    No purchase requests yet.
-                  </Td>
-                </tr>
-              ) : null}
-            </tbody>
-          </Table>
-        </TableWrap>
+              },
+            },
+            {
+              id: 'status',
+              header: 'STATUS',
+              render: (request) => (
+                <Tag
+                  tone={
+                    request.status === 'PENDING'
+                      ? 'warn'
+                      : request.status === 'APPROVED'
+                        ? 'ok'
+                        : request.status === 'RECEIVED'
+                          ? 'neutral'
+                          : 'bad'
+                  }
+                >
+                  {request.status === 'PENDING' ? 'Awaiting you' : request.status}
+                </Tag>
+              ),
+            },
+            {
+              id: 'action',
+              header: 'ACTION',
+              render: (request) =>
+                request.status === 'PENDING' ? (
+                  <div className="flex gap-1.5">
+                    <ActionButton
+                      endpoint="/api/ops/inventory"
+                      payload={{
+                        action: 'decide',
+                        requestId: request.id,
+                        decision: 'APPROVED',
+                      }}
+                    >
+                      Approve
+                    </ActionButton>
+                    <ActionButton
+                      endpoint="/api/ops/inventory"
+                      variant="secondary"
+                      payload={{
+                        action: 'decide',
+                        requestId: request.id,
+                        decision: 'REJECTED',
+                      }}
+                    >
+                      Reject
+                    </ActionButton>
+                  </div>
+                ) : (
+                  <span className="text-ink-faint">—</span>
+                ),
+            },
+          ]}
+        />
       </div>
 
       <div className="mt-4 grid gap-3 lg:grid-cols-2">
-        <Card className="p-4">
-          <CardHeading>Stock across every area</CardHeading>
-          <TableWrap>
-            <Table>
-              <thead>
-                <tr>
-                  <Th>Item</Th>
-                  {areas.map((area) => (
-                    <Th key={area.id}>{area.name}</Th>
-                  ))}
-                  <Th>Total</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item) => {
-                  const perArea = stock.map(
-                    (s) => s.rows.find((r) => r.item.id === item.id) ?? null,
-                  );
-                  const total = perArea.reduce((sum, r) => sum + (r?.quantity ?? 0), 0);
-                  return (
-                    <tr key={item.id}>
-                      <Td className="font-bold">{item.name}</Td>
-                      {perArea.map((row, index) => (
-                        <Td
-                          key={areas[index].id}
-                          className={
-                            row && row.status !== 'OK'
-                              ? 'font-bold text-danger-500'
-                              : ''
-                          }
-                        >
-                          {row ? `${row.quantity} ${item.unit}` : '—'}
-                        </Td>
-                      ))}
-                      <Td className="font-bold">
-                        {total} {item.unit}
-                      </Td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </Table>
-          </TableWrap>
-        </Card>
+        <WidgetTable<(typeof items)[number]>
+          title="Stock across every area"
+          data={items}
+          keyExtractor={(item) => item.id}
+          emptyMessage="No items found."
+          columns={[
+            {
+              id: 'item',
+              header: 'ITEM',
+              className: 'font-bold text-navy-950',
+              render: (item) => item.name,
+            },
+            ...areas.map((area) => ({
+              id: area.id,
+              header: area.name.toUpperCase(),
+              render: (item: (typeof items)[number]) => {
+                const s = stock.find((st) => st.area.id === area.id);
+                const row = s?.rows.find((r) => r.item.id === item.id) ?? null;
+                return (
+                  <span
+                    className={
+                      row && row.status !== 'OK'
+                        ? 'font-bold text-rose-600'
+                        : 'text-slate-700'
+                    }
+                  >
+                    {row ? `${row.quantity} ${item.unit}` : '—'}
+                  </span>
+                );
+              },
+            })),
+            {
+              id: 'total',
+              header: 'TOTAL',
+              align: 'right',
+              className: 'font-bold text-slate-900',
+              render: (item) => {
+                const total = stock.reduce((sum, s) => {
+                  const r = s.rows.find((row) => row.item.id === item.id);
+                  return sum + (r?.quantity ?? 0);
+                }, 0);
+                return `${total} ${item.unit}`;
+              },
+            },
+          ]}
+        />
 
-        <Card className="p-4">
-          <CardHeading>Consumption per wash by area</CardHeading>
-          <TableWrap>
-            <Table>
-              <thead>
-                <tr>
-                  <Th>Area</Th>
-                  <Th>Washes</Th>
-                  <Th>Goods cost</Th>
-                  <Th>Per wash</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {consumption.map((row) => (
-                  <tr key={row.areaId}>
-                    <Td className="font-bold">{row.areaName}</Td>
-                    <Td>{row.washes}</Td>
-                    <Td>{money(row.goodsCost)}</Td>
-                    <Td className="font-bold">₹{row.perWash.toFixed(2)}</Td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          </TableWrap>
+        <div className="flex flex-col justify-between">
+          <WidgetTable<(typeof consumption)[number]>
+            title="Consumption per wash by area"
+            data={consumption}
+            keyExtractor={(row) => row.areaId}
+            emptyMessage="No consumption data recorded."
+            columns={[
+              {
+                id: 'area',
+                header: 'AREA',
+                className: 'font-bold text-navy-950',
+                render: (row) => row.areaName,
+              },
+              {
+                id: 'washes',
+                header: 'WASHES',
+                align: 'center',
+                render: (row) => row.washes,
+              },
+              {
+                id: 'goodsCost',
+                header: 'GOODS COST',
+                render: (row) => money(row.goodsCost),
+              },
+              {
+                id: 'perWash',
+                header: 'PER WASH',
+                align: 'right',
+                className: 'font-bold text-slate-900',
+                render: (row) => `₹${row.perWash.toFixed(2)}`,
+              },
+            ]}
+          />
 
           {bestPerWash &&
           worstPerWash &&
@@ -307,7 +328,7 @@ export default async function AdminInventory() {
               </Note>
             </div>
           ) : null}
-        </Card>
+        </div>
       </div>
     </>
   );

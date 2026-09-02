@@ -6,12 +6,9 @@ import {
   CardHeading,
   Note,
   Row,
-  Table,
-  TableWrap,
   Tag,
-  Td,
-  Th,
 } from '@/components/ui/primitives';
+import { WidgetTable } from '@/components/ui/WidgetTable';
 import { canSeeArea } from '@/lib/auth/rbac';
 import type { Session } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
@@ -195,123 +192,125 @@ export async function ConsoleCustomerDetail({
           </div>
         </Card>
 
-        <Card className="p-4 lg:col-span-2">
-          <CardHeading>Recent washes</CardHeading>
-          <TableWrap>
-            <Table>
-              <thead>
-                <tr>
-                  <Th>Date</Th>
-                  <Th>Car</Th>
-                  <Th>Wash boy</Th>
-                  <Th>Photos</Th>
-                  <Th>Rating</Th>
-                  <Th>Status</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {history.map((visit) => {
+        <div className="flex flex-col justify-between lg:col-span-2">
+          <WidgetTable<(typeof history)[number]>
+            title="Recent washes"
+            data={history}
+            keyExtractor={(visit) => visit.id}
+            emptyMessage="No washes recorded yet."
+            columns={[
+              {
+                id: 'date',
+                header: 'DATE',
+                render: (visit) => (
+                  <span className="whitespace-nowrap text-slate-700">
+                    {formatDateFull(visit.scheduledDate)}
+                    {visit.completedAt ? (
+                      <span className="ml-1 text-slate-400">
+                        {formatClock(visit.completedAt)}
+                      </span>
+                    ) : null}
+                  </span>
+                ),
+              },
+              {
+                id: 'car',
+                header: 'CAR',
+                render: (visit) => {
                   const car = cars.find((c) => c.id === visit.carId);
-                  return (
-                    <tr key={visit.id}>
-                      <Td className="whitespace-nowrap">
-                        {formatDateFull(visit.scheduledDate)}
-                        {visit.completedAt ? (
-                          <span className="ml-1 text-ink-faint">
-                            {formatClock(visit.completedAt)}
-                          </span>
-                        ) : null}
-                      </Td>
-                      <Td>{car?.model ?? '—'}</Td>
-                      <Td>
-                        {visit.staffId
-                          ? (staffById.get(visit.staffId)?.name ?? '—')
-                          : '—'}
-                      </Td>
-                      <Td>
-                        {visit.beforePhotoUrl && visit.afterPhotoUrl ? (
-                          <Tag tone="ok">Both</Tag>
-                        ) : (
-                          <span className="text-ink-faint">—</span>
-                        )}
-                      </Td>
-                      <Td>{visit.rating ? `${visit.rating} ★` : '—'}</Td>
-                      <Td>
-                        {visit.status === 'DONE' ? (
-                          <Tag tone="ok">Done</Tag>
-                        ) : (
-                          <Tag tone="warn">
-                            {visit.missReason
-                              ? MISS_REASON_LABEL[visit.missReason]
-                              : 'Not done'}
-                          </Tag>
-                        )}
-                      </Td>
-                    </tr>
-                  );
-                })}
-                {history.length === 0 ? (
-                  <tr>
-                    <Td className="py-6 text-center text-ink-mute" colSpan={6}>
-                      No washes recorded yet.
-                    </Td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </Table>
-          </TableWrap>
-
+                  return car?.model ?? '—';
+                },
+              },
+              {
+                id: 'washBoy',
+                header: 'WASH BOY',
+                render: (visit) =>
+                  visit.staffId ? (staffById.get(visit.staffId)?.name ?? '—') : '—',
+              },
+              {
+                id: 'photos',
+                header: 'PHOTOS',
+                align: 'center',
+                render: (visit) =>
+                  visit.beforePhotoUrl && visit.afterPhotoUrl ? (
+                    <Tag tone="ok">Both</Tag>
+                  ) : (
+                    <span className="text-slate-400">—</span>
+                  ),
+              },
+              {
+                id: 'rating',
+                header: 'RATING',
+                align: 'center',
+                render: (visit) => (visit.rating ? `${visit.rating} ★` : '—'),
+              },
+              {
+                id: 'status',
+                header: 'STATUS',
+                align: 'right',
+                render: (visit) =>
+                  visit.status === 'DONE' ? (
+                    <Tag tone="ok">Done</Tag>
+                  ) : (
+                    <Tag tone="warn">
+                      {visit.missReason
+                        ? MISS_REASON_LABEL[visit.missReason]
+                        : 'Not done'}
+                    </Tag>
+                  ),
+              },
+            ]}
+          />
           {visits.some((v) => v.rescheduledToVisitId) ? (
-            <div className="mt-3">
+            <div className="mt-2">
               <Note tone="success">
                 Missed washes on this account were returned to the customer’s
                 count and rescheduled — they were not lost.
               </Note>
             </div>
           ) : null}
-        </Card>
+        </div>
 
-        <Card className="p-4">
-          <CardHeading>Payment history</CardHeading>
-          <TableWrap>
-            <Table>
-              <thead>
-                <tr>
-                  <Th>Date</Th>
-                  <Th>Amount</Th>
-                  <Th>Mode</Th>
-                  <Th>Status</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {payments.slice(0, 10).map((payment) => (
-                  <tr key={payment.id}>
-                    <Td className="whitespace-nowrap">
-                      {formatDateFull(payment.createdAt)}
-                    </Td>
-                    <Td className="font-bold">{money(payment.amount)}</Td>
-                    <Td>{PAYMENT_MODE_LABEL[payment.mode]}</Td>
-                    <Td>
-                      <Tag tone={payment.status === 'CONFIRMED' ? 'ok' : 'warn'}>
-                        {payment.kind === 'ADVANCE'
-                          ? 'Advance'
-                          : payment.status === 'CONFIRMED'
-                            ? 'Paid'
-                            : 'To confirm'}
-                      </Tag>
-                    </Td>
-                  </tr>
-                ))}
-                {payments.length === 0 ? (
-                  <tr>
-                    <Td className="py-6 text-center text-ink-mute" colSpan={4}>
-                      No payments recorded.
-                    </Td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </Table>
-          </TableWrap>
+        <div className="flex flex-col justify-between">
+          <WidgetTable<(typeof payments)[number]>
+            title="Payment history"
+            data={payments.slice(0, 10)}
+            keyExtractor={(payment) => payment.id}
+            emptyMessage="No payments recorded."
+            columns={[
+              {
+                id: 'date',
+                header: 'DATE',
+                className: 'whitespace-nowrap text-slate-700',
+                render: (payment) => formatDateFull(payment.createdAt),
+              },
+              {
+                id: 'amount',
+                header: 'AMOUNT',
+                className: 'font-bold text-slate-900',
+                render: (payment) => money(payment.amount),
+              },
+              {
+                id: 'mode',
+                header: 'MODE',
+                render: (payment) => PAYMENT_MODE_LABEL[payment.mode],
+              },
+              {
+                id: 'status',
+                header: 'STATUS',
+                align: 'right',
+                render: (payment) => (
+                  <Tag tone={payment.status === 'CONFIRMED' ? 'ok' : 'warn'}>
+                    {payment.kind === 'ADVANCE'
+                      ? 'Advance'
+                      : payment.status === 'CONFIRMED'
+                        ? 'Paid'
+                        : 'To confirm'}
+                  </Tag>
+                ),
+              },
+            ]}
+          />
 
           {payments.some((p) => p.status === 'PENDING') ? (
             <div className="mt-3 space-y-2">
@@ -339,7 +338,7 @@ export async function ConsoleCustomerDetail({
                 ))}
             </div>
           ) : null}
-        </Card>
+        </div>
 
         <Card className="p-4">
           <CardHeading>Invoices</CardHeading>

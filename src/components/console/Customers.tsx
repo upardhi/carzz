@@ -20,7 +20,7 @@ import {
   IconUsers,
   IconUserX,
 } from '@/components/shell/icons';
-import { Filters } from './Filters';
+import { Filters, PageSizeSelect } from './Filters';
 import { DataTable } from '@/components/ui/DataTable';
 
 const AVATAR_PALETTES = [
@@ -391,6 +391,7 @@ export async function ConsoleCustomers({
         pageSize={pageSize}
         totalItems={filtered.length}
         buildPageUrl={buildPageUrl}
+        pageSizeElement={<PageSizeSelect value={pageSize} />}
         emptyMessage="No customers match these filters."
         columns={[
           {

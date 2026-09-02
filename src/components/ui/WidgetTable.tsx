@@ -1,7 +1,5 @@
-'use client';
-
 import clsx from 'clsx';
-import { useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { TablePagination, EmptyTableRow } from './TableCard';
 
 export interface WidgetTableColumn<T> {
@@ -14,7 +12,7 @@ export interface WidgetTableColumn<T> {
 }
 
 export interface WidgetTableProps<T> {
-  title: ReactNode;
+  title?: ReactNode;
   action?: ReactNode;
   columns: WidgetTableColumn<T>[];
   data: T[];
@@ -37,21 +35,18 @@ export function WidgetTable<T>({
   data,
   keyExtractor = (_, idx) => String(idx),
   emptyMessage = 'No entries found.',
-  pageSize = 8,
-  page: externalPage,
-  onPageChange: externalOnPageChange,
+  pageSize,
+  page,
+  onPageChange,
   className,
 }: WidgetTableProps<T>) {
-  const [internalPage, setInternalPage] = useState(1);
-  const isControlled = externalPage !== undefined;
-  const page = isControlled ? externalPage : internalPage;
-  const onPageChange = isControlled
-    ? (p: number) => externalOnPageChange?.(p)
-    : setInternalPage;
-
+  const isControlled = page !== undefined && onPageChange !== undefined;
+  const currentPage = page ?? 1;
   const totalItems = data.length;
-  const startIndex = (page - 1) * pageSize;
-  const displayedData = isControlled ? data : data.slice(startIndex, startIndex + pageSize);
+  const startIndex = isControlled && pageSize ? (currentPage - 1) * pageSize : 0;
+  const displayedData = pageSize
+    ? data.slice(startIndex, startIndex + pageSize)
+    : data;
 
   const alignClass = (align?: 'left' | 'center' | 'right') => {
     if (align === 'center') return 'text-center';
@@ -121,9 +116,9 @@ export function WidgetTable<T>({
       </div>
 
       {/* Pagination Footer */}
-      {totalItems > pageSize ? (
+      {isControlled && pageSize && totalItems > pageSize ? (
         <TablePagination
-          page={page}
+          page={currentPage}
           totalItems={totalItems}
           perPage={pageSize}
           onPageChange={onPageChange}

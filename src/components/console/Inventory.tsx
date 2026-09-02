@@ -5,12 +5,9 @@ import {
   Kpi,
   KpiGrid,
   Note,
-  Table,
-  TableWrap,
   Tag,
-  Td,
-  Th,
 } from '@/components/ui/primitives';
+import { DataTable } from '@/components/ui/DataTable';
 import { scopeAreaFilter } from '@/lib/auth/rbac';
 import type { Session } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
@@ -111,60 +108,74 @@ export async function ConsoleInventory({ session }: { session: Session }) {
       ) : null}
 
       {stockByArea.map(({ area, rows }) => (
-        <div key={area.id} className="mt-4">
-          <h3 className="mb-2 text-sm font-extrabold">{area.name}</h3>
-          <TableWrap>
-            <Table>
-              <thead>
-                <tr>
-                  <Th>Item</Th>
-                  <Th>In stock</Th>
-                  <Th>Used per day</Th>
-                  <Th>Days left</Th>
-                  <Th>Reorder at</Th>
-                  <Th>Status</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row: StockRow) => (
-                  <tr key={row.item.id}>
-                    <Td className="font-bold">{row.item.name}</Td>
-                    <Td
-                      className={
-                        row.status === 'OUT' || row.status === 'CRITICAL'
-                          ? 'font-bold text-danger-500'
-                          : ''
-                      }
-                    >
-                      {row.quantity} {row.item.unit}
-                    </Td>
-                    <Td>
-                      {row.usagePerDay > 0
-                        ? `${row.usagePerDay.toFixed(2)} ${row.item.unit}`
-                        : '—'}
-                    </Td>
-                    <Td
-                      className={
-                        row.daysLeft !== null && row.daysLeft < 2
-                          ? 'font-extrabold text-danger-500'
-                          : ''
-                      }
-                    >
-                      {row.daysLeft !== null ? row.daysLeft.toFixed(1) : '—'}
-                    </Td>
-                    <Td>
-                      {row.item.reorderLevel} {row.item.unit}
-                    </Td>
-                    <Td>
-                      <Tag tone={STATUS_TONE[row.status]}>
-                        {STATUS_LABEL[row.status]}
-                      </Tag>
-                    </Td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          </TableWrap>
+        <div key={area.id} className="mt-6 space-y-2">
+          <h3 className="text-base font-extrabold text-navy-950">{area.name}</h3>
+          <DataTable<StockRow>
+            data={rows}
+            keyExtractor={(row) => row.item.id}
+            itemLabel="items"
+            emptyMessage={`No inventory items recorded for ${area.name}.`}
+            columns={[
+              {
+                id: 'item',
+                header: 'ITEM',
+                className: 'font-bold text-navy-950',
+                render: (row) => row.item.name,
+              },
+              {
+                id: 'inStock',
+                header: 'IN STOCK',
+                render: (row) => (
+                  <span
+                    className={
+                      row.status === 'OUT' || row.status === 'CRITICAL'
+                        ? 'font-bold text-rose-600'
+                        : 'text-slate-700'
+                    }
+                  >
+                    {row.quantity} {row.item.unit}
+                  </span>
+                ),
+              },
+              {
+                id: 'usage',
+                header: 'USED PER DAY',
+                render: (row) =>
+                  row.usagePerDay > 0
+                    ? `${row.usagePerDay.toFixed(2)} ${row.item.unit}`
+                    : '—',
+              },
+              {
+                id: 'daysLeft',
+                header: 'DAYS LEFT',
+                render: (row) => (
+                  <span
+                    className={
+                      row.daysLeft !== null && row.daysLeft < 2
+                        ? 'font-extrabold text-rose-600'
+                        : 'text-slate-700'
+                    }
+                  >
+                    {row.daysLeft !== null ? row.daysLeft.toFixed(1) : '—'}
+                  </span>
+                ),
+              },
+              {
+                id: 'reorder',
+                header: 'REORDER AT',
+                render: (row) => `${row.item.reorderLevel} ${row.item.unit}`,
+              },
+              {
+                id: 'status',
+                header: 'STATUS',
+                render: (row) => (
+                  <Tag tone={STATUS_TONE[row.status]}>
+                    {STATUS_LABEL[row.status]}
+                  </Tag>
+                ),
+              },
+            ]}
+          />
         </div>
       ))}
 

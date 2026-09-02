@@ -1,5 +1,3 @@
-'use client';
-
 import clsx from 'clsx';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
@@ -29,12 +27,13 @@ export interface DataTableProps<T> {
   onSort?: (columnId: string) => void;
 
   // Pagination
-  page: number;
-  pageSize: number;
-  totalItems: number;
+  page?: number;
+  pageSize?: number;
+  totalItems?: number;
   onPageChange?: (page: number) => void;
   onPageSizeChange?: (pageSize: number) => void;
   pageSizeOptions?: number[];
+  pageSizeElement?: ReactNode;
   buildPageUrl?: (page: number) => string;
 
   className?: string;
@@ -61,13 +60,17 @@ export function DataTable<T>({
   onPageChange,
   onPageSizeChange,
   pageSizeOptions = [10, 20, 50, 100],
+  pageSizeElement,
   buildPageUrl,
 
   className,
 }: DataTableProps<T>) {
-  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
-  const startItem = totalItems === 0 ? 0 : (page - 1) * pageSize + 1;
-  const endItem = Math.min(totalItems, page * pageSize);
+  const hasPagination = page !== undefined && totalItems !== undefined && pageSize !== undefined;
+  const currentPage = page ?? 1;
+  const currentPageSize = pageSize ?? (data.length || 1);
+  const totalPages = hasPagination && pageSize ? Math.max(1, Math.ceil(totalItems / pageSize)) : 1;
+  const startItem = hasPagination && pageSize ? (totalItems === 0 ? 0 : (currentPage - 1) * currentPageSize + 1) : 1;
+  const endItem = hasPagination && pageSize ? Math.min(totalItems, currentPage * currentPageSize) : data.length;
 
   const alignClass = (align?: 'left' | 'center' | 'right') => {
     if (align === 'center') return 'text-center';
@@ -76,15 +79,17 @@ export function DataTable<T>({
   };
 
   // Build smart pagination page array with ellipsis
-  const paginationPages = Array.from({ length: totalPages }, (_, i) => i + 1)
-    .filter((p) => p === 1 || p === totalPages || Math.abs(p - page) <= 2)
-    .reduce<(number | '...')[]>((acc, p, idx, arr) => {
-      if (idx > 0 && p - (arr[idx - 1] as number) > 1) {
-        acc.push('...');
-      }
-      acc.push(p);
-      return acc;
-    }, []);
+  const paginationPages = hasPagination
+    ? Array.from({ length: totalPages }, (_, i) => i + 1)
+        .filter((p) => p === 1 || p === totalPages || Math.abs(p - page) <= 2)
+        .reduce<(number | '...')[]>((acc, p, idx, arr) => {
+          if (idx > 0 && p - (arr[idx - 1] as number) > 1) {
+            acc.push('...');
+          }
+          acc.push(p);
+          return acc;
+        }, [])
+    : [];
 
   return (
     <div className={clsx('space-y-4', className)}>
@@ -126,25 +131,28 @@ export function DataTable<T>({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {data.map((item, rowIdx) => (
-                <tr
-                  key={keyExtractor(item, (page - 1) * pageSize + rowIdx)}
-                  className="transition-colors hover:bg-slate-50/70"
-                >
-                  {columns.map((col) => (
-                    <td
-                      key={col.id}
-                      className={clsx(
-                        'px-4 py-3 text-slate-700',
-                        alignClass(col.align),
-                        col.className,
-                      )}
-                    >
-                      {col.render(item, (page - 1) * pageSize + rowIdx)}
-                    </td>
-                  ))}
-                </tr>
-              ))}
+              {data.map((item, rowIdx) => {
+                const globalIdx = (currentPage - 1) * currentPageSize + rowIdx;
+                return (
+                  <tr
+                    key={keyExtractor(item, globalIdx)}
+                    className="transition-colors hover:bg-slate-50/70"
+                  >
+                    {columns.map((col) => (
+                      <td
+                        key={col.id}
+                        className={clsx(
+                          'px-4 py-3 text-slate-700',
+                          alignClass(col.align),
+                          col.className,
+                        )}
+                      >
+                        {col.render(item, globalIdx)}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
               {data.length === 0 ? (
                 <EmptyTableRow colSpan={columns.length} message={emptyMessage} />
               ) : null}
@@ -154,41 +162,44 @@ export function DataTable<T>({
       </div>
 
       {/* Comprehensive Pagination Footer matching Image 2 */}
-      <div className="flex flex-wrap items-center justify-between gap-4 pt-1 text-xs text-slate-500">
-        {/* Left: Showing entries info */}
-        <div>
-          Showing <span className="font-semibold text-slate-800">{startItem}</span> to{' '}
-          <span className="font-semibold text-slate-800">{endItem}</span> of{' '}
-          <span className="font-semibold text-slate-800">{totalItems}</span> {itemLabel}
-        </div>
+      {hasPagination || pageSizeElement || onPageSizeChange ? (
+        <div className="flex flex-wrap items-center justify-between gap-4 pt-1 text-xs text-slate-500">
+          {/* Left: Showing entries info */}
+          {hasPagination ? (
+            <div>
+              Showing <span className="font-semibold text-slate-800">{startItem}</span> to{' '}
+              <span className="font-semibold text-slate-800">{endItem}</span> of{' '}
+              <span className="font-semibold text-slate-800">{totalItems}</span> {itemLabel}
+            </div>
+          ) : <div />}
 
-        {/* Center: Pagination numbers */}
-        {totalPages > 1 ? (
-          <nav className="flex items-center gap-1" aria-label="Pagination">
-            {/* Prev button */}
-            {buildPageUrl ? (
-              <Link
-                href={buildPageUrl(page - 1)}
-                aria-disabled={page <= 1}
-                className={clsx(
-                  'flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition-colors',
-                  page <= 1 ? 'pointer-events-none opacity-40' : 'hover:bg-slate-50',
-                )}
-                aria-label="Previous page"
-              >
-                ‹
-              </Link>
-            ) : (
-              <button
-                type="button"
-                disabled={page <= 1}
-                onClick={() => onPageChange?.(page - 1)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-40"
-                aria-label="Previous page"
-              >
-                ‹
-              </button>
-            )}
+          {/* Center: Pagination numbers */}
+          {hasPagination && totalPages > 1 ? (
+            <nav className="flex items-center gap-1" aria-label="Pagination">
+              {/* Prev button */}
+              {buildPageUrl ? (
+                <Link
+                  href={buildPageUrl((page ?? 1) - 1)}
+                  aria-disabled={(page ?? 1) <= 1}
+                  className={clsx(
+                    'flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition-colors',
+                    (page ?? 1) <= 1 ? 'pointer-events-none opacity-40' : 'hover:bg-slate-50',
+                  )}
+                  aria-label="Previous page"
+                >
+                  ‹
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  disabled={(page ?? 1) <= 1}
+                  onClick={() => onPageChange?.((page ?? 1) - 1)}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-40"
+                  aria-label="Previous page"
+                >
+                  ‹
+                </button>
+              )}
 
             {/* Page numbers with ellipsis */}
             {paginationPages.map((p, idx) => {
@@ -240,11 +251,11 @@ export function DataTable<T>({
             {/* Next button */}
             {buildPageUrl ? (
               <Link
-                href={buildPageUrl(page + 1)}
-                aria-disabled={page >= totalPages}
+                href={buildPageUrl((page ?? 1) + 1)}
+                aria-disabled={(page ?? 1) >= totalPages}
                 className={clsx(
                   'flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition-colors',
-                  page >= totalPages ? 'pointer-events-none opacity-40' : 'hover:bg-slate-50',
+                  (page ?? 1) >= totalPages ? 'pointer-events-none opacity-40' : 'hover:bg-slate-50',
                 )}
                 aria-label="Next page"
               >
@@ -253,8 +264,8 @@ export function DataTable<T>({
             ) : (
               <button
                 type="button"
-                disabled={page >= totalPages}
-                onClick={() => onPageChange?.(page + 1)}
+                disabled={(page ?? 1) >= totalPages}
+                onClick={() => onPageChange?.((page ?? 1) + 1)}
                 className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-40"
                 aria-label="Next page"
               >
@@ -265,7 +276,11 @@ export function DataTable<T>({
         ) : null}
 
         {/* Right: Rows per page selector */}
-        {onPageSizeChange ? (
+        {pageSizeElement ? (
+          <div className="ml-auto sm:ml-0 flex items-center gap-1.5">
+            {pageSizeElement}
+          </div>
+        ) : onPageSizeChange ? (
           <div className="ml-auto sm:ml-0 flex items-center gap-1.5">
             <select
               aria-label="Items per page"
@@ -282,6 +297,7 @@ export function DataTable<T>({
           </div>
         ) : null}
       </div>
-    </div>
-  );
+    ) : null}
+  </div>
+);
 }

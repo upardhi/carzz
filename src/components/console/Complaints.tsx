@@ -1,12 +1,6 @@
 import { PageHeader } from '@/components/shell/ConsoleShell';
-import {
-  Card,
-  CardHeading,
-  Table,
-  TableWrap,
-  Td,
-  Th,
-} from '@/components/ui/primitives';
+import { WidgetTable } from '@/components/ui/WidgetTable';
+import type { Complaint } from '@/lib/data/types';
 import { scopeAreaFilter } from '@/lib/auth/rbac';
 import type { Session } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
@@ -66,85 +60,79 @@ export async function ConsoleComplaints({
       />
 
       <div className="mt-4 grid gap-3 lg:grid-cols-2">
-        <Card className="p-4">
-          <CardHeading>Complaints by wash boy</CardHeading>
-          <TableWrap>
-            <Table>
-              <thead>
-                <tr>
-                  <Th>Wash boy</Th>
-                  <Th>Complaints</Th>
-                  <Th>Share</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {worst.map(([staffId, count]) => (
-                  <tr key={staffId}>
-                    <Td className="font-bold">
-                      {staffById.get(staffId)?.name ?? '—'}
-                    </Td>
-                    <Td
-                      className={
-                        count / complaints.length > 0.25
-                          ? 'font-extrabold text-danger-500'
-                          : ''
-                      }
-                    >
-                      {count}
-                    </Td>
-                    <Td>
-                      {complaints.length
-                        ? `${Math.round((count / complaints.length) * 100)}%`
-                        : '—'}
-                    </Td>
-                  </tr>
-                ))}
-                {worst.length === 0 ? (
-                  <tr>
-                    <Td className="py-6 text-center text-ink-mute" colSpan={3}>
-                      No complaints attributed to staff.
-                    </Td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </Table>
-          </TableWrap>
-        </Card>
+        <WidgetTable<[string, number]>
+          title="Complaints by wash boy"
+          data={worst}
+          keyExtractor={([staffId]) => staffId}
+          emptyMessage="No complaints attributed to staff."
+          columns={[
+            {
+              id: 'staff',
+              header: 'WASH BOY',
+              className: 'font-bold text-navy-950',
+              render: ([staffId]) => staffById.get(staffId)?.name ?? '—',
+            },
+            {
+              id: 'count',
+              header: 'COMPLAINTS',
+              align: 'center',
+              render: ([, count]) => (
+                <span
+                  className={
+                    count / complaints.length > 0.25
+                      ? 'font-extrabold text-rose-600'
+                      : 'font-semibold text-slate-700'
+                  }
+                >
+                  {count}
+                </span>
+              ),
+            },
+            {
+              id: 'share',
+              header: 'SHARE',
+              align: 'right',
+              render: ([, count]) =>
+                complaints.length
+                  ? `${Math.round((count / complaints.length) * 100)}%`
+                  : '—',
+            },
+          ]}
+        />
 
-        <Card className="p-4">
-          <CardHeading>Recently resolved</CardHeading>
-          <TableWrap>
-            <Table>
-              <thead>
-                <tr>
-                  <Th>Date</Th>
-                  <Th>Customer</Th>
-                  <Th>Issue</Th>
-                  <Th>Resolution</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {resolved.slice(0, 8).map((complaint) => (
-                  <tr key={complaint.id}>
-                    <Td className="whitespace-nowrap">
-                      {formatDateFull(complaint.resolvedAt ?? complaint.createdAt)}
-                    </Td>
-                    <Td>{customerById.get(complaint.customerId)?.name ?? '—'}</Td>
-                    <Td>{COMPLAINT_TYPE_LABEL[complaint.type]}</Td>
-                    <Td className="text-ink-mute">{complaint.resolution ?? '—'}</Td>
-                  </tr>
-                ))}
-                {resolved.length === 0 ? (
-                  <tr>
-                    <Td className="py-6 text-center text-ink-mute" colSpan={4}>
-                      Nothing resolved yet.
-                    </Td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </Table>
-          </TableWrap>
-        </Card>
+        <WidgetTable<Complaint>
+          title="Recently resolved"
+          data={resolved.slice(0, 8)}
+          keyExtractor={(complaint) => complaint.id}
+          emptyMessage="Nothing resolved yet."
+          columns={[
+            {
+              id: 'date',
+              header: 'DATE',
+              className: 'whitespace-nowrap',
+              render: (complaint) =>
+                formatDateFull(complaint.resolvedAt ?? complaint.createdAt),
+            },
+            {
+              id: 'customer',
+              header: 'CUSTOMER',
+              className: 'font-medium text-navy-950',
+              render: (complaint) =>
+                customerById.get(complaint.customerId)?.name ?? '—',
+            },
+            {
+              id: 'issue',
+              header: 'ISSUE',
+              render: (complaint) => COMPLAINT_TYPE_LABEL[complaint.type],
+            },
+            {
+              id: 'resolution',
+              header: 'RESOLUTION',
+              className: 'text-slate-500',
+              render: (complaint) => complaint.resolution ?? '—',
+            },
+          ]}
+        />
       </div>
     </>
   );
