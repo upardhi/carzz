@@ -68,24 +68,42 @@ async function AdminDashboardContent() {
 
   return (
     <>
-      <KpiGrid>
-        <Kpi label="Customers" value={summary.customers} />
-        <Kpi label="Active cars" value={summary.activeCars} />
-        <Kpi label="Collected" value={moneyShort(summary.collected)} tone="success" />
+      <KpiGrid columns={6}>
         <Kpi
-          label="Total cost"
+          label="ACTIVE CUSTOMERS"
+          value={summary.customers}
+          tone="purple"
+          subtext="Registered accounts"
+        />
+        <Kpi
+          label="ACTIVE CARS"
+          value={summary.activeCars}
+          tone="blue"
+          subtext="Under subscription"
+        />
+        <Kpi
+          label="COLLECTED"
+          value={moneyShort(summary.collected)}
+          tone="emerald"
+          subtext="Received this cycle"
+        />
+        <Kpi
+          label="TOTAL COST"
           value={moneyShort(summary.payoutCost + summary.expenses)}
+          tone="slate"
+          subtext="Payouts & expenses"
         />
         <Kpi
-          label="Net profit"
+          label="NET PROFIT"
           value={moneyShort(summary.profit)}
-          tone={summary.profit > 0 ? 'success' : 'danger'}
-          hint={percent(summary.margin)}
+          tone={summary.profit > 0 ? 'emerald' : 'rose'}
+          subtext={`${percent(summary.margin)} net margin`}
         />
         <Kpi
-          label="Outstanding"
+          label="OUTSTANDING"
           value={moneyShort(summary.outstanding)}
-          tone="danger"
+          tone="amber"
+          subtext="Pending collection"
         />
       </KpiGrid>
 

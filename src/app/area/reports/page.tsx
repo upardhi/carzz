@@ -49,17 +49,43 @@ export default async function AreaReports() {
     <>
       <PageHeader title="Reports" description={cycleLabel(cycle)} />
 
-      <KpiGrid>
-        <Kpi label="Billed" value={money(billed)} />
-        <Kpi label="Collected" value={money(collected)} tone="success" />
+      <KpiGrid columns={6}>
         <Kpi
-          label="Collection rate"
-          value={percent(billed ? collected / billed : 0)}
-          tone={billed && collected / billed < 0.8 ? 'gold' : 'success'}
+          label="TOTAL BILLED"
+          value={money(billed)}
+          tone="blue"
+          subtext="Invoiced this month"
         />
-        <Kpi label="Washes done" value={performance.reduce((s, p) => s + p.washesDone, 0)} />
-        <Kpi label="Washes missed" value={missed.total} tone="gold" />
-        <Kpi label="Cost of missed" value={money(missed.totalCost)} tone="danger" />
+        <Kpi
+          label="COLLECTED"
+          value={money(collected)}
+          tone="emerald"
+          subtext="Received to date"
+        />
+        <Kpi
+          label="COLLECTION RATE"
+          value={percent(billed ? collected / billed : 0)}
+          tone={billed && collected / billed < 0.8 ? 'amber' : 'emerald'}
+          subtext={billed && collected / billed >= 0.8 ? 'On target' : 'Below target'}
+        />
+        <Kpi
+          label="WASHES DONE"
+          value={performance.reduce((s, p) => s + p.washesDone, 0)}
+          tone="purple"
+          subtext="Delivered successfully"
+        />
+        <Kpi
+          label="WASHES MISSED"
+          value={missed.total}
+          tone="amber"
+          subtext="To reschedule"
+        />
+        <Kpi
+          label="COST OF MISSED"
+          value={money(missed.totalCost)}
+          tone="rose"
+          subtext="Unrecovered labor cost"
+        />
       </KpiGrid>
 
       <div className="mt-4 grid gap-3 lg:grid-cols-2">

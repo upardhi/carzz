@@ -62,37 +62,60 @@ export default async function AdminInventory() {
         description="Nothing is bought until you approve it"
       />
 
-      <KpiGrid>
-        <Kpi label="Stock value" value={money(stockValue)} />
+      <KpiGrid columns={6}>
         <Kpi
-          label="Awaiting you"
-          value={pending.length}
-          tone={pending.length ? 'danger' : 'success'}
+          label="STOCK VALUE"
+          value={money(stockValue)}
+          tone="purple"
+          subtext="Total inventory on hand"
         />
         <Kpi
-          label="On order"
+          label="AWAITING APPROVAL"
+          value={pending.length}
+          tone={pending.length ? 'rose' : 'emerald'}
+          subtext={pending.length ? `${pending.length} purchase orders` : 'All requests processed'}
+        />
+        <Kpi
+          label="ON ORDER"
           value={money(
             requests
               .filter((r) => r.status === 'APPROVED')
               .reduce((s, r) => s + r.estimatedCost, 0),
           )}
+          tone="blue"
+          subtext="Approved goods in transit"
         />
-        <Kpi label="Areas low" value={areasLow} tone={areasLow ? 'gold' : 'default'} />
         <Kpi
-          label="Out of stock"
+          label="AREAS LOW"
+          value={areasLow}
+          tone={areasLow ? 'amber' : 'slate'}
+          subtext={areasLow ? `${areasLow} areas need restock` : 'Stock healthy'}
+        />
+        <Kpi
+          label="OUT OF STOCK"
           value={allRows.filter((r) => r.status === 'OUT').length}
-          tone="danger"
+          tone="rose"
+          subtext={
+            allRows.filter((r) => r.status === 'OUT').length > 0
+              ? 'Urgent attention required'
+              : 'Zero depleted items'
+          }
         />
         <Kpi
-          label="Cost per wash"
+          label="COST PER WASH"
           value={
             consumption.length
               ? `₹${(
                   consumption.reduce((s, c) => s + c.goodsCost, 0) /
-                  Math.max(1, consumption.reduce((s, c) => s + c.washes, 0))
+                  Math.max(
+                    1,
+                    consumption.reduce((s, c) => s + c.washes, 0),
+                  )
                 ).toFixed(2)}`
               : '—'
           }
+          tone="sky"
+          subtext="Average goods burn"
         />
       </KpiGrid>
 

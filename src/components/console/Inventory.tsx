@@ -66,31 +66,46 @@ export async function ConsoleInventory({ session }: { session: Session }) {
         description="Stock, usage and purchase requests"
       />
 
-      <KpiGrid>
-        <Kpi label="Items tracked" value={items.length} />
+      <KpiGrid columns={6}>
         <Kpi
-          label="Out of stock"
+          label="ITEMS TRACKED"
+          value={items.length}
+          tone="blue"
+          subtext="Active inventory catalog"
+        />
+        <Kpi
+          label="OUT OF STOCK"
           value={allRows.filter((r) => r.status === 'OUT').length}
-          tone="danger"
+          tone="rose"
+          subtext={
+            allRows.filter((r) => r.status === 'OUT').length > 0
+              ? 'Replenish immediately'
+              : 'All items stocked'
+          }
         />
         <Kpi
-          label="Order now"
+          label="ORDER NOW"
           value={allRows.filter((r) => r.status === 'CRITICAL').length}
-          tone="danger"
+          tone="rose"
+          subtext="Below safety stock"
         />
         <Kpi
-          label="Low"
+          label="LOW STOCK"
           value={allRows.filter((r) => r.status === 'LOW').length}
-          tone="gold"
+          tone="amber"
+          subtext="Approaching reorder point"
         />
         <Kpi
-          label="Stock value"
+          label="STOCK VALUE"
           value={money(allRows.reduce((sum, r) => sum + r.value, 0))}
+          tone="purple"
+          subtext="Total assets on hand"
         />
         <Kpi
-          label="Open requests"
+          label="OPEN REQUESTS"
           value={requests.filter((r) => r.status === 'PENDING').length}
-          tone="gold"
+          tone="amber"
+          subtext="Awaiting purchase review"
         />
       </KpiGrid>
 

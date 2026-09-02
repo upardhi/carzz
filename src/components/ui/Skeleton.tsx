@@ -34,20 +34,26 @@ export function PageHeaderSkeleton() {
 /* KPI Grid                                                                    */
 /* -------------------------------------------------------------------------- */
 
-/** Matches a single <Kpi> tile. */
+/** Matches a single <StatCard> / <Kpi> tile. */
 export function KpiSkeleton() {
   return (
-    <div className="rounded-card border border-line bg-white px-3 py-2.5 shadow-card">
-      <Skeleton className="mb-1.5 h-2.5 w-16" />
-      <Skeleton className="mt-1 h-6 w-20" />
+    <div className="flex flex-col justify-between rounded-2xl border border-line-soft bg-white p-4 shadow-sm">
+      <div className="flex items-center gap-3">
+        <Skeleton className="h-10 w-10 shrink-0 rounded-xl" />
+        <div className="min-w-0 flex-1 space-y-1.5">
+          <Skeleton className="h-2.5 w-16" />
+          <Skeleton className="h-6 w-20" />
+        </div>
+      </div>
+      <Skeleton className="mt-2 h-2.5 w-24" />
     </div>
   );
 }
 
-/** Matches the full <KpiGrid> — six tiles by default. */
+/** Matches the full <KpiGrid> / <StatGrid> — six tiles by default. */
 export function KpiGridSkeleton({ count = 6 }: { count?: number }) {
   return (
-    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+    <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-6">
       {Array.from({ length: count }).map((_, i) => (
         <KpiSkeleton key={i} />
       ))}

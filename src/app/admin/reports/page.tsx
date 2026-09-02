@@ -66,16 +66,43 @@ export default async function AdminReports() {
     <>
       <PageHeader title="Reports" description={cycleLabel(cycle)} />
 
-      <KpiGrid>
-        <Kpi label="Billed" value={money(summary.billed)} />
-        <Kpi label="Collected" value={money(summary.collected)} tone="success" />
+      <KpiGrid columns={6}>
         <Kpi
-          label="Collection rate"
-          value={percent(summary.billed ? summary.collected / summary.billed : 0)}
+          label="TOTAL BILLED"
+          value={money(summary.billed)}
+          tone="blue"
+          subtext="Invoiced this month"
         />
-        <Kpi label="Washes done" value={summary.washesDone} />
-        <Kpi label="Washes missed" value={missed.total} tone="gold" />
-        <Kpi label="Customers lost" value={lost.length} tone="danger" />
+        <Kpi
+          label="COLLECTED"
+          value={money(summary.collected)}
+          tone="emerald"
+          subtext="Total cash received"
+        />
+        <Kpi
+          label="COLLECTION RATE"
+          value={percent(summary.billed ? summary.collected / summary.billed : 0)}
+          tone={summary.billed && summary.collected / summary.billed < 0.8 ? 'amber' : 'emerald'}
+          subtext={summary.billed && summary.collected / summary.billed >= 0.8 ? 'Healthy collection' : 'Action needed'}
+        />
+        <Kpi
+          label="WASHES DONE"
+          value={summary.washesDone}
+          tone="purple"
+          subtext="Across all areas"
+        />
+        <Kpi
+          label="WASHES MISSED"
+          value={missed.total}
+          tone="amber"
+          subtext="Carried over"
+        />
+        <Kpi
+          label="CUSTOMERS LOST"
+          value={lost.length}
+          tone="rose"
+          subtext={lost.length > 0 ? `${lost.length} churned accounts` : 'Zero churn'}
+        />
       </KpiGrid>
 
       <div className="mt-4 grid gap-3 lg:grid-cols-2">

@@ -66,43 +66,130 @@ export function AddStaffForm({
     password.length >= 6;
 
   return (
-    <div>
-      <label className="field-label" htmlFor="st-name">Name</label>
-      <input id="st-name" className="field" value={name} onChange={(e) => setName(e.target.value)} />
+    <div className="space-y-3.5">
+      <div>
+        <label className="block text-[10px] font-extrabold uppercase tracking-wider text-ink-mute mb-1.5" htmlFor="st-name">
+          NAME
+        </label>
+        <input
+          id="st-name"
+          className="w-full rounded-xl border border-line bg-surface px-3.5 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-navy-500 focus:outline-none focus:ring-1 focus:ring-navy-500 transition-colors shadow-2xs"
+          placeholder="Enter full name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+      </div>
 
-      <label className="field-label mt-2" htmlFor="st-phone">Mobile</label>
-      <input id="st-phone" className="field" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
+      <div>
+        <label className="block text-[10px] font-extrabold uppercase tracking-wider text-ink-mute mb-1.5" htmlFor="st-phone">
+          MOBILE
+        </label>
+        <input
+          id="st-phone"
+          inputMode="tel"
+          className="w-full rounded-xl border border-line bg-surface px-3.5 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-navy-500 focus:outline-none focus:ring-1 focus:ring-navy-500 transition-colors shadow-2xs"
+          placeholder="Enter mobile number"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+        />
+      </div>
 
-      <label className="field-label mt-2" htmlFor="st-email">Login email</label>
-      <input id="st-email" className="field" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+      <div>
+        <label className="block text-[10px] font-extrabold uppercase tracking-wider text-ink-mute mb-1.5" htmlFor="st-email">
+          LOGIN EMAIL
+        </label>
+        <input
+          id="st-email"
+          inputMode="email"
+          className="w-full rounded-xl border border-line bg-surface px-3.5 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-navy-500 focus:outline-none focus:ring-1 focus:ring-navy-500 transition-colors shadow-2xs"
+          placeholder="Enter login email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+      </div>
 
-      <label className="field-label mt-2" htmlFor="st-pass">Starting password</label>
-      <input id="st-pass" className="field" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 6 characters" />
+      <div>
+        <label className="block text-[10px] font-extrabold uppercase tracking-wider text-ink-mute mb-1.5" htmlFor="st-pass">
+          STARTING PASSWORD
+        </label>
+        <input
+          id="st-pass"
+          className="w-full rounded-xl border border-line bg-surface px-3.5 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-navy-500 focus:outline-none focus:ring-1 focus:ring-navy-500 transition-colors shadow-2xs"
+          placeholder="At least 6 characters"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+      </div>
 
-      {areas.length > 1 ? (
-        <>
-          <label className="field-label mt-2" htmlFor="st-area">Area</label>
-          <select id="st-area" className="field" value={areaId} onChange={(e) => setAreaId(e.target.value)}>
+      <div>
+        <label className="block text-[10px] font-extrabold uppercase tracking-wider text-ink-mute mb-1.5" htmlFor="st-area">
+          AREA
+        </label>
+        <div className="relative">
+          <select
+            id="st-area"
+            className="w-full appearance-none rounded-xl border border-line bg-surface px-3.5 py-2 pr-9 text-sm font-medium text-ink focus:border-navy-500 focus:outline-none focus:ring-1 focus:ring-navy-500 transition-colors shadow-2xs"
+            value={areaId}
+            onChange={(e) => setAreaId(e.target.value)}
+          >
             {areas.map((a) => (
               <option key={a.id} value={a.id}>{a.name}</option>
             ))}
           </select>
-        </>
-      ) : null}
+          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-ink-faint">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </div>
+        </div>
+      </div>
 
-      <label className="field-label mt-2" htmlFor="st-ref">Referred by</label>
-      <select id="st-ref" className="field" value={referredByStaffId} onChange={(e) => setReferredByStaffId(e.target.value)}>
-        <option value="">Nobody</option>
-        {staff.map((s) => (
-          <option key={s.id} value={s.id}>
-            {s.name} ({money(referralBonus)} bonus)
-          </option>
-        ))}
-      </select>
+      <div>
+        <label className="block text-[10px] font-extrabold uppercase tracking-wider text-ink-mute mb-1.5" htmlFor="st-ref">
+          REFERRED BY
+        </label>
+        <div className="relative">
+          <select
+            id="st-ref"
+            className="w-full appearance-none rounded-xl border border-line bg-surface px-3.5 py-2 pr-9 text-sm font-medium text-ink focus:border-navy-500 focus:outline-none focus:ring-1 focus:ring-navy-500 transition-colors shadow-2xs"
+            value={referredByStaffId}
+            onChange={(e) => setReferredByStaffId(e.target.value)}
+          >
+            <option value="">Nobody</option>
+            {staff.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name} ({money(referralBonus)} bonus)
+              </option>
+            ))}
+          </select>
+          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-ink-faint">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </div>
+        </div>
+      </div>
 
-      <Button block className="mt-3" disabled={!valid || pending} onClick={submit}>
-        {pending ? 'Adding…' : 'Add wash boy'}
-      </Button>
+      <button
+        type="button"
+        disabled={!valid || pending}
+        onClick={submit}
+        className="w-full rounded-xl bg-navy-900 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-navy-800 disabled:opacity-50 transition-colors flex items-center justify-center gap-1.5"
+      >
+        {pending ? 'Adding…' : '+ Add wash boy'}
+      </button>
+
+      <div className="mt-3.5 flex items-start gap-2.5 rounded-xl border border-navy-100 bg-navy-50/70 p-3">
+        <div className="text-navy-600 shrink-0 mt-0.5">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 16v-4M12 8h.01" />
+          </svg>
+        </div>
+        <p className="text-xs font-medium text-navy-900 leading-relaxed">
+          An email with login details will be sent to the staff after creating the account.
+        </p>
+      </div>
 
       {state.ok ? (
         <div className="mt-2"><Note tone="success">{state.ok}</Note></div>

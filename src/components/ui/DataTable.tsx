@@ -14,6 +14,8 @@ export interface DataTableColumn<T> {
   render: (item: T, index: number) => ReactNode;
 }
 
+export type Column<T> = DataTableColumn<T>;
+
 export interface DataTableProps<T> {
   columns: DataTableColumn<T>[];
   data: T[];

@@ -48,20 +48,42 @@ export default async function AdminPayout({
         description={`${cycleLabel(cycle)} · the system calculates, you approve`}
       />
 
-      <KpiGrid>
-        <Kpi label="Staff" value={payouts.length} />
-        <Kpi label="Total payable" value={money(total)} />
+      <KpiGrid columns={6}>
         <Kpi
-          label="Awaiting you"
-          value={pending.length}
-          tone={pending.length ? 'danger' : 'success'}
+          label="STAFF COUNT"
+          value={payouts.length}
+          tone="purple"
+          subtext="Employees on payroll"
         />
-        <Kpi label="Approved" value={approved.length} tone="success" />
-        <Kpi label="Washes" value={payouts.reduce((s, p) => s + p.washes, 0)} />
         <Kpi
-          label="Deductions"
+          label="TOTAL PAYABLE"
+          value={money(total)}
+          tone="blue"
+          subtext="Net payout this cycle"
+        />
+        <Kpi
+          label="AWAITING APPROVAL"
+          value={pending.length}
+          tone={pending.length ? 'rose' : 'emerald'}
+          subtext={pending.length ? `${pending.length} need owner signoff` : 'All approved'}
+        />
+        <Kpi
+          label="APPROVED"
+          value={approved.length}
+          tone="emerald"
+          subtext="Ready for disbursement"
+        />
+        <Kpi
+          label="WASHES DONE"
+          value={payouts.reduce((s, p) => s + p.washes, 0)}
+          tone="sky"
+          subtext="Billable wash units"
+        />
+        <Kpi
+          label="DEDUCTIONS"
           value={money(payouts.reduce((s, p) => s + p.deductions, 0))}
-          tone="gold"
+          tone="amber"
+          subtext="Absence & flags"
         />
       </KpiGrid>
 

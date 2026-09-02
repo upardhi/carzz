@@ -4,7 +4,7 @@ import { scopeAreaFilter } from '@/lib/auth/rbac';
 import type { Session } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { LEAD_SOURCES, type Car, type Customer, type CustomerStatus } from '@/lib/data/types';
-import { currentCycle, formatTime, money } from '@/lib/util/format';
+import { currentCycle, formatTime, money, moneyShort } from '@/lib/util/format';
 import { LEAD_SOURCE_LABEL, PATTERN_SHORT } from '@/lib/util/labels';
 import {
   IconCalendar,
@@ -22,6 +22,7 @@ import {
 } from '@/components/shell/icons';
 import { Filters, PageSizeSelect } from './Filters';
 import { DataTable } from '@/components/ui/DataTable';
+import { StatCard, StatGrid } from '@/components/ui/StatCard';
 
 const AVATAR_PALETTES = [
   { bg: 'bg-[#EFF6FF]', text: 'text-[#2563EB]' }, // soft blue
@@ -238,99 +239,46 @@ export async function ConsoleCustomers({
         </Link>
       </div>
 
-      {/* 6 Dynamic KPI Stat Cards */}
-      <div className="my-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
-        {/* TOTAL */}
-        <div className="flex items-center gap-3 rounded-xl border border-slate-200/70 bg-white p-3.5 shadow-xs">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#EFF6FF] text-[#2563EB]">
-            <IconUsers width={20} height={20} />
-          </div>
-          <div className="min-w-0">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">TOTAL</div>
-            <div className="mt-0.5 text-xl sm:text-2xl font-black text-slate-900 leading-tight tracking-tight">
-              {totalCustomers}
-            </div>
-            <div className="truncate text-[11px] font-medium text-slate-400">All customers</div>
-          </div>
-        </div>
-
-        {/* ACTIVE */}
-        <div className="flex items-center gap-3 rounded-xl border border-slate-200/70 bg-white p-3.5 shadow-xs">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ECFDF5] text-[#10B981]">
-            <IconUser width={20} height={20} />
-          </div>
-          <div className="min-w-0">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">ACTIVE</div>
-            <div className="mt-0.5 text-xl sm:text-2xl font-black text-slate-900 leading-tight tracking-tight">
-              {activeCustomers}
-            </div>
-            <div className="truncate text-[11px] font-semibold text-emerald-600">
-              {activePercent}% of total
-            </div>
-          </div>
-        </div>
-
-        {/* ON HOLD */}
-        <div className="flex items-center gap-3 rounded-xl border border-slate-200/70 bg-white p-3.5 shadow-xs">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#FFF7ED] text-[#F97316]">
-            <IconClock width={20} height={20} />
-          </div>
-          <div className="min-w-0">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">ON HOLD</div>
-            <div className="mt-0.5 text-xl sm:text-2xl font-black text-slate-900 leading-tight tracking-tight">
-              {holdCustomers}
-            </div>
-            <div className="truncate text-[11px] font-semibold text-amber-600">
-              {holdPercent}% of total
-            </div>
-          </div>
-        </div>
-
-        {/* INACTIVE */}
-        <div className="flex items-center gap-3 rounded-xl border border-slate-200/70 bg-white p-3.5 shadow-xs">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#F5F3FF] text-[#8B5CF6]">
-            <IconUserX width={20} height={20} />
-          </div>
-          <div className="min-w-0">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">INACTIVE</div>
-            <div className="mt-0.5 text-xl sm:text-2xl font-black text-slate-900 leading-tight tracking-tight">
-              {inactiveCustomers}
-            </div>
-            <div className="truncate text-[11px] font-semibold text-purple-600">
-              {inactivePercent}% of total
-            </div>
-          </div>
-        </div>
-
-        {/* CARS */}
-        <div className="flex items-center gap-3 rounded-xl border border-slate-200/70 bg-white p-3.5 shadow-xs">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#EFF6FF] text-[#3B82F6]">
-            <IconCar width={20} height={20} />
-          </div>
-          <div className="min-w-0">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">CARS</div>
-            <div className="mt-0.5 text-xl sm:text-2xl font-black text-slate-900 leading-tight tracking-tight">
-              {totalCarsCount}
-            </div>
-            <div className="truncate text-[11px] font-medium text-slate-400">Total cars</div>
-          </div>
-        </div>
-
-        {/* UNPAID THIS MONTH */}
-        <div className="flex items-center gap-3 rounded-xl border border-slate-200/70 bg-white p-3.5 shadow-xs">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#FFF7ED] text-[#F97316]">
-            <IconRupee width={20} height={20} />
-          </div>
-          <div className="min-w-0">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">UNPAID THIS MONTH</div>
-            <div className="mt-0.5 text-xl sm:text-2xl font-black text-slate-900 leading-tight tracking-tight">
-              {unpaidCount}
-            </div>
-            <div className="truncate text-[11px] font-semibold text-amber-600">
-              {money(unpaidAmount)}
-            </div>
-          </div>
-        </div>
+      {/* 6 Reusable KPI Stat Cards */}
+      <div className="my-6">
+        <StatGrid columns={6}>
+          <StatCard
+            label="TOTAL"
+            value={totalCustomers}
+            tone="purple"
+            subtext="All customers"
+          />
+          <StatCard
+            label="ACTIVE"
+            value={activeCustomers}
+            tone="emerald"
+            subtext={`${activePercent}% of total`}
+          />
+          <StatCard
+            label="ON HOLD"
+            value={holdCustomers}
+            tone="amber"
+            subtext={`${holdPercent}% of total`}
+          />
+          <StatCard
+            label="INACTIVE"
+            value={inactiveCustomers}
+            tone="slate"
+            subtext={`${inactivePercent}% of total`}
+          />
+          <StatCard
+            label="CARS"
+            value={totalCarsCount}
+            tone="blue"
+            subtext="Total cars"
+          />
+          <StatCard
+            label="UNPAID THIS MONTH"
+            value={unpaidCount}
+            tone="amber"
+            subtext={money(unpaidAmount)}
+          />
+        </StatGrid>
       </div>
 
       {/* Filter and Search Bar */}

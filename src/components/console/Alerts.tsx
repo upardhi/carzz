@@ -40,14 +40,30 @@ export async function ConsoleAlerts({
         description="Customers the system has flagged for payment"
       />
 
-      <KpiGrid>
-        <Kpi label="Customers" value={alerts.length} tone={alerts.length ? 'danger' : 'success'} />
-        <Kpi label="Outstanding" value={money(total)} tone={total ? 'gold' : 'success'} />
-        <Kpi label="Over 14 days" value={severe.length} tone={severe.length ? 'danger' : 'default'} />
+      <KpiGrid columns={4}>
         <Kpi
-          label="Worst"
-          value={alerts.length ? `${alerts[0].daysOverdue}d` : '—'}
-          tone={alerts.length ? 'danger' : 'default'}
+          label="ACCOUNTS FLAGGED"
+          value={alerts.length}
+          tone={alerts.length ? 'rose' : 'emerald'}
+          subtext={alerts.length ? 'Need payment follow-up' : 'All accounts clean'}
+        />
+        <Kpi
+          label="OUTSTANDING"
+          value={money(total)}
+          tone={total ? 'amber' : 'emerald'}
+          subtext="Total overdue balance"
+        />
+        <Kpi
+          label="OVER 14 DAYS"
+          value={severe.length}
+          tone={severe.length ? 'rose' : 'slate'}
+          subtext="Critical payment delay"
+        />
+        <Kpi
+          label="LONGEST OVERDUE"
+          value={alerts.length ? `${alerts[0].daysOverdue} days` : '—'}
+          tone={alerts.length ? 'rose' : 'slate'}
+          subtext="Oldest unpaid account"
         />
       </KpiGrid>
 

@@ -1,6 +1,7 @@
 import clsx from 'clsx';
 import Link from 'next/link';
 import type { ComponentProps, ReactNode } from 'react';
+import { StatCard, StatGrid, type StatTone, type SubtextTone } from './StatCard';
 
 /* -------------------------------------------------------------------------- */
 /* Card                                                                       */
@@ -154,7 +155,7 @@ export function Tag({
 /* Buttons                                                                    */
 /* -------------------------------------------------------------------------- */
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'gold';
+type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'gold' | 'success';
 type ButtonSize = 'sm' | 'md' | 'lg';
 
 const VARIANTS: Record<ButtonVariant, string> = {
@@ -162,8 +163,9 @@ const VARIANTS: Record<ButtonVariant, string> = {
   secondary:
     'bg-white text-navy-800 border border-line-strong hover:bg-surface-muted disabled:text-ink-faint',
   ghost: 'text-navy-800 hover:bg-navy-50 disabled:text-ink-faint',
-  danger: 'bg-danger-500 text-white hover:bg-danger-600 disabled:bg-line-strong',
+  danger: 'bg-danger-600 text-white hover:bg-danger-700 disabled:bg-line-strong',
   gold: 'bg-gold-500 text-white hover:bg-gold-600 disabled:bg-line-strong',
+  success: 'bg-success-600 text-white hover:bg-success-700 disabled:bg-line-strong',
 };
 
 const SIZES: Record<ButtonSize, string> = {
@@ -285,43 +287,54 @@ export function EmptyState({
   );
 }
 
-/** KPI tile grid used across every console dashboard. */
-export function KpiGrid({ children }: { children: ReactNode }) {
+/** KPI tile grid used across every console dashboard — renders modern StatGrid */
+export function KpiGrid({
+  children,
+  columns = 6,
+  className,
+}: {
+  children: ReactNode;
+  columns?: 2 | 3 | 4 | 5 | 6;
+  className?: string;
+}) {
   return (
-    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+    <StatGrid columns={columns} className={className}>
       {children}
-    </div>
+    </StatGrid>
   );
 }
 
+/** Modern KPI metric card with icon box, value, and dynamic subtext */
 export function Kpi({
   label,
   value,
   tone = 'default',
   hint,
+  icon,
+  subtext,
+  subtextTone,
+  className,
 }: {
   label: string;
   value: ReactNode;
-  tone?: 'default' | 'brand' | 'success' | 'gold' | 'danger';
-  hint?: string;
+  tone?: 'default' | 'brand' | 'success' | 'gold' | 'danger' | StatTone;
+  hint?: ReactNode;
+  icon?: ReactNode;
+  subtext?: ReactNode;
+  subtextTone?: SubtextTone;
+  className?: string;
 }) {
-  const TONE = {
-    default: 'text-ink',
-    brand: 'text-navy-800',
-    success: 'text-success-600',
-    gold: 'text-gold-600',
-    danger: 'text-danger-500',
-  };
   return (
-    <div className="rounded-card border border-line bg-white px-3 py-2.5 shadow-card">
-      <div className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">
-        {label}
-      </div>
-      <div className={clsx('mt-0.5 text-xl font-extrabold tracking-tight', TONE[tone])}>
-        {value}
-      </div>
-      {hint ? <div className="text-[11px] text-ink-faint">{hint}</div> : null}
-    </div>
+    <StatCard
+      label={label}
+      value={value}
+      tone={tone as StatTone}
+      hint={hint}
+      subtext={subtext}
+      subtextTone={subtextTone}
+      icon={icon}
+      className={className}
+    />
   );
 }
 

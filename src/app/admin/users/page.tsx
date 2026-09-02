@@ -45,13 +45,24 @@ export default async function AdminUsers() {
         description="Who exists, and what each of them can reach"
       />
 
-      <KpiGrid>
+      <KpiGrid columns={5}>
         {ROLES.map((role) => (
           <Kpi
             key={role}
-            label={ROLE_LABEL[role]}
+            label={ROLE_LABEL[role].toUpperCase()}
             value={countByRole.get(role) ?? 0}
-            hint={role === 'CUSTOMER' ? 'app logins' : undefined}
+            tone={
+              role === 'SUPER_ADMIN'
+                ? 'purple'
+                : role === 'AREA_ADMIN'
+                  ? 'blue'
+                  : role === 'MANAGER'
+                    ? 'sky'
+                    : role === 'EMPLOYEE'
+                      ? 'emerald'
+                      : 'slate'
+            }
+            subtext={role === 'CUSTOMER' ? 'Mobile app logins' : `${ROLE_LABEL[role]} accounts`}
           />
         ))}
       </KpiGrid>
