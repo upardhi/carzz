@@ -91,7 +91,10 @@ export async function getStore(): Promise<DataStore> {
       };
 
       if (!globalForPrisma.__carzzPrisma) {
-        const connectionString = requireEnv('DATABASE_URL');
+        let connectionString = requireEnv('DATABASE_URL');
+        if (connectionString.includes('sslmode=require') && !connectionString.includes('uselibpqcompat=true')) {
+          connectionString = connectionString.replace('sslmode=require', 'sslmode=verify-full');
+        }
         let adapter: unknown;
         if (Pool) {
           globalForPrisma.__carzzPgPool ??= new Pool({

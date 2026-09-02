@@ -11,11 +11,14 @@ import { PrismaClient } from '@prisma/client';
  * DDL — the two workloads a connection pooler handles worst.
  */
 export function createPrismaClient(): PrismaClient {
-  const connectionString = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
+  let connectionString = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
   if (!connectionString) {
     throw new Error(
       'Set DATABASE_URL (and DIRECT_URL, if your host has a pooler) first.',
     );
+  }
+  if (connectionString.includes('sslmode=require') && !connectionString.includes('uselibpqcompat=true')) {
+    connectionString = connectionString.replace('sslmode=require', 'sslmode=verify-full');
   }
   return new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
 }
