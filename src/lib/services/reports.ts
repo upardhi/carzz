@@ -92,7 +92,7 @@ async function _computeAreaPerformance(
   const areaFilter = areaIds ? { areaId: { in: areaIds } } : {};
   const skipExtra = options?.skipPayoutsAndGoods === true;
 
-  // Single batch parallelization: fetch all areas, payouts, items, customers, staff, visits, invoices, complaints, stock issues concurrently!
+  // Single batch parallelization: fetch all areas, payouts, items, customers, staff, visits, invoices, complaints, stock issues, and cars concurrently!
   const [
     allAreas,
     payouts,
@@ -103,6 +103,7 @@ async function _computeAreaPerformance(
     allInvoices,
     allComplaints,
     allStockIssues,
+    allActiveCars,
   ] = await Promise.all([
     store.areas.find({
       where: (areaIds ? { id: { in: areaIds } } : undefined) as never,
@@ -120,26 +121,21 @@ async function _computeAreaPerformance(
       where: { status: { in: ['OPEN', 'ESCALATED'] }, ...areaFilter } as never,
     }),
     skipExtra ? Promise.resolve([]) : store.stockIssues.find({ where: areaFilter as never }),
+    skipExtra ? Promise.resolve([]) : store.cars.find({ where: { active: true } }),
   ]);
 
   if (allAreas.length === 0) return [];
   const areas = areaIds ? allAreas.filter((a) => areaIds.includes(a.id)) : allAreas;
   if (areas.length === 0) return [];
 
-  const customerIds = allCustomers.map((c) => c.id);
-  const allCars = skipExtra
-    ? []
-    : areaIds
-      ? customerIds.length
-        ? await store.cars.find({
-            where: { active: true, customerId: { in: customerIds } } as never,
-          })
-        : []
-      : await store.cars.find({ where: { active: true } });
+  const customerIdSet = new Set(allCustomers.map((c) => c.id));
+  const scopedCars = areaIds
+    ? allActiveCars.filter((car) => customerIdSet.has(car.customerId))
+    : allActiveCars;
 
   const itemCost = new Map(items.map((i) => [i.id, i]));
   const carsByCustomer = new Map<Id, number>();
-  for (const car of allCars) {
+  for (const car of scopedCars) {
     carsByCustomer.set(car.customerId, (carsByCustomer.get(car.customerId) ?? 0) + 1);
   }
 

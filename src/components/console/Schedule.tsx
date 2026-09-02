@@ -21,7 +21,8 @@ export async function ConsoleSchedule({
   const date = searchParams.date ?? todayISO();
   const areaFilter = scopeAreaFilter(session.scope);
 
-  const [visits, staff, areas] = await Promise.all([
+  // Single batch parallelization: fetch visits, staff, areas, attendance, customers, and active cars concurrently!
+  const [visits, staff, areas, attendance, customers, cars] = await Promise.all([
     store.visits.find({
       where: { scheduledDate: date, ...areaFilter } as never,
       orderBy: [{ field: 'scheduledTime' }],
@@ -30,17 +31,9 @@ export async function ConsoleSchedule({
       where: { role: 'EMPLOYEE', active: true, ...areaFilter } as never,
     }),
     store.areas.find(),
-  ]);
-
-  const customerIds = [...new Set(visits.map((v) => v.customerId))];
-  const carIds = [...new Set(visits.map((v) => v.carId))];
-  const [customers, cars] = await Promise.all([
-    customerIds.length
-      ? store.customers.find({ where: { id: { in: customerIds } } as never })
-      : [],
-    carIds.length
-      ? store.cars.find({ where: { id: { in: carIds } } as never })
-      : [],
+    store.attendance.find({ where: { date } }),
+    store.customers.find({ where: areaFilter as never }),
+    store.cars.find({ where: { active: true } }),
   ]);
 
   const customerById = new Map(customers.map((c) => [c.id, c]));
@@ -49,7 +42,6 @@ export async function ConsoleSchedule({
   const areaById = new Map(areas.map((a) => [a.id, a]));
 
   const unassigned = visits.filter((v) => !v.staffId && v.status === 'PENDING');
-  const attendance = await store.attendance.find({ where: { date } });
   const absent = staff.filter((s) => {
     const record = attendance.find((a) => a.staffId === s.id);
     return !record?.loginAt && record?.status !== 'PRESENT';
