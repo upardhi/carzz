@@ -16,7 +16,11 @@ export type DataProvider = 'memory' | 'prisma' | 'firebase';
  * The adapters are imported lazily so the app boots on `memory` without
  * `@prisma/client` or `firebase-admin` present.
  */
-const globalForStore = globalThis as unknown as { __carzzStore?: DataStore };
+const globalForStore = globalThis as unknown as {
+  __carzzStore?: DataStore;
+  __carzzPrisma?: unknown;
+  __carzzPgPool?: unknown;
+};
 
 export async function getStore(): Promise<DataStore> {
   if (globalForStore.__carzzStore) return globalForStore.__carzzStore;
@@ -85,35 +89,37 @@ export async function getStore(): Promise<DataStore> {
       // One client and one connection pool per process, reused across requests.
       // Passing an explicit pg.Pool instance keeps connections warm and avoids
       // destroying and recreating sockets on every query.
-      const globalForPrisma = globalThis as unknown as {
-        __carzzPrisma?: unknown;
-        __carzzPgPool?: unknown;
-      };
-
-      if (!globalForPrisma.__carzzPrisma) {
+      if (!globalForStore.__carzzPrisma) {
         let connectionString = requireEnv('DATABASE_URL');
         if (connectionString.includes('sslmode=require') && !connectionString.includes('uselibpqcompat=true')) {
           connectionString = connectionString.replace('sslmode=require', 'sslmode=verify-full');
         }
         let adapter: unknown;
         if (Pool) {
-          globalForPrisma.__carzzPgPool ??= new Pool({
+          const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+          const maxConnections = process.env.DB_POOL_MAX
+            ? parseInt(process.env.DB_POOL_MAX, 10)
+            : (isServerless ? 1 : 3);
+
+          globalForStore.__carzzPgPool ??= new Pool({
             connectionString,
-            max: 20,
-            idleTimeoutMillis: 30000,
+            max: maxConnections,
+            idleTimeoutMillis: 5000,
+            connectionTimeoutMillis: 8000,
+            allowExitOnIdle: true,
           });
-          adapter = new PrismaPg(globalForPrisma.__carzzPgPool);
+          adapter = new PrismaPg(globalForStore.__carzzPgPool);
         } else {
           adapter = new PrismaPg({ connectionString });
         }
 
-        globalForPrisma.__carzzPrisma = new PrismaClient({
+        globalForStore.__carzzPrisma = new PrismaClient({
           adapter,
           log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
         });
       }
 
-      store = new PrismaStore(globalForPrisma.__carzzPrisma as never);
+      store = new PrismaStore(globalForStore.__carzzPrisma as never);
       break;
     }
 
