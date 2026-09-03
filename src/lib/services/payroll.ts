@@ -2,41 +2,38 @@ import 'server-only';
 
 import type { DataStore } from '../data/ports/store';
 import type {
+  Attendance,
   Id,
   PayoutLine,
   PayoutSettings,
+  PocketMoneyRequest,
   Rupees,
+  Staff,
   StaffPayout,
+  WashVisit,
 } from '../data/types';
 
-/**
- * Computes one wash boy's pay for a cycle, line by line.
- *
- * Every figure is derived from recorded events — completed visits, ratings,
- * attendance, pocket withdrawals — so a disputed payslip can always be traced
- * back to the day it came from. Nothing here writes; approval is a separate,
- * deliberate step by the Super Admin.
- */
-export async function computePayout(
-  store: DataStore,
-  staffId: Id,
-  cycle: string,
-  settings?: PayoutSettings,
-): Promise<StaffPayout> {
-  const rules = settings ?? (await store.getPayoutSettings());
-  const staff = await store.staff.get(staffId);
-  if (!staff) throw new Error(`Staff ${staffId} not found`);
-
-  const [visits, attendance, pocket, referredStaff, existing] = await Promise.all([
-    store.visits.find({ where: { staffId, cycle, status: 'DONE' } }),
-    store.attendance.find({ where: { staffId } }),
-    store.pocketRequests.find({
-      where: { staffId, status: { in: ['APPROVED', 'PAID'] } } as never,
-    }),
-    store.staff.find({ where: { referredByStaffId: staffId } }),
-    store.payouts.findOne({ where: { staffId, cycle } }),
-  ]);
-
+function calculatePayoutRecord({
+  staff,
+  rules,
+  cycle,
+  visits,
+  attendance,
+  pocket,
+  referredStaff,
+  carsReferred,
+  existing,
+}: {
+  staff: Staff;
+  rules: PayoutSettings;
+  cycle: string;
+  visits: WashVisit[];
+  attendance: Attendance[];
+  pocket: PocketMoneyRequest[];
+  referredStaff: Staff[];
+  carsReferred: number;
+  existing: StaffPayout | null;
+}): StaffPayout {
   /* --- base pay, by whichever rule the owner has set --- */
   let base = 0;
   if (rules.baseMode === 'DAY_SLAB') {
@@ -66,10 +63,6 @@ export async function computePayout(
   /* --- referrals --- */
   const cycleStart = `${cycle}-01`;
   const cycleEnd = `${cycle}-31`;
-  const carsReferred = await store.customers.count({
-    referredById: staffId,
-    joinedOn: { gte: cycleStart, lte: cycleEnd },
-  } as never);
   const staffReferred = referredStaff.filter(
     (s) => s.joinedOn >= cycleStart && s.joinedOn <= cycleEnd,
   ).length;
@@ -170,8 +163,8 @@ export async function computePayout(
   const net = base + bonuses + referrals - deductions - pocketTaken;
 
   return {
-    id: existing?.id ?? `pyt_${staffId}_${cycle}`,
-    staffId,
+    id: existing?.id ?? `pyt_${staff.id}_${cycle}`,
+    staffId: staff.id,
     areaId: staff.areaId,
     cycle,
     washes: visits.length,
@@ -188,24 +181,221 @@ export async function computePayout(
   };
 }
 
+/**
+ * Computes one wash boy's pay for a cycle, line by line.
+ *
+ * Every figure is derived from recorded events — completed visits, ratings,
+ * attendance, pocket withdrawals — so a disputed payslip can always be traced
+ * back to the day it came from. Nothing here writes; approval is a separate,
+ * deliberate step by the Super Admin.
+ */
+export async function computePayout(
+  store: DataStore,
+  staffId: Id,
+  cycle: string,
+  settings?: PayoutSettings,
+): Promise<StaffPayout> {
+  const rules = settings ?? (await store.getPayoutSettings());
+  const staff = await store.staff.get(staffId);
+  if (!staff) throw new Error(`Staff ${staffId} not found`);
+
+  const cycleStart = `${cycle}-01`;
+  const cycleEnd = `${cycle}-31`;
+
+  const [visits, attendance, pocket, referredStaff, carsReferred, existing] =
+    await Promise.all([
+      store.visits.find({ where: { staffId, cycle, status: 'DONE' } }),
+      store.attendance.find({ where: { staffId } }),
+      store.pocketRequests.find({
+        where: { staffId, status: { in: ['APPROVED', 'PAID'] } } as never,
+      }),
+      store.staff.find({ where: { referredByStaffId: staffId } }),
+      store.customers.count({
+        referredById: staffId,
+        joinedOn: { gte: cycleStart, lte: cycleEnd },
+      } as never),
+      store.payouts.findOne({ where: { staffId, cycle } }),
+    ]);
+
+  return calculatePayoutRecord({
+    staff,
+    rules,
+    cycle,
+    visits,
+    attendance,
+    pocket,
+    referredStaff,
+    carsReferred,
+    existing,
+  });
+}
+
+interface PayoutRunCacheEntry {
+  data: Promise<StaffPayout[]>;
+  expires: number;
+}
+
+const payoutRunCache: Map<string, PayoutRunCacheEntry> =
+  ((globalThis as unknown as { __payoutRunCache?: Map<string, PayoutRunCacheEntry> })
+    .__payoutRunCache ??= new Map());
+
+export function invalidatePayoutRunCache(): void {
+  payoutRunCache.clear();
+}
+
 /** Every employee's payout for a cycle, within an access scope. */
-export async function computePayoutRun(
+export function computePayoutRun(
   store: DataStore,
   cycle: string,
   areaIds: Id[] | null,
 ): Promise<StaffPayout[]> {
-  const settings = await store.getPayoutSettings();
-  const staff = await store.staff.find({
-    where: {
-      role: 'EMPLOYEE',
-      active: true,
-      ...(areaIds ? { areaId: { in: areaIds } } : {}),
-    } as never,
+  const cacheKey = `${cycle}:${areaIds ? areaIds.slice().sort().join(',') : 'all'}`;
+  const now = Date.now();
+  const cached = payoutRunCache.get(cacheKey);
+  if (cached && cached.expires > now) {
+    return cached.data;
+  }
+
+  const promise = _computePayoutRunInternal(store, cycle, areaIds).catch((err) => {
+    payoutRunCache.delete(cacheKey);
+    throw err;
   });
 
-  const payouts = await Promise.all(
-    staff.map((s) => computePayout(store, s.id, cycle, settings)),
+  payoutRunCache.set(cacheKey, {
+    data: promise,
+    expires: now + 60_000,
+  });
+
+  return promise;
+}
+
+async function _computePayoutRunInternal(
+  store: DataStore,
+  cycle: string,
+  areaIds: Id[] | null,
+): Promise<StaffPayout[]> {
+  const [settings, staff] = await Promise.all([
+    store.getPayoutSettings(),
+    store.staff.find({
+      where: {
+        role: 'EMPLOYEE',
+        active: true,
+        ...(areaIds ? { areaId: { in: areaIds } } : {}),
+      } as never,
+    }),
+  ]);
+
+  if (staff.length === 0) return [];
+
+  const staffIds = staff.map((s) => s.id);
+  const cycleStart = `${cycle}-01`;
+  const cycleEnd = `${cycle}-31`;
+
+  // Bulk queries: instead of N queries x 7 tables, fetch the batch once.
+  const [
+    allVisits,
+    allAttendance,
+    allPocket,
+    allReferredStaff,
+    allReferredCustomers,
+    allExisting,
+  ] = await Promise.all([
+    store.visits.find({
+      where: {
+        staffId: { in: staffIds },
+        cycle,
+        status: 'DONE',
+      } as never,
+    }),
+    store.attendance.find({
+      where: {
+        staffId: { in: staffIds },
+        date: { gte: cycleStart, lte: cycleEnd },
+      } as never,
+    }),
+    store.pocketRequests.find({
+      where: {
+        staffId: { in: staffIds },
+        status: { in: ['APPROVED', 'PAID'] },
+      } as never,
+    }),
+    store.staff.find({
+      where: {
+        referredByStaffId: { in: staffIds },
+      } as never,
+    }),
+    store.customers.find({
+      where: {
+        referredById: { in: staffIds },
+        joinedOn: { gte: cycleStart, lte: cycleEnd },
+      } as never,
+    }),
+    store.payouts.find({
+      where: {
+        staffId: { in: staffIds },
+        cycle,
+      } as never,
+    }),
+  ]);
+
+  // Group into memory Maps for instant lookup
+  const visitsByStaff = new Map<Id, WashVisit[]>();
+  for (const v of allVisits) {
+    if (!v.staffId) continue;
+    const list = visitsByStaff.get(v.staffId) ?? [];
+    list.push(v);
+    visitsByStaff.set(v.staffId, list);
+  }
+
+  const attendanceByStaff = new Map<Id, Attendance[]>();
+  for (const a of allAttendance) {
+    const list = attendanceByStaff.get(a.staffId) ?? [];
+    list.push(a);
+    attendanceByStaff.set(a.staffId, list);
+  }
+
+  const pocketByStaff = new Map<Id, PocketMoneyRequest[]>();
+  for (const p of allPocket) {
+    const list = pocketByStaff.get(p.staffId) ?? [];
+    list.push(p);
+    pocketByStaff.set(p.staffId, list);
+  }
+
+  const referredStaffByStaff = new Map<Id, Staff[]>();
+  for (const s of allReferredStaff) {
+    if (!s.referredByStaffId) continue;
+    const list = referredStaffByStaff.get(s.referredByStaffId) ?? [];
+    list.push(s);
+    referredStaffByStaff.set(s.referredByStaffId, list);
+  }
+
+  const carsReferredCountByStaff = new Map<Id, number>();
+  for (const c of allReferredCustomers) {
+    if (!c.referredById) continue;
+    carsReferredCountByStaff.set(
+      c.referredById,
+      (carsReferredCountByStaff.get(c.referredById) ?? 0) + 1,
+    );
+  }
+
+  const existingByStaff = new Map<Id, StaffPayout>(
+    allExisting.map((p) => [p.staffId, p]),
   );
+
+  const payouts = staff.map((s) =>
+    calculatePayoutRecord({
+      staff: s,
+      rules: settings,
+      cycle,
+      visits: visitsByStaff.get(s.id) ?? [],
+      attendance: attendanceByStaff.get(s.id) ?? [],
+      pocket: pocketByStaff.get(s.id) ?? [],
+      referredStaff: referredStaffByStaff.get(s.id) ?? [],
+      carsReferred: carsReferredCountByStaff.get(s.id) ?? 0,
+      existing: existingByStaff.get(s.id) ?? null,
+    }),
+  );
+
   return payouts.sort((a, b) => b.net - a.net);
 }
 
@@ -215,6 +405,7 @@ export async function approvePayout(
   payout: StaffPayout,
   approvedByUserId: Id,
 ): Promise<StaffPayout> {
+  invalidatePayoutRunCache();
   const record = {
     ...payout,
     status: 'APPROVED' as const,
@@ -253,9 +444,11 @@ export async function pocketAllowance(
   store: DataStore,
   staffId: Id,
   cycle: string,
+  precomputedPayout?: StaffPayout,
 ): Promise<PocketAllowance> {
   const rules = await store.getPayoutSettings();
-  const payout = await computePayout(store, staffId, cycle, rules);
+  const payout =
+    precomputedPayout ?? (await computePayout(store, staffId, cycle, rules));
 
   const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
   const requests = await store.pocketRequests.find({

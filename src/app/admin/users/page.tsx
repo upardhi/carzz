@@ -5,12 +5,9 @@ import {
   Kpi,
   KpiGrid,
   Note,
-  Table,
-  TableWrap,
   Tag,
-  Td,
-  Th,
 } from '@/components/ui/primitives';
+import { DataTable } from '@/components/ui/DataTable';
 import { ActionButton } from '@/components/console/ActionButton';
 import { requirePermission } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
@@ -48,88 +45,118 @@ export default async function AdminUsers() {
         description="Who exists, and what each of them can reach"
       />
 
-      <KpiGrid>
+      <KpiGrid columns={5}>
         {ROLES.map((role) => (
           <Kpi
             key={role}
-            label={ROLE_LABEL[role]}
+            label={ROLE_LABEL[role].toUpperCase()}
             value={countByRole.get(role) ?? 0}
-            hint={role === 'CUSTOMER' ? 'app logins' : undefined}
+            tone={
+              role === 'SUPER_ADMIN'
+                ? 'purple'
+                : role === 'AREA_ADMIN'
+                  ? 'blue'
+                  : role === 'MANAGER'
+                    ? 'sky'
+                    : role === 'EMPLOYEE'
+                      ? 'emerald'
+                      : 'slate'
+            }
+            subtext={role === 'CUSTOMER' ? 'Mobile app logins' : `${ROLE_LABEL[role]} accounts`}
           />
         ))}
       </KpiGrid>
 
       <div className="mt-4 grid gap-3 xl:grid-cols-[2fr_1fr]">
         <div>
-          <TableWrap>
-            <Table>
-              <thead>
-                <tr>
-                  <Th>Name</Th>
-                  <Th>Role</Th>
-                  <Th>Reaches</Th>
-                  <Th>Email</Th>
-                  <Th>Mobile</Th>
-                  <Th>Added</Th>
-                  <Th>Status</Th>
-                  <Th>Action</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {staffUsers.map((user) => (
-                  <tr key={user.id}>
-                    <Td className="font-bold">{user.name}</Td>
-                    <Td>
-                      <Tag tone={user.role === 'SUPER_ADMIN' ? 'info' : 'neutral'}>
-                        {ROLE_LABEL[user.role]}
-                      </Tag>
-                    </Td>
-                    <Td className="text-[12px] text-ink-mute">
-                      {user.role === 'SUPER_ADMIN'
-                        ? 'Every area'
-                        : user.regionId
-                          ? `${regionById.get(user.regionId)?.name ?? '—'} region`
-                          : user.areaId
-                            ? (areaById.get(user.areaId)?.name ?? '—')
-                            : '—'}
-                    </Td>
-                    <Td className="text-[12px] text-ink-mute">{user.email}</Td>
-                    <Td className="text-[12px] text-ink-mute">{user.phone}</Td>
-                    <Td className="whitespace-nowrap text-[12px] text-ink-mute">
-                      {formatDateFull(user.createdAt)}
-                    </Td>
-                    <Td>
-                      <Tag tone={user.active ? 'ok' : 'bad'}>
-                        {user.active ? 'Active' : 'Disabled'}
-                      </Tag>
-                    </Td>
-                    <Td>
-                      {user.id === session.user.id ? (
-                        <span className="text-[12px] text-ink-faint">You</span>
-                      ) : (
-                        <ActionButton
-                          endpoint="/api/admin/users"
-                          variant={user.active ? 'secondary' : 'primary'}
-                          payload={{
-                            action: 'setActive',
-                            userId: user.id,
-                            active: !user.active,
-                          }}
-                          confirm={
-                            user.active
-                              ? `Deactivate ${user.name}? Their login stops working immediately.`
-                              : undefined
-                          }
-                        >
-                          {user.active ? 'Deactivate' : 'Reactivate'}
-                        </ActionButton>
-                      )}
-                    </Td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          </TableWrap>
+          <DataTable<(typeof staffUsers)[number]>
+            data={staffUsers}
+            keyExtractor={(user) => user.id}
+            itemLabel="staff users"
+            emptyMessage="No staff users found."
+            columns={[
+              {
+                id: 'name',
+                header: 'NAME',
+                className: 'font-bold text-navy-950',
+                render: (user) => user.name,
+              },
+              {
+                id: 'role',
+                header: 'ROLE',
+                render: (user) => (
+                  <Tag tone={user.role === 'SUPER_ADMIN' ? 'info' : 'neutral'}>
+                    {ROLE_LABEL[user.role]}
+                  </Tag>
+                ),
+              },
+              {
+                id: 'reaches',
+                header: 'REACHES',
+                className: 'text-xs text-slate-500',
+                render: (user) =>
+                  user.role === 'SUPER_ADMIN'
+                    ? 'Every area'
+                    : user.regionId
+                      ? `${regionById.get(user.regionId)?.name ?? '—'} region`
+                      : user.areaId
+                        ? (areaById.get(user.areaId)?.name ?? '—')
+                        : '—',
+              },
+              {
+                id: 'email',
+                header: 'EMAIL',
+                className: 'text-xs text-slate-500',
+                render: (user) => user.email,
+              },
+              {
+                id: 'mobile',
+                header: 'MOBILE',
+                className: 'text-xs text-slate-500',
+                render: (user) => user.phone,
+              },
+              {
+                id: 'added',
+                header: 'ADDED',
+                className: 'whitespace-nowrap text-xs text-slate-500',
+                render: (user) => formatDateFull(user.createdAt),
+              },
+              {
+                id: 'status',
+                header: 'STATUS',
+                render: (user) => (
+                  <Tag tone={user.active ? 'ok' : 'bad'}>
+                    {user.active ? 'Active' : 'Disabled'}
+                  </Tag>
+                ),
+              },
+              {
+                id: 'action',
+                header: 'ACTION',
+                render: (user) =>
+                  user.id === session.user.id ? (
+                    <span className="text-xs text-slate-400">You</span>
+                  ) : (
+                    <ActionButton
+                      endpoint="/api/admin/users"
+                      variant={user.active ? 'secondary' : 'primary'}
+                      payload={{
+                        action: 'setActive',
+                        userId: user.id,
+                        active: !user.active,
+                      }}
+                      confirm={
+                        user.active
+                          ? `Deactivate ${user.name}? Their login stops working immediately.`
+                          : undefined
+                      }
+                    >
+                      {user.active ? 'Deactivate' : 'Reactivate'}
+                    </ActionButton>
+                  ),
+              },
+            ]}
+          />
 
           <Card className="mt-3 p-4">
             <CardHeading>What each role can reach</CardHeading>

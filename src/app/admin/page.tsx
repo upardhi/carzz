@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import Link from 'next/link';
 import { PageHeader } from '@/components/shell/ConsoleShell';
 import {
@@ -7,11 +8,14 @@ import {
   KpiGrid,
   Note,
   Row,
-  Table,
-  TableWrap,
-  Td,
-  Th,
 } from '@/components/ui/primitives';
+import { WidgetTable } from '@/components/ui/WidgetTable';
+import {
+  CardRowSkeleton,
+  CardSkeleton,
+  KpiGridSkeleton,
+  TableSkeleton,
+} from '@/components/ui/Skeleton';
 import { requirePermission } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { computePayoutRun } from '@/lib/services/payroll';
@@ -31,15 +35,23 @@ import { LEAD_SOURCE_LABEL } from '@/lib/util/labels';
 
 export const metadata = { title: 'Business overview' };
 
-export default async function AdminOverview() {
+/* -------------------------------------------------------------------------- */
+/* Async content component — everything that touches the DB                   */
+/* -------------------------------------------------------------------------- */
+
+async function AdminDashboardContent() {
+  // requirePermission is memoised by React cache() so this is free — the
+  // layout already resolved the session for this request.
   await requirePermission('report:business');
   const store = await getStore();
   const cycle = currentCycle();
 
-  // The payout run is expensive, and both reports below need it — so compute
-  // it once and hand it down rather than letting each recalculate.
+  // The payout run is the most expensive step. areaPerformance re-uses it so
+  // we avoid computing it twice.
   const payouts = await computePayoutRun(store, cycle, null);
   const areas = await areaPerformance(store, cycle, null, payouts);
+
+  // Everything that can run in parallel after areas are known.
   const [summary, sources, purchases] = await Promise.all([
     businessSummary(store, cycle, null, areas),
     leadSourceReport(store, null),
@@ -50,79 +62,107 @@ export default async function AdminOverview() {
   const ranked = [...areas].sort((a, b) => b.margin - a.margin);
   const best = ranked[0];
   const worst = ranked[ranked.length - 1];
-  // The channel burning the most money per customer who actually stays.
   const worstSource = [...sources]
     .filter((s) => s.cost > 0)
     .sort((a, b) => b.costPerActiveCar - a.costPerActiveCar)[0];
 
   return (
     <>
-      <PageHeader
-        title="Business overview"
-        description={`${cycleLabel(cycle)} · every area`}
-      />
-
-      <KpiGrid>
-        <Kpi label="Customers" value={summary.customers} />
-        <Kpi label="Active cars" value={summary.activeCars} />
-        <Kpi label="Collected" value={moneyShort(summary.collected)} tone="success" />
+      <KpiGrid columns={6}>
         <Kpi
-          label="Total cost"
+          label="ACTIVE CUSTOMERS"
+          value={summary.customers}
+          tone="purple"
+          subtext="Registered accounts"
+        />
+        <Kpi
+          label="ACTIVE CARS"
+          value={summary.activeCars}
+          tone="blue"
+          subtext="Under subscription"
+        />
+        <Kpi
+          label="COLLECTED"
+          value={moneyShort(summary.collected)}
+          tone="emerald"
+          subtext="Received this cycle"
+        />
+        <Kpi
+          label="TOTAL COST"
           value={moneyShort(summary.payoutCost + summary.expenses)}
+          tone="slate"
+          subtext="Payouts & expenses"
         />
         <Kpi
-          label="Net profit"
+          label="NET PROFIT"
           value={moneyShort(summary.profit)}
-          tone={summary.profit > 0 ? 'success' : 'danger'}
-          hint={percent(summary.margin)}
+          tone={summary.profit > 0 ? 'emerald' : 'rose'}
+          subtext={`${percent(summary.margin)} net margin`}
         />
         <Kpi
-          label="Outstanding"
+          label="OUTSTANDING"
           value={moneyShort(summary.outstanding)}
-          tone="danger"
+          tone="amber"
+          subtext="Pending collection"
         />
       </KpiGrid>
 
       <div className="mt-4 grid gap-3 lg:grid-cols-2">
-        <Card className="p-4">
-          <CardHeading>Area performance</CardHeading>
-          <TableWrap>
-            <Table>
-              <thead>
-                <tr>
-                  <Th>Area</Th>
-                  <Th>Customers</Th>
-                  <Th>Collected</Th>
-                  <Th>Cost</Th>
-                  <Th>Profit</Th>
-                  <Th>Margin</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {areas.map((area) => (
-                  <tr key={area.area.id}>
-                    <Td className="font-bold">{area.area.name}</Td>
-                    <Td>{area.customers}</Td>
-                    <Td>{moneyShort(area.collected)}</Td>
-                    <Td>{moneyShort(area.goodsCost + area.payoutCost)}</Td>
-                    <Td
-                      className={
-                        area.profit > 0
-                          ? 'font-bold text-success-600'
-                          : 'font-bold text-danger-500'
-                      }
-                    >
-                      {moneyShort(area.profit)}
-                    </Td>
-                    <Td className="font-bold">{percent(area.margin)}</Td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          </TableWrap>
-
+        <div className="flex flex-col justify-between">
+          <WidgetTable<(typeof areas)[number]>
+            title="Area performance"
+            data={areas}
+            keyExtractor={(area) => area.area.id}
+            emptyMessage="No performance data recorded."
+            columns={[
+              {
+                id: 'area',
+                header: 'AREA',
+                className: 'font-bold text-navy-950',
+                render: (area) => area.area.name,
+              },
+              {
+                id: 'customers',
+                header: 'CUSTOMERS',
+                align: 'center',
+                render: (area) => area.customers,
+              },
+              {
+                id: 'collected',
+                header: 'COLLECTED',
+                render: (area) => moneyShort(area.collected),
+              },
+              {
+                id: 'cost',
+                header: 'COST',
+                render: (area) => moneyShort(area.goodsCost + area.payoutCost),
+              },
+              {
+                id: 'profit',
+                header: 'PROFIT',
+                render: (area) => (
+                  <span
+                    className={
+                      area.profit > 0
+                        ? 'font-bold text-emerald-600'
+                        : 'font-bold text-rose-600'
+                    }
+                  >
+                    {moneyShort(area.profit)}
+                  </span>
+                ),
+              },
+              {
+                id: 'margin',
+                header: 'MARGIN',
+                align: 'right',
+                className: 'font-bold text-slate-900',
+                render: (area) => percent(area.margin),
+              },
+            ]}
+          />
           {best && worst && best.area.id !== worst.area.id ? (
-            <div className="mt-3">
+            <div className="mt-2">
               <Note>
                 <b>{worst.area.name} is your weakest</b> — {percent(worst.margin)}{' '}
                 against {percent(best.margin)} in {best.area.name}, on the same
@@ -131,7 +171,7 @@ export default async function AdminOverview() {
               </Note>
             </div>
           ) : null}
-        </Card>
+        </div>
 
         <Card className="p-4">
           <CardHeading>Needs your decision</CardHeading>
@@ -240,6 +280,64 @@ export default async function AdminOverview() {
           <Row label="Margin" value={percent(summary.margin)} />
         </Card>
       </div>
+    </>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Skeleton for the Suspense fallback                                          */
+/* -------------------------------------------------------------------------- */
+
+function AdminDashboardSkeleton() {
+  return (
+    <>
+      <KpiGridSkeleton count={6} />
+      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+        <CardSkeleton>
+          <TableSkeleton rows={4} cols={6} />
+        </CardSkeleton>
+        <CardSkeleton>
+          <div className="space-y-2">
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="h-14 animate-pulse rounded-lg bg-surface-raised"
+              />
+            ))}
+          </div>
+        </CardSkeleton>
+        <CardRowSkeleton rows={7} />
+        <CardRowSkeleton rows={7} />
+      </div>
+    </>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Page export — synchronous shell + streamed content                         */
+/* -------------------------------------------------------------------------- */
+
+export default function AdminOverview() {
+  const cycle = currentCycle(); // pure computation — no await needed
+
+  return (
+    <>
+      {/* PageHeader renders immediately — no DB dependency */}
+      <PageHeader
+        title="Business overview"
+        description={`${cycleLabel(cycle)} · every area`}
+      />
+
+      {/*
+       * AdminDashboardContent streams in while the skeleton is visible.
+       * The loading.tsx at this segment level shows the full skeleton
+       * (header + cards) during client-side navigation; this inner Suspense
+       * handles the streaming on a hard-refresh or first load so the header
+       * is visible while data loads.
+       */}
+      <Suspense fallback={<AdminDashboardSkeleton />}>
+        <AdminDashboardContent />
+      </Suspense>
     </>
   );
 }

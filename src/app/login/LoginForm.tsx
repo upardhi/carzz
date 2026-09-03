@@ -40,14 +40,10 @@ export function LoginForm({ next }: { next?: string }) {
         setError(data.error ?? 'Could not sign you in.');
         return;
       }
-      // A full document load, not a client navigation. `refresh()` used to run
-      // first, but it re-fetches the *current* route — and middleware now
-      // bounces a signed-in visitor off `/login`, so that request came back a
-      // redirect, aborted, and took the navigation after it down with it: the
-      // sign-in simply appeared to do nothing. Loading the destination outright
-      // also guarantees every server component sees the new session cookie.
-      window.location.assign(safeNext(next) ?? data.redirect ?? '/');
-      return;
+      // Full navigation ensures the new session cookie is sent cleanly
+      // and immediately displays the destination layout/skeleton without
+      // racing an unnecessary re-render of /login.
+      window.location.href = next || data.redirect || '/';
     } catch {
       setError('No connection. Check your network and try again.');
     } finally {

@@ -11,9 +11,22 @@ import { NO_DATE_FIELDS, type DateFields } from './fields';
 export interface PrismaDelegate {
   findUnique(args: { where: { id: string } }): Promise<unknown>;
   findMany(args: Record<string, unknown>): Promise<unknown[]>;
+  /**
+   * Finds the first matching row without allocating a result array.
+   * Always faster than findMany(take:1) for single-row lookups.
+   */
+  findFirst(args: Record<string, unknown>): Promise<unknown>;
   count(args: Record<string, unknown>): Promise<number>;
   create(args: { data: Record<string, unknown> }): Promise<unknown>;
   createMany(args: { data: Record<string, unknown>[] }): Promise<unknown>;
+  /**
+   * INSERT … RETURNING — inserts rows and returns them in one round-trip.
+   * Supported on PostgreSQL and SQLite ≥ 3.35; undefined on MySQL/MariaDB.
+   * The repository uses this when present, falling back to createMany+find.
+   */
+  createManyAndReturn?(args: {
+    data: Record<string, unknown>[];
+  }): Promise<unknown[]>;
   update(args: {
     where: { id: string };
     data: Record<string, unknown>;
@@ -156,8 +169,13 @@ export class PrismaRepository<T extends { id: Id }> implements Repository<T> {
   }
 
   async findOne(options: FindOptions<T> = {}): Promise<T | null> {
-    const [row] = await this.find({ ...options, limit: 1 });
-    return row ?? null;
+    // findFirst skips the findMany array-allocation path: one row in, one row
+    // out, no intermediate array or loop over the remaining elements.
+    const row = await this.delegate.findFirst({
+      where: toPrismaWhere(options.where, this.fields),
+      orderBy: options.orderBy?.map((o) => ({ [o.field]: o.dir ?? 'asc' })),
+    });
+    return row ? this.row(row) : null;
   }
 
   async count(where?: Where<T>): Promise<number> {
@@ -173,11 +191,20 @@ export class PrismaRepository<T extends { id: Id }> implements Repository<T> {
   }
 
   async createMany(data: CreateInput<T>[]): Promise<T[]> {
-    await this.delegate.createMany({
-      data: data.map((d) => toDbData(d as Record<string, unknown>, this.fields)),
-    });
-    // `createMany` does not return rows on every connector, so read them back
-    // by id; callers always supply ids for bulk inserts.
+    const rows = data.map((d) =>
+      toDbData(d as Record<string, unknown>, this.fields),
+    );
+
+    if (this.delegate.createManyAndReturn) {
+      // Single round-trip: INSERT … RETURNING eliminates the follow-up SELECT.
+      // Available on PostgreSQL (always) and SQLite ≥ 3.35.
+      const created = await this.delegate.createManyAndReturn({ data: rows });
+      return created.map((row) => this.row(row));
+    }
+
+    // Fallback for MySQL / MariaDB / older SQLite: insert then read back by id.
+    // Callers always supply ids for bulk inserts so the WHERE IN is exact.
+    await this.delegate.createMany({ data: rows });
     const ids = data.map((d) => d.id).filter(Boolean) as Id[];
     return this.find({ where: { id: { in: ids } } as unknown as Where<T> });
   }

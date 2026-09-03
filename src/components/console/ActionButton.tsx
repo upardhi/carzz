@@ -7,7 +7,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { useToast } from '@/components/ui/ToastProvider';
 import type { ConfirmTone } from '@/components/ui/ConfirmDialog';
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'gold';
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'gold' | 'success';
 
 /**
  * A button that posts a JSON action, shows a toast notification, and refreshes the page.

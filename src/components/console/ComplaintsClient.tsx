@@ -39,19 +39,31 @@ function isWithinTimeFrame(
   if (isNaN(d.getTime())) return true;
 
   const now = new Date();
-  const dMidnight = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
-  const nowMidnight = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  const diffDays = Math.round((nowMidnight - dMidnight) / 86400000);
+  const msDiff = now.getTime() - d.getTime();
 
-  if (filter === 'TODAY') {
-    return diffDays === 0 || Math.abs(now.getTime() - d.getTime()) <= 86400000;
-  }
-  if (filter === 'WEEK') {
-    return diffDays >= 0 && diffDays <= 7;
-  }
-  if (filter === 'MONTH') {
-    return diffDays >= 0 && diffDays <= 30;
-  }
+  // Local calendar day diff
+  const dMidnightLocal = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const nowMidnightLocal = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const diffDaysLocal = Math.round((nowMidnightLocal - dMidnightLocal) / 86400000);
+
+  // UTC calendar day diff
+  const dMidnightUTC = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  const nowMidnightUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const diffDaysUTC = Math.round((nowMidnightUTC - dMidnightUTC) / 86400000);
+
+  const isSameDay = diffDaysLocal === 0 || diffDaysUTC === 0 || Math.abs(msDiff) <= 86400000;
+  const isThisWeek =
+    (diffDaysLocal >= 0 && diffDaysLocal <= 7) ||
+    (diffDaysUTC >= 0 && diffDaysUTC <= 7) ||
+    (msDiff >= 0 && msDiff <= 7 * 86400000);
+  const isThisMonth =
+    (diffDaysLocal >= 0 && diffDaysLocal <= 30) ||
+    (diffDaysUTC >= 0 && diffDaysUTC <= 30) ||
+    (msDiff >= 0 && msDiff <= 30 * 86400000);
+
+  if (filter === 'TODAY') return isSameDay;
+  if (filter === 'WEEK') return isThisWeek;
+  if (filter === 'MONTH') return isThisMonth;
   return true;
 }
 
@@ -88,10 +100,24 @@ export function ComplaintsClient({
   const staffById = useMemo(() => new Map(staff.map((s) => [s.id, s])), [staff]);
   const customerById = useMemo(() => new Map(customers.map((c) => [c.id, c])), [customers]);
 
-  // Overall KPIs
-  const openComplaints = useMemo(() => complaints.filter((c) => c.status === 'OPEN'), [complaints]);
-  const escalatedComplaints = useMemo(() => complaints.filter((c) => c.status === 'ESCALATED'), [complaints]);
-  const resolvedComplaints = useMemo(() => complaints.filter((c) => c.status === 'RESOLVED'), [complaints]);
+  // Complaints filtered by selected time horizon
+  const timeFilteredComplaints = useMemo(() => {
+    return complaints.filter((c) => isWithinTimeFrame(c.createdAt, timeFilter));
+  }, [complaints, timeFilter]);
+
+  // Dynamic KPIs scoped to selected time filter
+  const openComplaints = useMemo(
+    () => timeFilteredComplaints.filter((c) => c.status === 'OPEN'),
+    [timeFilteredComplaints],
+  );
+  const escalatedComplaints = useMemo(
+    () => timeFilteredComplaints.filter((c) => c.status === 'ESCALATED'),
+    [timeFilteredComplaints],
+  );
+  const resolvedComplaints = useMemo(
+    () => timeFilteredComplaints.filter((c) => c.status === 'RESOLVED'),
+    [timeFilteredComplaints],
+  );
 
   const resolutionDays = useMemo(() => {
     return resolvedComplaints
@@ -110,30 +136,25 @@ export function ComplaintsClient({
   }, [resolutionDays]);
 
   const oldestOpen = useMemo(() => {
-    const active = complaints.filter((c) => c.status !== 'RESOLVED');
+    const active = timeFilteredComplaints.filter((c) => c.status !== 'RESOLVED');
     if (!active.length) return null;
     return [...active].sort(
       (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
     )[0];
-  }, [complaints]);
-
-  // Filtered counts based on current time filter
-  const timeFilteredComplaints = useMemo(() => {
-    return complaints.filter((c) => isWithinTimeFrame(c.createdAt, timeFilter));
-  }, [complaints, timeFilter]);
+  }, [timeFilteredComplaints]);
 
   const countAll = timeFilteredComplaints.length;
-  const countOpen = useMemo(() => timeFilteredComplaints.filter((c) => c.status === 'OPEN').length, [timeFilteredComplaints]);
-  const countEscalated = useMemo(() => timeFilteredComplaints.filter((c) => c.status === 'ESCALATED').length, [timeFilteredComplaints]);
-  const countResolved = useMemo(() => timeFilteredComplaints.filter((c) => c.status === 'RESOLVED').length, [timeFilteredComplaints]);
+  const countOpen = openComplaints.length;
+  const countEscalated = escalatedComplaints.length;
+  const countResolved = resolvedComplaints.length;
 
-  // Overall counts across all time
+  // Overall counts across all time for comparison hints
   const totalAllTime = complaints.length;
-  const totalOpenAllTime = openComplaints.length;
-  const totalEscalatedAllTime = escalatedComplaints.length;
-  const totalResolvedAllTime = resolvedComplaints.length;
+  const totalOpenAllTime = useMemo(() => complaints.filter((c) => c.status === 'OPEN').length, [complaints]);
+  const totalEscalatedAllTime = useMemo(() => complaints.filter((c) => c.status === 'ESCALATED').length, [complaints]);
+  const totalResolvedAllTime = useMemo(() => complaints.filter((c) => c.status === 'RESOLVED').length, [complaints]);
 
-  // Filtered & Sorted complaints
+  // Filtered & Sorted complaints for list view
   const filteredComplaints = useMemo(() => {
     return timeFilteredComplaints
       .filter((c) => {

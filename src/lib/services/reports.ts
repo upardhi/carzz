@@ -3,11 +3,17 @@ import 'server-only';
 import type { DataStore } from '../data/ports/store';
 import type {
   Area,
+  Complaint,
+  Customer,
   Id,
+  Invoice,
   LeadSource,
   MissReason,
   Rupees,
+  Staff,
   StaffPayout,
+  StockIssue,
+  WashVisit,
 } from '../data/types';
 import { computePayoutRun } from './payroll';
 
@@ -30,93 +36,202 @@ export interface AreaPerformance {
 }
 
 /**
- * Per-area P&L and service quality for one cycle.
+ * Profitability by area, for one billing cycle.
  *
  * Cost is payout plus consumables, so the margin shown is the one the owner
  * actually banks — which is what makes a weak area visible rather than merely
  * a low-revenue one.
  */
-export async function areaPerformance(
+interface AreaPerfCacheEntry {
+  data: Promise<AreaPerformance[]>;
+  expires: number;
+}
+
+const areaPerfCache: Map<string, AreaPerfCacheEntry> =
+  ((globalThis as unknown as { __areaPerfCache?: Map<string, AreaPerfCacheEntry> })
+    .__areaPerfCache ??= new Map());
+
+export function areaPerformance(
   store: DataStore,
   cycle: string,
   areaIds: Id[] | null,
-  /** Pass an already-computed run to avoid recalculating every payout. */
   precomputedPayouts?: StaffPayout[],
+  options?: { skipPayoutsAndGoods?: boolean },
 ): Promise<AreaPerformance[]> {
-  const areas = (await store.areas.find({ orderBy: [{ field: 'name' }] })).filter(
-    (a) => areaIds === null || areaIds.includes(a.id),
-  );
+  if (precomputedPayouts) {
+    return _computeAreaPerformance(store, cycle, areaIds, precomputedPayouts, options);
+  }
 
-  // Cars are read once and indexed, rather than pulling the whole table for
-  // each area in turn — that was the dominant cost of this report.
-  const [payouts, items, allCars] = await Promise.all([
-    precomputedPayouts ?? computePayoutRun(store, cycle, areaIds),
-    store.inventoryItems.find(),
-    store.cars.find({ where: { active: true } }),
+  const cacheKey = `${cycle}:${areaIds ? areaIds.slice().sort().join(',') : 'all'}:${options?.skipPayoutsAndGoods ? 'fast' : 'full'}`;
+  const now = Date.now();
+  const cached = areaPerfCache.get(cacheKey);
+  if (cached && cached.expires > now) {
+    return cached.data;
+  }
+
+  const promise = _computeAreaPerformance(store, cycle, areaIds, undefined, options).catch((err) => {
+    areaPerfCache.delete(cacheKey);
+    throw err;
+  });
+
+  areaPerfCache.set(cacheKey, {
+    data: promise,
+    expires: now + 60_000,
+  });
+
+  return promise;
+}
+
+async function _computeAreaPerformance(
+  store: DataStore,
+  cycle: string,
+  areaIds: Id[] | null,
+  precomputedPayouts?: StaffPayout[],
+  options?: { skipPayoutsAndGoods?: boolean },
+): Promise<AreaPerformance[]> {
+  const areaFilter = areaIds ? { areaId: { in: areaIds } } : {};
+  const skipExtra = options?.skipPayoutsAndGoods === true;
+
+  // Single batch parallelization: fetch all areas, payouts, items, customers, staff, visits, invoices, complaints, stock issues, and cars concurrently!
+  const [
+    allAreas,
+    payouts,
+    items,
+    allCustomers,
+    allStaff,
+    allVisits,
+    allInvoices,
+    allComplaints,
+    allStockIssues,
+    allActiveCars,
+  ] = await Promise.all([
+    store.areas.find({
+      where: (areaIds ? { id: { in: areaIds } } : undefined) as never,
+      orderBy: [{ field: 'name' }],
+    }),
+    skipExtra
+      ? Promise.resolve([])
+      : (precomputedPayouts ?? computePayoutRun(store, cycle, areaIds)),
+    skipExtra ? Promise.resolve([]) : store.inventoryItems.find(),
+    store.customers.find({ where: areaFilter as never }),
+    store.staff.find({ where: { role: 'EMPLOYEE', ...areaFilter } as never }),
+    store.visits.find({ where: { cycle, ...areaFilter } as never }),
+    store.invoices.find({ where: { cycle, ...areaFilter } as never }),
+    store.complaints.find({
+      where: { status: { in: ['OPEN', 'ESCALATED'] }, ...areaFilter } as never,
+    }),
+    skipExtra ? Promise.resolve([]) : store.stockIssues.find({ where: areaFilter as never }),
+    skipExtra ? Promise.resolve([]) : store.cars.find({ where: { active: true } }),
   ]);
+
+  if (allAreas.length === 0) return [];
+  const areas = areaIds ? allAreas.filter((a) => areaIds.includes(a.id)) : allAreas;
+  if (areas.length === 0) return [];
+
+  const customerIdSet = new Set(allCustomers.map((c) => c.id));
+  const scopedCars = areaIds
+    ? allActiveCars.filter((car) => customerIdSet.has(car.customerId))
+    : allActiveCars;
+
   const itemCost = new Map(items.map((i) => [i.id, i]));
   const carsByCustomer = new Map<Id, number>();
-  for (const car of allCars) {
+  for (const car of scopedCars) {
     carsByCustomer.set(car.customerId, (carsByCustomer.get(car.customerId) ?? 0) + 1);
   }
 
-  return Promise.all(
-    areas.map(async (area) => {
-      const [customers, staff, visits, invoices, complaints, issues] =
-        await Promise.all([
-          store.customers.find({ where: { areaId: area.id } }),
-          store.staff.find({ where: { areaId: area.id, role: 'EMPLOYEE' } }),
-          store.visits.find({ where: { areaId: area.id, cycle } }),
-          store.invoices.find({ where: { areaId: area.id, cycle } }),
-          store.complaints.find({
-            where: { areaId: area.id, status: { in: ['OPEN', 'ESCALATED'] } } as never,
-          }),
-          store.stockIssues.find({ where: { areaId: area.id } }),
-        ]);
+  // Group by area in memory
+  const customersByArea = new Map<Id, Customer[]>();
+  for (const c of allCustomers) {
+    const list = customersByArea.get(c.areaId) ?? [];
+    list.push(c);
+    customersByArea.set(c.areaId, list);
+  }
 
-      const activeCarCount = customers.reduce(
-        (sum, c) => sum + (carsByCustomer.get(c.id) ?? 0),
-        0,
-      );
+  const staffByArea = new Map<Id, Staff[]>();
+  for (const s of allStaff) {
+    const list = staffByArea.get(s.areaId) ?? [];
+    list.push(s);
+    staffByArea.set(s.areaId, list);
+  }
 
-      const done = visits.filter((v) => v.status === 'DONE');
-      const missed = visits.filter((v) => v.status === 'MISSED');
-      const rated = done.filter((v) => v.rating !== null);
+  const visitsByArea = new Map<Id, WashVisit[]>();
+  for (const v of allVisits) {
+    const list = visitsByArea.get(v.areaId) ?? [];
+    list.push(v);
+    visitsByArea.set(v.areaId, list);
+  }
 
-      const billed = invoices.reduce((sum, i) => sum + i.amount, 0);
-      const collected = invoices.reduce((sum, i) => sum + i.paidAmount, 0);
+  const invoicesByArea = new Map<Id, Invoice[]>();
+  for (const inv of allInvoices) {
+    const list = invoicesByArea.get(inv.areaId) ?? [];
+    list.push(inv);
+    invoicesByArea.set(inv.areaId, list);
+  }
 
-      const goodsCost = issues.reduce(
-        (sum, i) => sum + i.quantity * (itemCost.get(i.itemId)?.unitCost ?? 0),
-        0,
-      );
-      const payoutCost = payouts
-        .filter((p) => p.areaId === area.id)
-        .reduce((sum, p) => sum + p.net, 0);
+  const complaintsByArea = new Map<Id, Complaint[]>();
+  for (const comp of allComplaints) {
+    const list = complaintsByArea.get(comp.areaId) ?? [];
+    list.push(comp);
+    complaintsByArea.set(comp.areaId, list);
+  }
 
-      const profit = collected - goodsCost - payoutCost;
+  const stockIssuesByArea = new Map<Id, StockIssue[]>();
+  for (const issue of allStockIssues) {
+    const list = stockIssuesByArea.get(issue.areaId) ?? [];
+    list.push(issue);
+    stockIssuesByArea.set(issue.areaId, list);
+  }
 
-      return {
-        area,
-        customers: customers.filter((c) => c.status !== 'INACTIVE').length,
-        activeCars: activeCarCount,
-        staff: staff.length,
-        washesDone: done.length,
-        washesMissed: missed.length,
-        billed,
-        collected,
-        outstanding: billed - collected,
-        goodsCost,
-        payoutCost,
-        profit,
-        margin: collected > 0 ? profit / collected : 0,
-        averageRating: rated.length
-          ? rated.reduce((sum, v) => sum + (v.rating ?? 0), 0) / rated.length
-          : 0,
-        openComplaints: complaints.length,
-      };
-    }),
-  );
+  return areas.map((area) => {
+    const customers = customersByArea.get(area.id) ?? [];
+    const staff = staffByArea.get(area.id) ?? [];
+    const visits = visitsByArea.get(area.id) ?? [];
+    const invoices = invoicesByArea.get(area.id) ?? [];
+    const complaints = complaintsByArea.get(area.id) ?? [];
+    const issues = stockIssuesByArea.get(area.id) ?? [];
+
+    const activeCarCount = customers.reduce(
+      (sum, c) => sum + (carsByCustomer.get(c.id) ?? 0),
+      0,
+    );
+
+    const done = visits.filter((v) => v.status === 'DONE');
+    const missed = visits.filter((v) => v.status === 'MISSED');
+    const rated = done.filter((v) => v.rating !== null);
+
+    const billed = invoices.reduce((sum, i) => sum + i.amount, 0);
+    const collected = invoices.reduce((sum, i) => sum + i.paidAmount, 0);
+
+    const goodsCost = issues.reduce(
+      (sum, i) => sum + i.quantity * (itemCost.get(i.itemId)?.unitCost ?? 0),
+      0,
+    );
+    const payoutCost = payouts
+      .filter((p) => p.areaId === area.id)
+      .reduce((sum, p) => sum + p.net, 0);
+
+    const profit = collected - goodsCost - payoutCost;
+
+    return {
+      area,
+      customers: customers.filter((c) => c.status !== 'INACTIVE').length,
+      activeCars: activeCarCount,
+      staff: staff.length,
+      washesDone: done.length,
+      washesMissed: missed.length,
+      billed,
+      collected,
+      outstanding: billed - collected,
+      goodsCost,
+      payoutCost,
+      profit,
+      margin: collected > 0 ? profit / collected : 0,
+      averageRating: rated.length
+        ? rated.reduce((sum, v) => sum + (v.rating ?? 0), 0) / rated.length
+        : 0,
+      openComplaints: complaints.length,
+    };
+  });
 }
 
 export interface LeadSourceRow {
@@ -191,17 +306,50 @@ export interface MissedWashRow {
   costToDeliver: Rupees;
 }
 
+interface MissedWashCacheEntry {
+  data: Promise<{ rows: MissedWashRow[]; total: number; totalCost: Rupees }>;
+  expires: number;
+}
+const missedWashCache: Map<string, MissedWashCacheEntry> =
+  ((globalThis as unknown as { __missedWashCache?: Map<string, MissedWashCacheEntry> })
+    .__missedWashCache ??= new Map());
+
 /**
  * What missed washes cost. Each one returns to the customer's count, so the
  * business delivers it later at no extra charge — a real cost that never
  * appears on an invoice.
  */
-export async function missedWashReport(
+export function missedWashReport(
   store: DataStore,
   cycle: string,
   areaIds: Id[] | null,
 ): Promise<{ rows: MissedWashRow[]; total: number; totalCost: Rupees }> {
-  const [visits, packages, cars] = await Promise.all([
+  const cacheKey = `${cycle}:${areaIds ? areaIds.slice().sort().join(',') : 'all'}`;
+  const now = Date.now();
+  const cached = missedWashCache.get(cacheKey);
+  if (cached && cached.expires > now) {
+    return cached.data;
+  }
+
+  const promise = _computeMissedWashReport(store, cycle, areaIds).catch((err) => {
+    missedWashCache.delete(cacheKey);
+    throw err;
+  });
+
+  missedWashCache.set(cacheKey, {
+    data: promise,
+    expires: now + 60_000,
+  });
+
+  return promise;
+}
+
+async function _computeMissedWashReport(
+  store: DataStore,
+  cycle: string,
+  areaIds: Id[] | null,
+): Promise<{ rows: MissedWashRow[]; total: number; totalCost: Rupees }> {
+  const [visits, packages] = await Promise.all([
     store.visits.find({
       where: {
         cycle,
@@ -210,8 +358,16 @@ export async function missedWashReport(
       } as never,
     }),
     store.packages.find(),
-    store.cars.find(),
   ]);
+
+  if (visits.length === 0) {
+    return { rows: [], total: 0, totalCost: 0 };
+  }
+
+  const carIds = [...new Set(visits.map((v) => v.carId))];
+  const cars = await store.cars.find({
+    where: { id: { in: carIds } } as never,
+  });
 
   const packageById = new Map(packages.map((p) => [p.id, p]));
   const carById = new Map(cars.map((c) => [c.id, c]));
@@ -253,7 +409,40 @@ export interface StaffPerformanceRow {
   complaints: number;
 }
 
-export async function staffPerformance(
+interface StaffPerfCacheEntry {
+  data: Promise<StaffPerformanceRow[]>;
+  expires: number;
+}
+const staffPerfCache: Map<string, StaffPerfCacheEntry> =
+  ((globalThis as unknown as { __staffPerfCache?: Map<string, StaffPerfCacheEntry> })
+    .__staffPerfCache ??= new Map());
+
+export function staffPerformance(
+  store: DataStore,
+  cycle: string,
+  areaIds: Id[] | null,
+): Promise<StaffPerformanceRow[]> {
+  const cacheKey = `${cycle}:${areaIds ? areaIds.slice().sort().join(',') : 'all'}`;
+  const now = Date.now();
+  const cached = staffPerfCache.get(cacheKey);
+  if (cached && cached.expires > now) {
+    return cached.data;
+  }
+
+  const promise = _computeStaffPerformance(store, cycle, areaIds).catch((err) => {
+    staffPerfCache.delete(cacheKey);
+    throw err;
+  });
+
+  staffPerfCache.set(cacheKey, {
+    data: promise,
+    expires: now + 60_000,
+  });
+
+  return promise;
+}
+
+async function _computeStaffPerformance(
   store: DataStore,
   cycle: string,
   areaIds: Id[] | null,
@@ -265,32 +454,55 @@ export async function staffPerformance(
     } as never,
   });
 
-  const rows = await Promise.all(
-    staff.map(async (s) => {
-      const [visits, complaints] = await Promise.all([
-        store.visits.find({ where: { staffId: s.id, cycle } }),
-        store.complaints.count({ staffId: s.id }),
-      ]);
+  if (staff.length === 0) return [];
 
-      const done = visits.filter((v) => v.status === 'DONE');
-      const rated = done.filter((v) => v.rating !== null);
-
-      return {
-        staffId: s.id,
-        name: s.name,
-        areaId: s.areaId,
-        washes: done.length,
-        onTimeRate: done.length
-          ? done.filter((v) => v.onTime).length / done.length
-          : 0,
-        averageRating: rated.length
-          ? rated.reduce((sum, v) => sum + (v.rating ?? 0), 0) / rated.length
-          : 0,
-        missed: visits.filter((v) => v.status === 'MISSED').length,
-        complaints,
-      };
+  const staffIds = staff.map((s) => s.id);
+  const [allVisits, allComplaints] = await Promise.all([
+    store.visits.find({
+      where: { staffId: { in: staffIds }, cycle } as never,
     }),
-  );
+    store.complaints.find({
+      where: { staffId: { in: staffIds } } as never,
+    }),
+  ]);
+
+  const visitsByStaff = new Map<Id, WashVisit[]>();
+  for (const v of allVisits) {
+    if (!v.staffId) continue;
+    const list = visitsByStaff.get(v.staffId) ?? [];
+    list.push(v);
+    visitsByStaff.set(v.staffId, list);
+  }
+
+  const complaintsCountByStaff = new Map<Id, number>();
+  for (const c of allComplaints) {
+    if (!c.staffId) continue;
+    complaintsCountByStaff.set(
+      c.staffId,
+      (complaintsCountByStaff.get(c.staffId) ?? 0) + 1,
+    );
+  }
+
+  const rows: StaffPerformanceRow[] = staff.map((s) => {
+    const visits = visitsByStaff.get(s.id) ?? [];
+    const done = visits.filter((v) => v.status === 'DONE');
+    const rated = done.filter((v) => v.rating !== null);
+
+    return {
+      staffId: s.id,
+      name: s.name,
+      areaId: s.areaId,
+      washes: done.length,
+      onTimeRate: done.length
+        ? done.filter((v) => v.onTime).length / done.length
+        : 0,
+      averageRating: rated.length
+        ? rated.reduce((sum, v) => sum + (v.rating ?? 0), 0) / rated.length
+        : 0,
+      missed: visits.filter((v) => v.status === 'MISSED').length,
+      complaints: complaintsCountByStaff.get(s.id) ?? 0,
+    };
+  });
 
   return rows.sort((a, b) => b.washes - a.washes);
 }

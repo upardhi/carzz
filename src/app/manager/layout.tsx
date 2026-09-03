@@ -12,9 +12,14 @@ export default async function ManagerLayout({
 }) {
   const session = await requireSession();
   const store = await getStore();
-  const counts = await navCounts(store, session.scope);
 
-  const areas = await store.areas.find();
+  // counts is served from unstable_cache (60 s TTL). areas.find() needed for
+  // the scope label — both run in parallel.
+  const [counts, areas] = await Promise.all([
+    navCounts(session.scope),
+    store.areas.find(),
+  ]);
+
   const scopeLabel =
     session.scope.areaIds === null
       ? 'All areas'

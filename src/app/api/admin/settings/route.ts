@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { HttpError, requireApiSession } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
+import { invalidatePayoutRunCache } from '@/lib/services/payroll';
 
 const appSchema = z.object({
   scope: z.literal('app'),
@@ -71,6 +72,7 @@ export async function POST(request: Request) {
 
     const { scope: _scope, ...patch } = parsed.data;
     const saved = await store.savePayoutSettings(patch);
+    invalidatePayoutRunCache();
     return NextResponse.json({
       ok: true,
       settings: saved,

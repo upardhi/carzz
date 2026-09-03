@@ -6,12 +6,9 @@ import {
   KpiGrid,
   Note,
   Row,
-  Table,
-  TableWrap,
   Tag,
-  Td,
-  Th,
 } from '@/components/ui/primitives';
+import { DataTable } from '@/components/ui/DataTable';
 import { ActionButton } from '@/components/console/ActionButton';
 import { requirePermission } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
@@ -51,20 +48,42 @@ export default async function AdminPayout({
         description={`${cycleLabel(cycle)} · the system calculates, you approve`}
       />
 
-      <KpiGrid>
-        <Kpi label="Staff" value={payouts.length} />
-        <Kpi label="Total payable" value={money(total)} />
+      <KpiGrid columns={6}>
         <Kpi
-          label="Awaiting you"
-          value={pending.length}
-          tone={pending.length ? 'danger' : 'success'}
+          label="STAFF COUNT"
+          value={payouts.length}
+          tone="purple"
+          subtext="Employees on payroll"
         />
-        <Kpi label="Approved" value={approved.length} tone="success" />
-        <Kpi label="Washes" value={payouts.reduce((s, p) => s + p.washes, 0)} />
         <Kpi
-          label="Deductions"
+          label="TOTAL PAYABLE"
+          value={money(total)}
+          tone="blue"
+          subtext="Net payout this cycle"
+        />
+        <Kpi
+          label="AWAITING APPROVAL"
+          value={pending.length}
+          tone={pending.length ? 'rose' : 'emerald'}
+          subtext={pending.length ? `${pending.length} need owner signoff` : 'All approved'}
+        />
+        <Kpi
+          label="APPROVED"
+          value={approved.length}
+          tone="emerald"
+          subtext="Ready for disbursement"
+        />
+        <Kpi
+          label="WASHES DONE"
+          value={payouts.reduce((s, p) => s + p.washes, 0)}
+          tone="sky"
+          subtext="Billable wash units"
+        />
+        <Kpi
+          label="DEDUCTIONS"
           value={money(payouts.reduce((s, p) => s + p.deductions, 0))}
-          tone="gold"
+          tone="amber"
+          subtext="Absence & flags"
         />
       </KpiGrid>
 
@@ -101,104 +120,123 @@ export default async function AdminPayout({
       </Card>
 
       <div className="mt-4">
-        <TableWrap>
-          <Table>
-            <thead>
-              <tr>
-                <Th>Staff</Th>
-                <Th>Area</Th>
-                <Th>Washes</Th>
-                <Th>Base</Th>
-                <Th>Bonuses</Th>
-                <Th>Referrals</Th>
-                <Th>Deductions</Th>
-                <Th>Pocket taken</Th>
-                <Th>Net payable</Th>
-                <Th>Status</Th>
-                <Th>Action</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {payouts.map((payout) => {
-                const member = staffById.get(payout.staffId);
-                return (
-                  <tr key={payout.id}>
-                    <Td className="font-bold">{member?.name ?? '—'}</Td>
-                    <Td>{areaById.get(payout.areaId)?.name ?? '—'}</Td>
-                    <Td>{payout.washes}</Td>
-                    <Td>{money(payout.base)}</Td>
-                    <Td className="text-success-600">
-                      {payout.bonuses ? `+${money(payout.bonuses)}` : '—'}
-                    </Td>
-                    <Td className="text-success-600">
-                      {payout.referrals ? `+${money(payout.referrals)}` : '—'}
-                    </Td>
-                    <Td className="text-danger-500">
-                      {payout.deductions ? `−${money(payout.deductions)}` : '—'}
-                    </Td>
-                    <Td>
-                      {payout.pocketTaken ? `−${money(payout.pocketTaken)}` : '—'}
-                    </Td>
-                    <Td className="font-extrabold">{money(payout.net)}</Td>
-                    <Td>
-                      <Tag
-                        tone={
-                          payout.status === 'APPROVED'
-                            ? 'ok'
-                            : payout.status === 'HELD'
-                              ? 'bad'
-                              : 'warn'
-                        }
-                      >
-                        {payout.status === 'DRAFT' ? 'Awaiting' : payout.status}
-                      </Tag>
-                    </Td>
-                    <Td>
-                      {payout.status === 'DRAFT' ? (
-                        <div className="flex gap-1.5">
-                          <ActionButton
-                            endpoint="/api/admin/payout"
-                            payload={{
-                              action: 'approveOne',
-                              staffId: payout.staffId,
-                              cycle,
-                            }}
-                          >
-                            Approve
-                          </ActionButton>
-                          <ActionButton
-                            endpoint="/api/admin/payout"
-                            variant="secondary"
-                            payload={{ action: 'hold', staffId: payout.staffId, cycle }}
-                          >
-                            Hold
-                          </ActionButton>
-                        </div>
-                      ) : (
-                        <span className="text-ink-faint">—</span>
-                      )}
-                    </Td>
-                  </tr>
-                );
-              })}
-              {payouts.length ? (
-                <tr>
-                  <Td className="text-right font-extrabold" colSpan={8}>
-                    Total — {payouts.length} staff
-                  </Td>
-                  <Td className="text-base font-extrabold">{money(total)}</Td>
-                  <Td colSpan={2} />
-                </tr>
-              ) : (
-                <tr>
-                  <Td className="py-8 text-center text-ink-mute" colSpan={11}>
-                    No staff payouts for this month.
-                  </Td>
-                </tr>
-              )}
-            </tbody>
-          </Table>
-        </TableWrap>
+        <DataTable<(typeof payouts)[number]>
+          data={payouts}
+          keyExtractor={(payout) => payout.id}
+          itemLabel="staff payouts"
+          emptyMessage="No staff payouts for this month."
+          columns={[
+            {
+              id: 'staff',
+              header: 'STAFF',
+              className: 'font-bold text-navy-950',
+              render: (payout) => staffById.get(payout.staffId)?.name ?? '—',
+            },
+            {
+              id: 'area',
+              header: 'AREA',
+              render: (payout) => areaById.get(payout.areaId)?.name ?? '—',
+            },
+            {
+              id: 'washes',
+              header: 'WASHES',
+              align: 'center',
+              render: (payout) => payout.washes,
+            },
+            {
+              id: 'base',
+              header: 'BASE',
+              render: (payout) => money(payout.base),
+            },
+            {
+              id: 'bonuses',
+              header: 'BONUSES',
+              render: (payout) =>
+                payout.bonuses ? (
+                  <span className="font-semibold text-emerald-600">+{money(payout.bonuses)}</span>
+                ) : (
+                  '—'
+                ),
+            },
+            {
+              id: 'referrals',
+              header: 'REFERRALS',
+              render: (payout) =>
+                payout.referrals ? (
+                  <span className="font-semibold text-emerald-600">+{money(payout.referrals)}</span>
+                ) : (
+                  '—'
+                ),
+            },
+            {
+              id: 'deductions',
+              header: 'DEDUCTIONS',
+              render: (payout) =>
+                payout.deductions ? (
+                  <span className="font-semibold text-rose-600">−{money(payout.deductions)}</span>
+                ) : (
+                  '—'
+                ),
+            },
+            {
+              id: 'pocket',
+              header: 'POCKET TAKEN',
+              render: (payout) =>
+                payout.pocketTaken ? `−${money(payout.pocketTaken)}` : '—',
+            },
+            {
+              id: 'net',
+              header: 'NET PAYABLE',
+              className: 'font-extrabold text-slate-900',
+              render: (payout) => money(payout.net),
+            },
+            {
+              id: 'status',
+              header: 'STATUS',
+              render: (payout) => (
+                <Tag
+                  tone={
+                    payout.status === 'APPROVED'
+                      ? 'ok'
+                      : payout.status === 'HELD'
+                        ? 'bad'
+                        : 'warn'
+                  }
+                >
+                  {payout.status === 'DRAFT' ? 'Awaiting' : payout.status}
+                </Tag>
+              ),
+            },
+            {
+              id: 'action',
+              header: 'ACTION',
+              render: (payout) =>
+                payout.status === 'DRAFT' ? (
+                  <div className="flex gap-1.5">
+                    <ActionButton
+                      endpoint="/api/admin/payout"
+                      payload={{
+                        action: 'approveOne',
+                        staffId: payout.staffId,
+                        cycle,
+                      }}
+                    >
+                      Approve
+                    </ActionButton>
+                    <ActionButton
+                      endpoint="/api/admin/payout"
+                      variant="secondary"
+                      payload={{ action: 'hold', staffId: payout.staffId, cycle }}
+                    >
+                      Hold
+                    </ActionButton>
+                  </div>
+                ) : (
+                  <span className="text-ink-faint">—</span>
+                ),
+            },
+          ]}
+        />
       </div>
 
       <div className="mt-4 grid gap-3 lg:grid-cols-2">

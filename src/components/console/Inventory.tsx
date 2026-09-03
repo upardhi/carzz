@@ -5,16 +5,13 @@ import {
   Kpi,
   KpiGrid,
   Note,
-  Table,
-  TableWrap,
   Tag,
-  Td,
-  Th,
 } from '@/components/ui/primitives';
+import { DataTable } from '@/components/ui/DataTable';
 import { scopeAreaFilter } from '@/lib/auth/rbac';
 import type { Session } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
-import { stockForArea, type StockRow } from '@/lib/services/inventory';
+import { stockForAreas, type StockRow } from '@/lib/services/inventory';
 import { formatDateFull, money } from '@/lib/util/format';
 import { ActionButton } from './ActionButton';
 import { IssueStockForm, PurchaseRequestForm } from './InventoryForms';
@@ -41,13 +38,9 @@ export async function ConsoleInventory({ session }: { session: Session }) {
     (a) => session.scope.areaIds === null || session.scope.areaIds.includes(a.id),
   );
 
-  const [stockByArea, items, staff, requests] = await Promise.all([
-    Promise.all(
-      areas.map(async (area) => ({
-        area,
-        rows: await stockForArea(store, area.id),
-      })),
-    ),
+  const areaIds = areas.map((a) => a.id);
+  const [stockMap, items, staff, requests] = await Promise.all([
+    stockForAreas(store, areaIds),
     store.inventoryItems.find({ where: { active: true } }),
     store.staff.find({ where: { role: 'EMPLOYEE', active: true, ...areaFilter } as never }),
     store.purchaseRequests.find({
@@ -55,6 +48,11 @@ export async function ConsoleInventory({ session }: { session: Session }) {
       orderBy: [{ field: 'createdAt', dir: 'desc' }],
     }),
   ]);
+
+  const stockByArea = areas.map((area) => ({
+    area,
+    rows: stockMap.get(area.id) ?? [],
+  }));
 
   const itemById = new Map(items.map((i) => [i.id, i]));
   const areaById = new Map(areas.map((a) => [a.id, a]));
@@ -68,31 +66,46 @@ export async function ConsoleInventory({ session }: { session: Session }) {
         description="Stock, usage and purchase requests"
       />
 
-      <KpiGrid>
-        <Kpi label="Items tracked" value={items.length} />
+      <KpiGrid columns={6}>
         <Kpi
-          label="Out of stock"
+          label="ITEMS TRACKED"
+          value={items.length}
+          tone="blue"
+          subtext="Active inventory catalog"
+        />
+        <Kpi
+          label="OUT OF STOCK"
           value={allRows.filter((r) => r.status === 'OUT').length}
-          tone="danger"
+          tone="rose"
+          subtext={
+            allRows.filter((r) => r.status === 'OUT').length > 0
+              ? 'Replenish immediately'
+              : 'All items stocked'
+          }
         />
         <Kpi
-          label="Order now"
+          label="ORDER NOW"
           value={allRows.filter((r) => r.status === 'CRITICAL').length}
-          tone="danger"
+          tone="rose"
+          subtext="Below safety stock"
         />
         <Kpi
-          label="Low"
+          label="LOW STOCK"
           value={allRows.filter((r) => r.status === 'LOW').length}
-          tone="gold"
+          tone="amber"
+          subtext="Approaching reorder point"
         />
         <Kpi
-          label="Stock value"
+          label="STOCK VALUE"
           value={money(allRows.reduce((sum, r) => sum + r.value, 0))}
+          tone="purple"
+          subtext="Total assets on hand"
         />
         <Kpi
-          label="Open requests"
+          label="OPEN REQUESTS"
           value={requests.filter((r) => r.status === 'PENDING').length}
-          tone="gold"
+          tone="amber"
+          subtext="Awaiting purchase review"
         />
       </KpiGrid>
 
@@ -110,60 +123,74 @@ export async function ConsoleInventory({ session }: { session: Session }) {
       ) : null}
 
       {stockByArea.map(({ area, rows }) => (
-        <div key={area.id} className="mt-4">
-          <h3 className="mb-2 text-sm font-extrabold">{area.name}</h3>
-          <TableWrap>
-            <Table>
-              <thead>
-                <tr>
-                  <Th>Item</Th>
-                  <Th>In stock</Th>
-                  <Th>Used per day</Th>
-                  <Th>Days left</Th>
-                  <Th>Reorder at</Th>
-                  <Th>Status</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row: StockRow) => (
-                  <tr key={row.item.id}>
-                    <Td className="font-bold">{row.item.name}</Td>
-                    <Td
-                      className={
-                        row.status === 'OUT' || row.status === 'CRITICAL'
-                          ? 'font-bold text-danger-500'
-                          : ''
-                      }
-                    >
-                      {row.quantity} {row.item.unit}
-                    </Td>
-                    <Td>
-                      {row.usagePerDay > 0
-                        ? `${row.usagePerDay.toFixed(2)} ${row.item.unit}`
-                        : '—'}
-                    </Td>
-                    <Td
-                      className={
-                        row.daysLeft !== null && row.daysLeft < 2
-                          ? 'font-extrabold text-danger-500'
-                          : ''
-                      }
-                    >
-                      {row.daysLeft !== null ? row.daysLeft.toFixed(1) : '—'}
-                    </Td>
-                    <Td>
-                      {row.item.reorderLevel} {row.item.unit}
-                    </Td>
-                    <Td>
-                      <Tag tone={STATUS_TONE[row.status]}>
-                        {STATUS_LABEL[row.status]}
-                      </Tag>
-                    </Td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          </TableWrap>
+        <div key={area.id} className="mt-6 space-y-2">
+          <h3 className="text-base font-extrabold text-navy-950">{area.name}</h3>
+          <DataTable<StockRow>
+            data={rows}
+            keyExtractor={(row) => row.item.id}
+            itemLabel="items"
+            emptyMessage={`No inventory items recorded for ${area.name}.`}
+            columns={[
+              {
+                id: 'item',
+                header: 'ITEM',
+                className: 'font-bold text-navy-950',
+                render: (row) => row.item.name,
+              },
+              {
+                id: 'inStock',
+                header: 'IN STOCK',
+                render: (row) => (
+                  <span
+                    className={
+                      row.status === 'OUT' || row.status === 'CRITICAL'
+                        ? 'font-bold text-rose-600'
+                        : 'text-slate-700'
+                    }
+                  >
+                    {row.quantity} {row.item.unit}
+                  </span>
+                ),
+              },
+              {
+                id: 'usage',
+                header: 'USED PER DAY',
+                render: (row) =>
+                  row.usagePerDay > 0
+                    ? `${row.usagePerDay.toFixed(2)} ${row.item.unit}`
+                    : '—',
+              },
+              {
+                id: 'daysLeft',
+                header: 'DAYS LEFT',
+                render: (row) => (
+                  <span
+                    className={
+                      row.daysLeft !== null && row.daysLeft < 2
+                        ? 'font-extrabold text-rose-600'
+                        : 'text-slate-700'
+                    }
+                  >
+                    {row.daysLeft !== null ? row.daysLeft.toFixed(1) : '—'}
+                  </span>
+                ),
+              },
+              {
+                id: 'reorder',
+                header: 'REORDER AT',
+                render: (row) => `${row.item.reorderLevel} ${row.item.unit}`,
+              },
+              {
+                id: 'status',
+                header: 'STATUS',
+                render: (row) => (
+                  <Tag tone={STATUS_TONE[row.status]}>
+                    {STATUS_LABEL[row.status]}
+                  </Tag>
+                ),
+              },
+            ]}
+          />
         </div>
       ))}
 

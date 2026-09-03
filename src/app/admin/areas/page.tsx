@@ -38,27 +38,42 @@ export default async function AdminAreas() {
         description={`${cycleLabel(cycle)} · compare side by side to decide where to expand`}
       />
 
-      <KpiGrid>
-        <Kpi label="Areas" value={performance.length} />
+      <KpiGrid columns={6}>
         <Kpi
-          label="Customers"
+          label="ACTIVE AREAS"
+          value={performance.length}
+          tone="purple"
+          subtext="Coverage regions"
+        />
+        <Kpi
+          label="TOTAL CUSTOMERS"
           value={performance.reduce((s, p) => s + p.customers, 0)}
+          tone="blue"
+          subtext="Subscribed accounts"
         />
         <Kpi
-          label="Collected"
+          label="TOTAL COLLECTED"
           value={money(performance.reduce((s, p) => s + p.collected, 0))}
-          tone="success"
+          tone="emerald"
+          subtext="Revenue collected"
         />
         <Kpi
-          label="Profit"
+          label="NET PROFIT"
           value={money(performance.reduce((s, p) => s + p.profit, 0))}
-          tone="success"
+          tone="emerald"
+          subtext="After payouts & goods"
         />
-        <Kpi label="Best margin" value={best ? percent(best.margin) : '—'} tone="success" />
         <Kpi
-          label="Weakest margin"
+          label="BEST MARGIN"
+          value={best ? percent(best.margin) : '—'}
+          tone="emerald"
+          subtext={best ? best.area.name : '—'}
+        />
+        <Kpi
+          label="WEAKEST MARGIN"
           value={worst ? percent(worst.margin) : '—'}
-          tone="danger"
+          tone="rose"
+          subtext={worst ? worst.area.name : '—'}
         />
       </KpiGrid>
 

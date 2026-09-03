@@ -33,11 +33,28 @@ export async function getStore(): Promise<DataStore> {
       // the deployed bundle entirely, and every request that touched the
       // database failed with "the Prisma packages are not installed" — on the
       // host only, never locally, where node_modules is right there.
-      const [{ PrismaStore }, prismaModule, adapterModule] = await Promise.all([
-        import('./prisma/store'),
-        import('@prisma/client').catch(() => null),
-        import('@prisma/adapter-pg').catch(() => null),
-      ]);
+      let prismaModule = await import('@prisma/client').catch(() => null);
+      if (!prismaModule) {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          prismaModule = require('@prisma/client');
+        } catch {
+          // ignore
+        }
+      }
+
+      let adapterModule = await import('@prisma/adapter-pg').catch(() => null);
+      if (!adapterModule) {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          adapterModule = require('@prisma/adapter-pg');
+        } catch {
+          // ignore
+        }
+      }
+
+      const { PrismaStore } = await import('./prisma/store');
+
       if (!prismaModule || !adapterModule) {
         throw new Error(
           'DATA_PROVIDER=prisma but the Prisma packages are not installed.\n' +
@@ -45,26 +62,56 @@ export async function getStore(): Promise<DataStore> {
         );
       }
 
+      let pgModule = await import('pg').catch(() => null);
+      if (!pgModule) {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          pgModule = require('pg');
+        } catch {
+          // ignore
+        }
+      }
+
       const { PrismaClient } = prismaModule as {
         PrismaClient: new (options?: unknown) => unknown;
       };
       const { PrismaPg } = adapterModule as {
-        PrismaPg: new (options: { connectionString: string }) => unknown;
+        PrismaPg: new (poolOrConfig: unknown) => unknown;
+      };
+      const { Pool } = (pgModule ?? {}) as {
+        Pool?: new (options: unknown) => unknown;
       };
 
-      // One client per process, reused across requests. A fresh client per
-      // invocation would open its own connection pool every time and exhaust
-      // the database's connection limit on a serverless host.
-      const globalForPrisma = globalThis as unknown as { __carzzPrisma?: unknown };
-      globalForPrisma.__carzzPrisma ??= new PrismaClient({
-        // Prisma 7 connects through a driver adapter. node-postgres speaks to
-        // any Postgres — Neon, Supabase, RDS, a plain server — so the host
-        // stays a deployment choice rather than a code one.
-        adapter: new PrismaPg({
-          connectionString: requireEnv('DATABASE_URL'),
-        }),
-        log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
-      });
+      // One client and one connection pool per process, reused across requests.
+      // Passing an explicit pg.Pool instance keeps connections warm and avoids
+      // destroying and recreating sockets on every query.
+      const globalForPrisma = globalThis as unknown as {
+        __carzzPrisma?: unknown;
+        __carzzPgPool?: unknown;
+      };
+
+      if (!globalForPrisma.__carzzPrisma) {
+        let connectionString = requireEnv('DATABASE_URL');
+        if (connectionString.includes('sslmode=require') && !connectionString.includes('uselibpqcompat=true')) {
+          connectionString = connectionString.replace('sslmode=require', 'sslmode=verify-full');
+        }
+        let adapter: unknown;
+        if (Pool) {
+          globalForPrisma.__carzzPgPool ??= new Pool({
+            connectionString,
+            max: 20,
+            idleTimeoutMillis: 30000,
+          });
+          adapter = new PrismaPg(globalForPrisma.__carzzPgPool);
+        } else {
+          adapter = new PrismaPg({ connectionString });
+        }
+
+        globalForPrisma.__carzzPrisma = new PrismaClient({
+          adapter,
+          log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
+        });
+      }
 
       store = new PrismaStore(globalForPrisma.__carzzPrisma as never);
       break;
