@@ -8,10 +8,10 @@ import { Button } from '@/components/ui/primitives';
  * path on this site is allowed through — `//evil.example` and `https://…` are
  * both absolute URLs to a browser, and would turn sign-in into an open redirect.
  */
-function safeNext(value: string | undefined): string | null {
-  if (!value || !value.startsWith('/') || value.startsWith('//')) return null;
-  return value;
-}
+// function safeNext(value: string | undefined): string | null {
+//   if (!value || !value.startsWith('/') || value.startsWith('//')) return null;
+//   return value;
+// }
 
 export function LoginForm({ next }: { next?: string }) {
   const [email, setEmail] = useState('');

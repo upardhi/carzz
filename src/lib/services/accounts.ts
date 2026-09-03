@@ -240,14 +240,16 @@ async function _loadRedAlertsInternal(
   // adapter, which caps that operator at thirty values. Area ids are at most a
   // handful, and the rest of this file already scopes that way.
   const areaFilter = areaIds ? { areaId: { in: areaIds } } : {};
-  const [customers, confirmedPayments] = await Promise.all([
-    store.customers.find({ where: { ...areaFilter } }),
+  const [
+    // customers, 
+    confirmedPayments] = await Promise.all([
+    // store.customers.find({ where: { ...areaFilter } }),
     store.payments.find({
       where: { status: 'CONFIRMED', ...areaFilter },
       orderBy: [{ field: 'createdAt', dir: 'desc' }],
     }),
   ]);
-  const customerById = new Map(customers.map((c) => [c.id, c]));
+  // const customerById = new Map(customers.map((c) => [c.id, c]));
 
   // Newest first, so the first row seen for a customer is their latest payment
   // — the same one `findOne` with this ordering returned.
@@ -298,7 +300,7 @@ async function _loadRedAlertsInternal(
     );
     if (daysOverdue < 0) continue;
 
-    const lastPayment = lastPaymentMap.get(customerId);
+    // const lastPayment = lastPaymentMap.get(customerId);
 
     alerts.push({
       customer,
