@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { cache } from 'react';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getStore } from '../data';
 import type { User } from '../data/types';
@@ -20,10 +20,20 @@ export interface Session {
   scope: AccessScope;
 }
 
-/** Reads and validates the session cookie. Null when signed out. */
+/** Reads and validates the session cookie or Bearer token. Null when signed out. */
 export const getSession = cache(async (): Promise<Session | null> => {
   const jar = await cookies();
-  const claims = await verifySession(jar.get(SESSION_COOKIE)?.value);
+  let token = jar.get(SESSION_COOKIE)?.value;
+
+  if (!token) {
+    const head = await headers();
+    const authHeader = head.get('authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7).trim();
+    }
+  }
+
+  const claims = await verifySession(token);
   if (!claims) return null;
 
   const store = await getStore();

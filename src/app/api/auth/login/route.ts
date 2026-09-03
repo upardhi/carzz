@@ -96,5 +96,20 @@ async function signIn(request: Request) {
   const jar = await cookies();
   jar.set(SESSION_COOKIE, token, sessionCookieOptions);
 
-  return NextResponse.json({ ok: true, redirect: homeFor(user.role) });
+  return NextResponse.json({
+    ok: true,
+    redirect: homeFor(user.role),
+    token,
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+      customerId: user.customerId,
+      staffId: user.staffId,
+      areaId: user.areaId,
+      language: user.language,
+    },
+  });
 }

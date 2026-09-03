@@ -7,13 +7,38 @@ import { currentCycle, money } from '@/lib/util/format';
 
 const schema = z.object({ amount: z.number().int().positive() });
 
-/**
- * A wash boy asking for an advance against earnings.
- *
- * The cap is checked server-side and the request is stored either way — a
- * request over the limit still reaches the manager, flagged, rather than being
- * silently refused, because the manager may have a good reason to allow it.
- */
+export async function GET() {
+  try {
+    const session = await requireApiSession('pocket:request');
+    if (!session.user.staffId) {
+      throw new HttpError(403, 'This account has no staff record.');
+    }
+
+    const store = await getStore();
+    const cycle = currentCycle();
+    const allowance = await pocketAllowance(store, session.user.staffId, cycle);
+
+    const pastRequests = await store.pocketRequests.find({
+      where: { staffId: session.user.staffId },
+      orderBy: [{ field: 'requestedAt', dir: 'desc' }],
+    });
+
+    return NextResponse.json({
+      ok: true,
+      allowance,
+      pastRequests,
+    });
+  } catch (error) {
+    if (error instanceof HttpError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    return NextResponse.json(
+      { error: 'Could not fetch pocket allowance.' },
+      { status: 500 },
+    );
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const session = await requireApiSession('pocket:request');
