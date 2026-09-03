@@ -10,7 +10,7 @@
 import { readFileSync } from 'node:fs';
 import { DATE_FIELDS } from '../src/lib/data/prisma/fields';
 
-const schema = readFileSync('prisma/schema.prisma', 'utf8');
+const schema = readFileSync('prisma/schema.prisma', 'utf8').replace(/\r\n/g, '\n');
 
 /** `ServicePackage` → `servicePackage`, the name of its Prisma delegate. */
 const delegateName = (model: string) => model[0].toLowerCase() + model.slice(1);

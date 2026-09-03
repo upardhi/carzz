@@ -239,6 +239,10 @@ const payoutRunCache: Map<string, PayoutRunCacheEntry> =
   ((globalThis as unknown as { __payoutRunCache?: Map<string, PayoutRunCacheEntry> })
     .__payoutRunCache ??= new Map());
 
+export function invalidatePayoutRunCache(): void {
+  payoutRunCache.clear();
+}
+
 /** Every employee's payout for a cycle, within an access scope. */
 export function computePayoutRun(
   store: DataStore,
@@ -401,6 +405,7 @@ export async function approvePayout(
   payout: StaffPayout,
   approvedByUserId: Id,
 ): Promise<StaffPayout> {
+  invalidatePayoutRunCache();
   const record = {
     ...payout,
     status: 'APPROVED' as const,
