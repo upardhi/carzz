@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { PageHeader } from '@/components/shell/ConsoleShell';
 import {
   Kpi,
@@ -27,7 +28,7 @@ export default async function AreaReports() {
   const [performance, missed, staff, consumption, areas] = await Promise.all([
     areaPerformance(store, cycle, areaIds),
     missedWashReport(store, cycle, areaIds),
-    staffPerformance(store, cycle, areaIds),
+    staffPerformance(store, cycle, areaIds, { limit: 5 }),
     consumptionByArea(store, cycle, areaIds),
     store.areas.find(),
   ]);
@@ -170,9 +171,19 @@ export default async function AreaReports() {
           ) : null}
         </div>
 
-        <WidgetTable<(typeof staff)[number]>
+        <WidgetTable<(typeof staff.rows)[number]>
           title="Staff performance"
-          data={staff}
+          action={
+            staff.total > 5 ? (
+              <Link
+                href="/area/reports/staff"
+                className="text-xs font-bold text-navy-600 hover:text-navy-800 transition-colors"
+              >
+                View all ({staff.total}) →
+              </Link>
+            ) : undefined
+          }
+          data={staff.rows}
           keyExtractor={(row) => row.staffId}
           emptyMessage="No staff performance recorded."
           columns={[

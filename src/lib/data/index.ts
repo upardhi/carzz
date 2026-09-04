@@ -1,4 +1,5 @@
 import 'server-only';
+import { cache } from 'react';
 
 import type { DataStore } from './ports/store';
 import { MemoryStore } from './memory/store';
@@ -22,7 +23,7 @@ const globalForStore = globalThis as unknown as {
   __carzzPgPool?: unknown;
 };
 
-export async function getStore(): Promise<DataStore> {
+export const getStore = cache(async function getStore(): Promise<DataStore> {
   if (globalForStore.__carzzStore) return globalForStore.__carzzStore;
 
   const provider = (process.env.DATA_PROVIDER ?? 'memory') as DataProvider;
@@ -165,7 +166,7 @@ export async function getStore(): Promise<DataStore> {
 
   globalForStore.__carzzStore = store;
   return store;
-}
+});
 
 /**
  * The memory store is a fresh copy of the demo seed in every process — right

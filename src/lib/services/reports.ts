@@ -410,7 +410,7 @@ export interface StaffPerformanceRow {
 }
 
 interface StaffPerfCacheEntry {
-  data: Promise<StaffPerformanceRow[]>;
+  data: Promise<{ rows: StaffPerformanceRow[]; total: number }>;
   expires: number;
 }
 const staffPerfCache: Map<string, StaffPerfCacheEntry> =
@@ -421,15 +421,16 @@ export function staffPerformance(
   store: DataStore,
   cycle: string,
   areaIds: Id[] | null,
-): Promise<StaffPerformanceRow[]> {
-  const cacheKey = `${cycle}:${areaIds ? areaIds.slice().sort().join(',') : 'all'}`;
+  options?: { limit?: number },
+): Promise<{ rows: StaffPerformanceRow[]; total: number }> {
+  const cacheKey = `${cycle}:${areaIds ? areaIds.slice().sort().join(',') : 'all'}:${options?.limit ?? 'all'}`;
   const now = Date.now();
   const cached = staffPerfCache.get(cacheKey);
   if (cached && cached.expires > now) {
     return cached.data;
   }
 
-  const promise = _computeStaffPerformance(store, cycle, areaIds).catch((err) => {
+  const promise = _computeStaffPerformance(store, cycle, areaIds, options).catch((err) => {
     staffPerfCache.delete(cacheKey);
     throw err;
   });
@@ -446,15 +447,25 @@ async function _computeStaffPerformance(
   store: DataStore,
   cycle: string,
   areaIds: Id[] | null,
-): Promise<StaffPerformanceRow[]> {
-  const staff = await store.staff.find({
-    where: {
-      role: 'EMPLOYEE',
-      ...(areaIds ? { areaId: { in: areaIds } } : {}),
-    } as never,
-  });
+  options?: { limit?: number },
+): Promise<{ rows: StaffPerformanceRow[]; total: number }> {
+  const areaFilter = areaIds ? { areaId: { in: areaIds } } : {};
 
-  if (staff.length === 0) return [];
+  // Direct database-level count query for total employees
+  const [totalCount, staff] = await Promise.all([
+    store.staff.count({
+      role: 'EMPLOYEE',
+      ...areaFilter,
+    } as never),
+    store.staff.find({
+      where: {
+        role: 'EMPLOYEE',
+        ...areaFilter,
+      } as never,
+    }),
+  ]);
+
+  if (staff.length === 0) return { rows: [], total: totalCount };
 
   const staffIds = staff.map((s) => s.id);
   const [allVisits, allComplaints] = await Promise.all([
@@ -504,7 +515,10 @@ async function _computeStaffPerformance(
     };
   });
 
-  return rows.sort((a, b) => b.washes - a.washes);
+  const sorted = rows.sort((a, b) => b.washes - a.washes);
+  const displayed = options?.limit ? sorted.slice(0, options.limit) : sorted;
+
+  return { rows: displayed, total: totalCount };
 }
 
 export interface BusinessSummary {

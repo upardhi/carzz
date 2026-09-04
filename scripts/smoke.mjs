@@ -12,7 +12,7 @@
  * Pass --base=https://... to run the API and page suites against a deployed
  * environment instead (the server is then not started or stopped here).
  */
-import { spawn } from 'node:child_process';
+import { spawn, execSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { setTimeout as sleep } from 'node:timers/promises';
 
@@ -48,10 +48,13 @@ const check = (name, ok, detail = '') => {
 
 async function startServer() {
   if (externalBase) return null;
+  let logs = '';
   const server = spawn(process.execPath, [nextBin, 'start', '--port', String(PORT)], {
     stdio: ['ignore', 'pipe', 'pipe'],
     env: { ...process.env, PORT: String(PORT) },
   });
+  server.stdout?.on('data', (d) => { logs += d.toString(); });
+  server.stderr?.on('data', (d) => { logs += d.toString(); });
   for (let i = 0; i < 60; i += 1) {
     try {
       const r = await fetch(`${BASE}/login`);
@@ -61,13 +64,21 @@ async function startServer() {
     }
     await sleep(500);
   }
-  server.kill('SIGKILL');
-  throw new Error('server did not start');
+  await stopServer(server);
+  throw new Error(`server did not start: ${logs}`);
 }
 
 async function stopServer(server) {
   if (!server) return;
-  server.kill('SIGKILL');
+  if (process.platform === 'win32' && server.pid) {
+    try {
+      execSync(`taskkill /pid ${server.pid} /T /F`, { stdio: 'ignore' });
+    } catch {
+      server.kill('SIGKILL');
+    }
+  } else {
+    server.kill('SIGKILL');
+  }
   await sleep(400);
 }
 
@@ -131,12 +142,12 @@ async function uploadPhoto(visitId, kind, cookie) {
 /* Suite 1 — every route, for every role                                      */
 /* -------------------------------------------------------------------------- */
 
-const ADMIN_ROUTES = ['/admin', '/admin/areas', '/admin/reports', '/admin/sources',
+const ADMIN_ROUTES = ['/admin', '/admin/areas', '/admin/reports', '/admin/reports/staff', '/admin/sources',
   '/admin/payout', '/admin/accounting', '/admin/packages', '/admin/inventory',
   '/admin/complaints', '/admin/users', '/admin/settings'];
 const AREA_ROUTES = ['/area', '/area/schedule', '/area/customers', '/area/customers/new',
   '/area/staff', '/area/alerts', '/area/complaints', '/area/inventory', '/area/areas',
-  '/area/managers', '/area/reports'];
+  '/area/managers', '/area/reports', '/area/reports/staff'];
 const MANAGER_ROUTES = ['/manager', '/manager/schedule', '/manager/customers',
   '/manager/customers/new', '/manager/staff', '/manager/alerts', '/manager/complaints',
   '/manager/inventory'];
@@ -413,10 +424,10 @@ async function suiteOperations() {
     (await post('/api/admin/settings', { scope: 'payout', perWashRate: 1 }, manager)).status === 403);
 
   const payoutBefore = await html('/admin/payout', owner);
-  const totalBefore = payoutBefore.match(/Total payable[\s\S]{0,240}?₹([\d,]+)/)?.[1];
+  const totalBefore = payoutBefore.match(/TOTAL PAYABLE[\s\S]{0,240}?₹([\d,]+)/i)?.[1];
   await post('/api/admin/settings', { scope: 'payout', baseMode: 'DAY_SLAB' }, owner);
   const payoutAfter = await html('/admin/payout', owner);
-  const totalAfter = payoutAfter.match(/Total payable[\s\S]{0,240}?₹([\d,]+)/)?.[1];
+  const totalAfter = payoutAfter.match(/TOTAL PAYABLE[\s\S]{0,240}?₹([\d,]+)/i)?.[1];
   check('changing the base pay rule re-costs every payout',
     Boolean(totalBefore && totalAfter && totalBefore !== totalAfter), `${totalBefore} → ${totalAfter}`);
   await post('/api/admin/settings', { scope: 'payout', baseMode: 'PER_WASH' }, owner);

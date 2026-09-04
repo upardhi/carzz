@@ -226,47 +226,11 @@ async function _loadRedAlertsInternal(
     });
   }
 
-  // Both lookups are done once for the whole set rather than twice per
-  // customer inside the loop. This function feeds the sidebar badges, which
-  // are computed in the console layout — so every page in every console paid
-  // for two round trips per indebted customer, in series. Against a hosted
-  // database that was ~150 round trips, and it put roughly forty seconds in
-  // front of every screen. The memory provider hid it: there a lookup is a
-  // Map read, so the loop cost nothing.
-  //
-  // Both are narrowed by area rather than by a list of customer ids: the
-  // invoices above were already filtered to these areas, and `in` over a list
-  // that grows with the customer count would not survive the Firestore
-  // adapter, which caps that operator at thirty values. Area ids are at most a
-  // handful, and the rest of this file already scopes that way.
-  const areaFilter = areaIds ? { areaId: { in: areaIds } } : {};
-  const [
-    // customers, 
-    confirmedPayments] = await Promise.all([
-    // store.customers.find({ where: { ...areaFilter } }),
-    store.payments.find({
-      where: { status: 'CONFIRMED', ...areaFilter },
-      orderBy: [{ field: 'createdAt', dir: 'desc' }],
-    }),
-  ]);
-  // const customerById = new Map(customers.map((c) => [c.id, c]));
-
-  // Newest first, so the first row seen for a customer is their latest payment
-  // — the same one `findOne` with this ordering returned.
-  const lastPaymentOnByCustomer = new Map<Id, string>();
-  for (const payment of confirmedPayments) {
-    if (!lastPaymentOnByCustomer.has(payment.customerId)) {
-      lastPaymentOnByCustomer.set(payment.customerId, payment.createdAt);
-    }
-  }
-
   const alerts: RedAlert[] = [];
-
-  // --- Batch fetch to eliminate the N+1 loop ---
   const customerIds = [...byCustomer.keys()];
   if (customerIds.length === 0) return alerts;
 
-  // Two bulk queries replace the N*2 individual queries
+  // Single batch parallel query for indebted customers and their latest confirmed payments
   const [allCustomers, allPayments] = await Promise.all([
     store.customers.find({ where: { id: { in: customerIds } } as never }),
     store.payments.find({
@@ -314,7 +278,7 @@ async function _loadRedAlertsInternal(
             : agg.amount > 0 && daysOverdue > 0
               ? 'Payment overdue'
               : 'Month end, no payment',
-      lastPaymentOn: lastPaymentOnByCustomer.get(customerId) ?? null,
+      lastPaymentOn: lastPaymentMap.get(customerId)?.createdAt ?? null,
     });
   }
 

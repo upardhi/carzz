@@ -18,15 +18,19 @@ export async function ConsoleComplaints({
   const store = await getStore();
   const areaFilter = scopeAreaFilter(session.scope);
 
-  const [complaints, areas, staff, customers] = await Promise.all([
+  const [complaints, areas, staff] = await Promise.all([
     store.complaints.find({
       where: areaFilter as never,
       orderBy: [{ field: 'createdAt', dir: 'desc' }],
     }),
     store.areas.find(),
     store.staff.find(),
-    store.customers.find({ where: areaFilter as never }),
   ]);
+
+  const customerIds = [...new Set(complaints.map((c) => c.customerId))];
+  const customers = customerIds.length
+    ? await store.customers.find({ where: { id: { in: customerIds } } as never })
+    : [];
 
   const staffById = new Map(staff.map((s) => [s.id, s]));
   const customerById = new Map(customers.map((c) => [c.id, c]));

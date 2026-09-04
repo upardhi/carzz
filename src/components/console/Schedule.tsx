@@ -21,8 +21,8 @@ export async function ConsoleSchedule({
   const date = searchParams.date ?? todayISO();
   const areaFilter = scopeAreaFilter(session.scope);
 
-  // Single batch parallelization: fetch visits, staff, areas, attendance, customers, and active cars concurrently!
-  const [visits, staff, areas, attendance, customers, cars] = await Promise.all([
+  // Fetch day visits, active staff, areas, and attendance
+  const [visits, staff, areas, attendance] = await Promise.all([
     store.visits.find({
       where: { scheduledDate: date, ...areaFilter } as never,
       orderBy: [{ field: 'scheduledTime' }],
@@ -32,8 +32,18 @@ export async function ConsoleSchedule({
     }),
     store.areas.find(),
     store.attendance.find({ where: { date } }),
-    store.customers.find({ where: areaFilter as never }),
-    store.cars.find({ where: { active: true } }),
+  ]);
+
+  const customerIds = [...new Set(visits.map((v) => v.customerId))];
+  const carIds = [...new Set(visits.map((v) => v.carId))];
+
+  const [customers, cars] = await Promise.all([
+    customerIds.length
+      ? store.customers.find({ where: { id: { in: customerIds } } as never })
+      : Promise.resolve([]),
+    carIds.length
+      ? store.cars.find({ where: { id: { in: carIds } } as never })
+      : Promise.resolve([]),
   ]);
 
   const customerById = new Map(customers.map((c) => [c.id, c]));

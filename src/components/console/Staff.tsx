@@ -92,7 +92,7 @@ export async function ConsoleStaff({
 
   const attendanceByStaff = new Map(attendanceToday.map((a) => [a.staffId, a]));
   const areaById = new Map(areas.map((a) => [a.id, a]));
-  const performanceById = new Map(performance.map((p) => [p.staffId, p]));
+  const performanceById = new Map(performance.rows.map((p) => [p.staffId, p]));
   const staffById = new Map(staff.map((s) => [s.id, s]));
 
   // Anyone over the monthly off allowance is a discipline conversation waiting

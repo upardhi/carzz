@@ -6,10 +6,9 @@ import {
   KpiGrid,
   Note,
   Row,
-  Tag,
 } from '@/components/ui/primitives';
-import { DataTable } from '@/components/ui/DataTable';
 import { ActionButton } from '@/components/console/ActionButton';
+import { StaffPayoutTable } from '@/components/console/StaffPayoutTable';
 import { requirePermission } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { computePayoutRun } from '@/lib/services/payroll';
@@ -33,9 +32,6 @@ export default async function AdminPayout({
     store.areas.find(),
     store.getPayoutSettings(),
   ]);
-
-  const staffById = new Map(staff.map((s) => [s.id, s]));
-  const areaById = new Map(areas.map((a) => [a.id, a]));
 
   const total = payouts.reduce((sum, p) => sum + p.net, 0);
   const pending = payouts.filter((p) => p.status === 'DRAFT');
@@ -120,122 +116,11 @@ export default async function AdminPayout({
       </Card>
 
       <div className="mt-4">
-        <DataTable<(typeof payouts)[number]>
-          data={payouts}
-          keyExtractor={(payout) => payout.id}
-          itemLabel="staff payouts"
-          emptyMessage="No staff payouts for this month."
-          columns={[
-            {
-              id: 'staff',
-              header: 'STAFF',
-              className: 'font-bold text-navy-950',
-              render: (payout) => staffById.get(payout.staffId)?.name ?? '—',
-            },
-            {
-              id: 'area',
-              header: 'AREA',
-              render: (payout) => areaById.get(payout.areaId)?.name ?? '—',
-            },
-            {
-              id: 'washes',
-              header: 'WASHES',
-              align: 'center',
-              render: (payout) => payout.washes,
-            },
-            {
-              id: 'base',
-              header: 'BASE',
-              render: (payout) => money(payout.base),
-            },
-            {
-              id: 'bonuses',
-              header: 'BONUSES',
-              render: (payout) =>
-                payout.bonuses ? (
-                  <span className="font-semibold text-emerald-600">+{money(payout.bonuses)}</span>
-                ) : (
-                  '—'
-                ),
-            },
-            {
-              id: 'referrals',
-              header: 'REFERRALS',
-              render: (payout) =>
-                payout.referrals ? (
-                  <span className="font-semibold text-emerald-600">+{money(payout.referrals)}</span>
-                ) : (
-                  '—'
-                ),
-            },
-            {
-              id: 'deductions',
-              header: 'DEDUCTIONS',
-              render: (payout) =>
-                payout.deductions ? (
-                  <span className="font-semibold text-rose-600">−{money(payout.deductions)}</span>
-                ) : (
-                  '—'
-                ),
-            },
-            {
-              id: 'pocket',
-              header: 'POCKET TAKEN',
-              render: (payout) =>
-                payout.pocketTaken ? `−${money(payout.pocketTaken)}` : '—',
-            },
-            {
-              id: 'net',
-              header: 'NET PAYABLE',
-              className: 'font-extrabold text-slate-900',
-              render: (payout) => money(payout.net),
-            },
-            {
-              id: 'status',
-              header: 'STATUS',
-              render: (payout) => (
-                <Tag
-                  tone={
-                    payout.status === 'APPROVED'
-                      ? 'ok'
-                      : payout.status === 'HELD'
-                        ? 'bad'
-                        : 'warn'
-                  }
-                >
-                  {payout.status === 'DRAFT' ? 'Awaiting' : payout.status}
-                </Tag>
-              ),
-            },
-            {
-              id: 'action',
-              header: 'ACTION',
-              render: (payout) =>
-                payout.status === 'DRAFT' ? (
-                  <div className="flex gap-1.5">
-                    <ActionButton
-                      endpoint="/api/admin/payout"
-                      payload={{
-                        action: 'approveOne',
-                        staffId: payout.staffId,
-                        cycle,
-                      }}
-                    >
-                      Approve
-                    </ActionButton>
-                    <ActionButton
-                      endpoint="/api/admin/payout"
-                      variant="secondary"
-                      payload={{ action: 'hold', staffId: payout.staffId, cycle }}
-                    >
-                      Hold
-                    </ActionButton>
-                  </div>
-                ) : (
-                  <span className="text-ink-faint">—</span>
-                ),
-            },
-          ]}
+        <StaffPayoutTable
+          payouts={payouts}
+          staff={staff}
+          areas={areas}
+          cycle={cycle}
         />
       </div>
 
