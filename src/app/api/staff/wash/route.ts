@@ -4,6 +4,7 @@ import { HttpError, requireApiSession } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { MISS_REASONS } from '@/lib/data/types';
 import { completeWash, missWash, WashRuleError } from '@/lib/services/visits';
+import { resolvePublicPhotoUrl } from '@/lib/util/photoUrl';
 
 const schema = z.discriminatedUnion('action', [
   z.object({
@@ -54,7 +55,11 @@ export async function POST(request: Request) {
       });
       return NextResponse.json({
         ok: true,
-        visit: updated,
+        visit: {
+          ...updated,
+          beforePhotoUrl: resolvePublicPhotoUrl(updated.beforePhotoUrl),
+          afterPhotoUrl: resolvePublicPhotoUrl(updated.afterPhotoUrl),
+        },
         message: 'Wash closed. Your earnings have been updated.',
       });
     }

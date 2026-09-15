@@ -28,16 +28,18 @@ const f = (dateOnly: string[], timestamp: string[]): DateFields => ({
 
 /** Keyed by the Prisma delegate name (the model name, camel-cased). */
 export const DATE_FIELDS = {
-  user: f([], ['createdAt']),
+  user: f(['dob'], ['createdAt']),
   userCredential: NO_DATE_FIELDS,
   region: f([], ['createdAt']),
   area: f([], ['createdAt']),
-  staff: f(['joinedOn'], []),
+  staff: f(['joinedOn', 'dob'], []),
   attendance: f(['date'], ['loginAt']),
   pocketMoneyRequest: f([], ['requestedAt', 'decidedAt']),
+  staffLeave: f(['startDate', 'endDate'], ['appliedAt', 'decidedAt']),
   customer: f(['holdUntil', 'joinedOn'], []),
+
   servicePackage: NO_DATE_FIELDS,
-  car: NO_DATE_FIELDS,
+  car: f([], ['serviceStartedAt']),
   washVisit: f(['scheduledDate'], ['startedAt', 'completedAt']),
   payment: f([], ['createdAt']),
   invoice: f(['dueOn'], ['createdAt']),

@@ -8,7 +8,7 @@ import {
   BannerEditor,
   ContactEditor,
   PackagesEditor,
-  PublishToggle,
+  // PublishToggle,
   SectionsEditor,
   SeoEditor,
   TestimonialsEditor,
@@ -40,7 +40,7 @@ export default async function AdminWebsite() {
       />
 
       <div className="space-y-3">
-        <PublishToggle content={content} />
+        {/* <PublishToggle content={content} /> */}
 
         <Note tone="brand">
           You control the <b>words</b> here — the layout and design stay

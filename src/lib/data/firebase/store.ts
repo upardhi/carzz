@@ -20,6 +20,7 @@ import type {
   ServicePackage,
   SiteContent,
   Staff,
+  StaffLeave,
   StaffPayout,
   StockIssue,
   StockLevel,
@@ -43,6 +44,7 @@ export const COLLECTIONS = {
   staff: 'staff',
   attendance: 'attendance',
   pocketRequests: 'pocketMoneyRequests',
+  leaves: 'staffLeaves',
   customers: 'customers',
   cars: 'cars',
   packages: 'servicePackages',
@@ -68,6 +70,7 @@ export class FirestoreStore implements DataStore {
   readonly staff;
   readonly attendance;
   readonly pocketRequests;
+  readonly leaves;
   readonly customers;
   readonly cars;
   readonly packages;
@@ -92,10 +95,12 @@ export class FirestoreStore implements DataStore {
     this.staff = new FirestoreRepository<Staff>(c(COLLECTIONS.staff));
     this.attendance = new FirestoreRepository<Attendance>(c(COLLECTIONS.attendance));
     this.pocketRequests = new FirestoreRepository<PocketMoneyRequest>(c(COLLECTIONS.pocketRequests));
+    this.leaves = new FirestoreRepository<StaffLeave>(c(COLLECTIONS.leaves));
     this.customers = new FirestoreRepository<Customer>(c(COLLECTIONS.customers));
     this.cars = new FirestoreRepository<Car>(c(COLLECTIONS.cars));
     this.packages = new FirestoreRepository<ServicePackage>(c(COLLECTIONS.packages));
     this.visits = new FirestoreRepository<WashVisit>(c(COLLECTIONS.visits));
+
     this.payments = new FirestoreRepository<Payment>(c(COLLECTIONS.payments));
     this.invoices = new FirestoreRepository<Invoice>(c(COLLECTIONS.invoices));
     this.expenses = new FirestoreRepository<Expense>(c(COLLECTIONS.expenses));
@@ -184,6 +189,8 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   autoApprovePurchaseUnder: 0,
   teaBreakMinutes: 15,
   languages: ['en', 'hi', 'mr'],
+  minWashMinutes: 8,
+  maxWashMinutes: 45,
 };
 
 export const DEFAULT_PAYOUT_SETTINGS: PayoutSettings = {

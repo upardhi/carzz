@@ -9,7 +9,7 @@ import {
 import { requirePermission } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { businessSummary } from '@/lib/services/reports';
-import { currentCycle, cycleLabel, money, percent } from '@/lib/util/format';
+import { currentCycle, cycleLabel, money } from '@/lib/util/format';
 import { EXPENSE_HEAD_LABEL } from '@/lib/util/labels';
 import { ExpenseForm } from './ExpenseForm';
 
@@ -46,12 +46,6 @@ export default async function AdminAccounting({
     .reduce((s, p) => s + p.amount, 0);
 
   const totalCost = summary.payoutCost + summary.expenses;
-  // What the margin would be if every rupee already billed were collected.
-  const potentialMargin =
-    summary.collected + summary.outstanding > 0
-      ? (summary.profit + summary.outstanding) /
-        (summary.collected + summary.outstanding)
-      : 0;
 
   return (
     <>
@@ -85,8 +79,8 @@ export default async function AdminAccounting({
             />
           ))}
           <div className="mt-2 flex items-baseline justify-between border-t-2 border-navy-850 pt-2">
-            <span className="font-extrabold">Total</span>
-            <span className="font-extrabold">{money(totalCost)}</span>
+            <span className="font-bold">Total</span>
+            <span className="font-bold">{money(totalCost)}</span>
           </div>
         </Card>
 
@@ -98,7 +92,6 @@ export default async function AdminAccounting({
             sub={`Net profit · ${cycleLabel(cycle)}`}
           />
           <div className="mt-3">
-            <Row label="Margin" value={percent(summary.margin)} />
             <Row label="Cost per wash" value={money(summary.costPerWash)} />
             <Row label="Revenue per car" value={money(summary.revenuePerCar)} />
           </div>
@@ -107,9 +100,8 @@ export default async function AdminAccounting({
             <div className="mt-3">
               <Note>
                 If the {money(summary.outstanding)} outstanding were collected,
-                margin would be {percent(potentialMargin)} instead of{' '}
-                {percent(summary.margin)}. Collection is the biggest single
-                lever you have.
+                that adds {money(summary.outstanding)} straight to profit.
+                Collection is the biggest single lever you have.
               </Note>
             </div>
           ) : null}

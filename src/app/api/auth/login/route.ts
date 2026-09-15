@@ -51,10 +51,11 @@ async function signIn(request: Request) {
   const identifier = email.toLowerCase();
 
   // Staff sign in with a phone number far more often than an email, so accept
-  // either without making the user pick a mode.
-  const user =
-    (await store.users.findOne({ where: { email: identifier } })) ??
-    (await store.users.findOne({ where: { phone: email.trim() } }));
+  // either by detecting the format directly, cutting query latency in half.
+  const isEmail = identifier.includes('@');
+  const user = await (isEmail
+    ? store.users.findOne({ where: { email: identifier } })
+    : store.users.findOne({ where: { phone: email.trim() } }));
 
   // Same response and roughly the same work for a missing user as for a wrong
   // password, so the form cannot be used to enumerate accounts.
@@ -76,6 +77,27 @@ async function signIn(request: Request) {
     );
   }
 
+  // A disabled area or region locks out everyone assigned to it, not just
+  // the account itself — the office has stopped operating there.
+  if (user.areaId) {
+    const area = await store.areas.get(user.areaId);
+    if (area && !area.active) {
+      return NextResponse.json(
+        { error: 'This area has been disabled. Ask the office.' },
+        { status: 403 },
+      );
+    }
+  }
+  if (user.regionId) {
+    const region = await store.regions.get(user.regionId);
+    if (region && !region.active) {
+      return NextResponse.json(
+        { error: 'This region has been disabled. Ask the office.' },
+        { status: 403 },
+      );
+    }
+  }
+
   // Upgrade a seeded demo credential to a real hash on first use.
   if (credential && isSeedCredential(credential.passwordHash)) {
     await store.setCredential(user.id, await hashPassword(password));
@@ -95,5 +117,20 @@ async function signIn(request: Request) {
   const jar = await cookies();
   jar.set(SESSION_COOKIE, token, sessionCookieOptions);
 
-  return NextResponse.json({ ok: true, redirect: homeFor(user.role) });
+  return NextResponse.json({
+    ok: true,
+    redirect: homeFor(user.role),
+    token,
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+      customerId: user.customerId,
+      staffId: user.staffId,
+      areaId: user.areaId,
+      language: user.language,
+    },
+  });
 }

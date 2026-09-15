@@ -52,11 +52,11 @@ export function MobileShell({
             </button>
           ) : null}
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-[17px] font-extrabold tracking-tight">
+            <h1 className="truncate text-[17px] font-bold tracking-tight">
               {title}
             </h1>
             {subtitle ? (
-              <p className="truncate text-xs text-navy-300">{subtitle}</p>
+              <p className="truncate text-xs text-navy-300 font-medium">{subtitle}</p>
             ) : null}
           </div>
           {action}
@@ -83,7 +83,7 @@ export function MobileShell({
                 href={tab.href}
                 aria-current={active ? 'page' : undefined}
                 className={clsx(
-                  'flex flex-1 flex-col items-center gap-0.5 py-2 text-[10.5px] font-bold transition-colors',
+                  'flex flex-1 flex-col items-center gap-0.5 py-2 text-[10.5px] font-semibold transition-colors',
                   active
                     ? 'text-navy-800 shadow-[inset_0_2px_0_0_currentColor]'
                     : 'text-ink-mute hover:text-ink-soft',

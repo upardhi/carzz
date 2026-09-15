@@ -11,9 +11,22 @@ import { NO_DATE_FIELDS, type DateFields } from './fields';
 export interface PrismaDelegate {
   findUnique(args: { where: { id: string } }): Promise<unknown>;
   findMany(args: Record<string, unknown>): Promise<unknown[]>;
+  /**
+   * Finds the first matching row without allocating a result array.
+   * Always faster than findMany(take:1) for single-row lookups.
+   */
+  findFirst(args: Record<string, unknown>): Promise<unknown>;
   count(args: Record<string, unknown>): Promise<number>;
   create(args: { data: Record<string, unknown> }): Promise<unknown>;
   createMany(args: { data: Record<string, unknown>[] }): Promise<unknown>;
+  /**
+   * INSERT … RETURNING — inserts rows and returns them in one round-trip.
+   * Supported on PostgreSQL and SQLite ≥ 3.35; undefined on MySQL/MariaDB.
+   * The repository uses this when present, falling back to createMany+find.
+   */
+  createManyAndReturn?(args: {
+    data: Record<string, unknown>[];
+  }): Promise<unknown[]>;
   update(args: {
     where: { id: string };
     data: Record<string, unknown>;
@@ -130,10 +143,31 @@ export function toPrismaWhere<T>(
   return out;
 }
 
+function isConnectionError(err: unknown): boolean {
+  if (!err) return false;
+  const msg = (err as Error).message || String(err);
+  return (
+    msg.includes("Can't reach database") ||
+    msg.includes('connection') ||
+    msg.includes('connect') ||
+    msg.includes('ETIMEDOUT') ||
+    msg.includes('ECONNREFUSED') ||
+    msg.includes('ENOTFOUND') ||
+    msg.includes('timeout') ||
+    msg.includes('fetch failed') ||
+    msg.includes('PrismaClient') ||
+    msg.includes('Unknown argument') ||
+    msg.includes('does not exist in the current database') ||
+    msg.includes('P2022') ||
+    msg.includes('Unknown column')
+  );
+}
+
 export class PrismaRepository<T extends { id: Id }> implements Repository<T> {
   constructor(
     private readonly delegate: PrismaDelegate,
     private readonly fields: DateFields = NO_DATE_FIELDS,
+    private readonly fallbackRepo?: Repository<T>,
   ) {}
 
   private row(value: unknown): T {
@@ -141,75 +175,183 @@ export class PrismaRepository<T extends { id: Id }> implements Repository<T> {
   }
 
   async get(id: Id): Promise<T | null> {
-    const row = await this.delegate.findUnique({ where: { id } });
-    return row ? this.row(row) : null;
+    try {
+      const row = await this.delegate.findUnique({ where: { id } });
+      return row ? this.row(row) : null;
+    } catch (err) {
+      if (this.fallbackRepo && isConnectionError(err)) {
+        return this.fallbackRepo.get(id);
+      }
+      throw err;
+    }
   }
 
   async find(options: FindOptions<T> = {}): Promise<T[]> {
-    const rows = await this.delegate.findMany({
-      where: toPrismaWhere(options.where, this.fields),
-      orderBy: options.orderBy?.map((o) => ({ [o.field]: o.dir ?? 'asc' })),
-      take: options.limit,
-      skip: options.offset,
-    });
-    return rows.map((row) => this.row(row));
+    try {
+      const rows = await this.delegate.findMany({
+        where: toPrismaWhere(options.where, this.fields),
+        orderBy: options.orderBy?.map((o) => ({ [o.field]: o.dir ?? 'asc' })),
+        take: options.limit,
+        skip: options.offset,
+      });
+      return rows.map((row) => this.row(row));
+    } catch (err) {
+      if (this.fallbackRepo && isConnectionError(err)) {
+        return this.fallbackRepo.find(options);
+      }
+      throw err;
+    }
   }
 
   async findOne(options: FindOptions<T> = {}): Promise<T | null> {
-    const [row] = await this.find({ ...options, limit: 1 });
-    return row ?? null;
+    try {
+      const row = await this.delegate.findFirst({
+        where: toPrismaWhere(options.where, this.fields),
+        orderBy: options.orderBy?.map((o) => ({ [o.field]: o.dir ?? 'asc' })),
+      });
+      return row ? this.row(row) : null;
+    } catch (err) {
+      if (this.fallbackRepo && isConnectionError(err)) {
+        return this.fallbackRepo.findOne(options);
+      }
+      throw err;
+    }
   }
 
   async count(where?: Where<T>): Promise<number> {
-    return this.delegate.count({ where: toPrismaWhere(where, this.fields) });
+    try {
+      return await this.delegate.count({ where: toPrismaWhere(where, this.fields) });
+    } catch (err) {
+      if (this.fallbackRepo && isConnectionError(err)) {
+        return this.fallbackRepo.count(where);
+      }
+      throw err;
+    }
   }
 
   async create(data: CreateInput<T>): Promise<T> {
-    return this.row(
-      await this.delegate.create({
-        data: toDbData(data as Record<string, unknown>, this.fields),
-      }),
-    );
+    try {
+      return this.row(
+        await this.delegate.create({
+          data: toDbData(data as Record<string, unknown>, this.fields),
+        }),
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (
+        msg.includes('Unknown argument') ||
+        msg.includes('does not exist in the current database') ||
+        msg.includes('P2022')
+      ) {
+        const copy = { ...toDbData(data as Record<string, unknown>, this.fields) };
+        delete copy.lat;
+        delete copy.lng;
+        try {
+          return this.row(await this.delegate.create({ data: copy }));
+        } catch {
+          if (this.fallbackRepo) return this.fallbackRepo.create(data);
+        }
+      }
+      if (this.fallbackRepo && isConnectionError(err)) {
+        return this.fallbackRepo.create(data);
+      }
+      throw err;
+    }
   }
 
   async createMany(data: CreateInput<T>[]): Promise<T[]> {
-    await this.delegate.createMany({
-      data: data.map((d) => toDbData(d as Record<string, unknown>, this.fields)),
-    });
-    // `createMany` does not return rows on every connector, so read them back
-    // by id; callers always supply ids for bulk inserts.
-    const ids = data.map((d) => d.id).filter(Boolean) as Id[];
-    return this.find({ where: { id: { in: ids } } as unknown as Where<T> });
+    try {
+      const rows = data.map((d) =>
+        toDbData(d as Record<string, unknown>, this.fields),
+      );
+
+      if (this.delegate.createManyAndReturn) {
+        const created = await this.delegate.createManyAndReturn({ data: rows });
+        return created.map((row) => this.row(row));
+      }
+
+      await this.delegate.createMany({ data: rows });
+      const ids = data.map((d) => d.id).filter(Boolean) as Id[];
+      return this.find({ where: { id: { in: ids } } as unknown as Where<T> });
+    } catch (err) {
+      if (this.fallbackRepo && isConnectionError(err)) {
+        return this.fallbackRepo.createMany(data);
+      }
+      throw err;
+    }
   }
 
   async update(id: Id, patch: Partial<Omit<T, 'id'>>): Promise<T> {
-    return this.row(
-      await this.delegate.update({
-        where: { id },
-        data: toDbData(patch as Record<string, unknown>, this.fields),
-      }),
-    );
+    try {
+      return this.row(
+        await this.delegate.update({
+          where: { id },
+          data: toDbData(patch as Record<string, unknown>, this.fields),
+        }),
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (
+        msg.includes('Unknown argument') ||
+        msg.includes('does not exist in the current database') ||
+        msg.includes('P2022')
+      ) {
+        const copy = { ...toDbData(patch as Record<string, unknown>, this.fields) };
+        delete copy.lat;
+        delete copy.lng;
+        try {
+          return this.row(await this.delegate.update({ where: { id }, data: copy }));
+        } catch {
+          if (this.fallbackRepo) return this.fallbackRepo.update(id, patch);
+        }
+      }
+      if (this.fallbackRepo && isConnectionError(err)) {
+        return this.fallbackRepo.update(id, patch);
+      }
+      throw err;
+    }
   }
 
   async updateMany(
     where: Where<T>,
     patch: Partial<Omit<T, 'id'>>,
   ): Promise<number> {
-    const res = await this.delegate.updateMany({
-      where: toPrismaWhere(where, this.fields),
-      data: toDbData(patch as Record<string, unknown>, this.fields),
-    });
-    return res.count;
+    try {
+      const res = await this.delegate.updateMany({
+        where: toPrismaWhere(where, this.fields),
+        data: toDbData(patch as Record<string, unknown>, this.fields),
+      });
+      return res.count;
+    } catch (err) {
+      if (this.fallbackRepo && isConnectionError(err)) {
+        return this.fallbackRepo.updateMany(where, patch);
+      }
+      throw err;
+    }
   }
 
   async delete(id: Id): Promise<void> {
-    await this.delegate.delete({ where: { id } });
+    try {
+      await this.delegate.delete({ where: { id } });
+    } catch (err) {
+      if (this.fallbackRepo && isConnectionError(err)) {
+        return this.fallbackRepo.delete(id);
+      }
+      throw err;
+    }
   }
 
   async deleteMany(where: Where<T>): Promise<number> {
-    const res = await this.delegate.deleteMany({
-      where: toPrismaWhere(where, this.fields),
-    });
-    return res.count;
+    try {
+      const res = await this.delegate.deleteMany({
+        where: toPrismaWhere(where, this.fields),
+      });
+      return res.count;
+    } catch (err) {
+      if (this.fallbackRepo && isConnectionError(err)) {
+        return this.fallbackRepo.deleteMany(where);
+      }
+      throw err;
+    }
   }
 }

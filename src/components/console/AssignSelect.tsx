@@ -11,7 +11,7 @@ export function AssignSelect({
 }: {
   visitId: string;
   current: string | null;
-  staff: { id: string; name: string }[];
+  staff: { id: string; name: string; count?: number; isOnLeave?: boolean }[];
 }) {
   const router = useRouter();
   const [value, setValue] = useState(current ?? '');
@@ -63,8 +63,8 @@ export function AssignSelect({
       >
         <option value="">Unassigned</option>
         {staff.map((s) => (
-          <option key={s.id} value={s.id}>
-            {s.name}
+          <option key={s.id} value={s.id} disabled={s.isOnLeave}>
+            {s.name} {s.isOnLeave ? '🏖️ (On Leave)' : s.count !== undefined ? `(${s.count} cars${s.count > 14 ? ' ⚠️' : ''})` : ''}
           </option>
         ))}
       </select>
@@ -74,3 +74,4 @@ export function AssignSelect({
     </span>
   );
 }
+

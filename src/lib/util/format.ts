@@ -30,15 +30,20 @@ export function percent(value: number, digits = 0): string {
 }
 
 const DAY = new Intl.DateTimeFormat('en-IN', {
+  timeZone: 'Asia/Kolkata',
   day: 'numeric',
   month: 'short',
 });
 const DAY_YEAR = new Intl.DateTimeFormat('en-IN', {
+  timeZone: 'Asia/Kolkata',
   day: 'numeric',
   month: 'short',
   year: 'numeric',
 });
-const WEEKDAY = new Intl.DateTimeFormat('en-IN', { weekday: 'long' });
+const WEEKDAY = new Intl.DateTimeFormat('en-IN', {
+  timeZone: 'Asia/Kolkata',
+  weekday: 'long',
+});
 
 export function formatDate(value: DateOnly | Timestamp | Date): string {
   return DAY.format(toDate(value));
@@ -102,6 +107,14 @@ export function cycleLabel(cycle: string): string {
     month: 'long',
     year: 'numeric',
   }).format(new Date(Date.UTC(y, m - 1, 1)));
+}
+
+export function previousCycle(cycle: string = currentCycle()): string {
+  const [y, m] = cycle.split('-').map(Number);
+  if (m === 1) {
+    return `${y - 1}-12`;
+  }
+  return `${y}-${String(m - 1).padStart(2, '0')}`;
 }
 
 export function addDays(value: DateOnly | Date, days: number): Date {

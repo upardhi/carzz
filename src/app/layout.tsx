@@ -1,8 +1,12 @@
+import type { ReactNode } from 'react';
 import type { Metadata, Viewport } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import { InstallPrompt } from '@/components/pwa/InstallPrompt';
 import { OnlineStatus } from '@/components/pwa/OnlineStatus';
 import { ServiceWorkerRegistrar } from '@/components/pwa/ServiceWorker';
+import { OfflineSyncWatcher } from '@/components/pwa/OfflineSyncWatcher';
+import { ConfirmProvider } from '@/components/ui/ConfirmProvider';
+import { ToastProvider } from '@/components/ui/ToastProvider';
 import './globals.css';
 
 const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME ?? 'Carz Management';
@@ -45,7 +49,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#0f1e2a',
+  themeColor: '#081429',
   width: 'device-width',
   initialScale: 1,
   // Installed apps should not rubber-band or zoom on a double tap, but pinch
@@ -57,7 +61,7 @@ export const viewport: Viewport = {
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <html
@@ -65,10 +69,15 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable}`}
     >
       <body>
-        <OnlineStatus />
-        {children}
-        <InstallPrompt />
-        <ServiceWorkerRegistrar />
+        <ConfirmProvider>
+          <ToastProvider>
+            <OnlineStatus />
+            <OfflineSyncWatcher />
+            {children}
+            <InstallPrompt />
+            <ServiceWorkerRegistrar />
+          </ToastProvider>
+        </ConfirmProvider>
       </body>
     </html>
   );

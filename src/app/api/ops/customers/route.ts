@@ -1,16 +1,44 @@
+import { revalidatePath } from 'next/cache';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { HttpError, requireApiSession } from '@/lib/auth/server';
+import { hashPassword } from '@/lib/auth/password';
 import { getStore } from '@/lib/data';
+import type { DataStore } from '@/lib/data/ports/store';
 import {
   LEAD_SOURCES,
   WEEKDAY_PATTERNS,
   type Customer,
+  type Car,
 } from '@/lib/data/types';
 import { recordPayment } from '@/lib/services/accounts';
 import { generateVisitsForCar } from '@/lib/services/schedule';
 import { currentCycle, todayISO } from '@/lib/util/format';
 import { assertInScope, opsError } from '../_guard';
+
+/** A number plate identifies one real vehicle — two cars must never share one. */
+async function assertPlateAvailable(
+  store: DataStore,
+  plate: string,
+  excludeCarId?: string,
+): Promise<void> {
+  const existing = await store.cars.findOne({ where: { plate } as never });
+  if (existing && existing.id !== excludeCarId) {
+    throw new HttpError(409, `Plate ${plate} is already registered to another car.`);
+  }
+}
+
+function revalidateCustomerPages() {
+  try {
+    for (const base of ['/admin', '/manager', '/area']) {
+      revalidatePath(`${base}/customers`);
+      revalidatePath(`${base}/customers/[customerId]`, 'page');
+      revalidatePath(`${base}/schedule`);
+    }
+  } catch {
+    // ignore — running outside a request context
+  }
+}
 
 const carSchema = z.object({
   model: z.string().trim().min(1),
@@ -18,6 +46,7 @@ const carSchema = z.object({
   colour: z.string().trim().min(1),
   plate: z.string().trim().min(4),
   packageId: z.string().min(1),
+  schedulePattern: z.enum(WEEKDAY_PATTERNS).optional().default('MON_THU'),
   scheduleTime: z.string().regex(/^\d{2}:\d{2}$/),
   specialInstructions: z.string().max(300).optional(),
 });
@@ -33,23 +62,104 @@ const createSchema = z.object({
   altPhone: z.string().trim().optional(),
   address: z.string().trim().min(4),
   landmark: z.string().trim().optional(),
+  lat: z.number().optional().nullable(),
+  lng: z.number().optional().nullable(),
   note: z.string().max(300).optional(),
   areaId: z.string().min(1),
   cars: z.array(carSchema).min(1, 'Add at least one car'),
-  schedulePattern: z.enum(WEEKDAY_PATTERNS),
+  schedulePattern: z.enum(WEEKDAY_PATTERNS).optional(),
   assignedStaffId: z.string().optional(),
-  advance: z.number().int().min(0).default(0),
-  paymentMode: z.enum(['CASH', 'MANUAL_UPI', 'GATEWAY']).default('CASH'),
+  advance: z.number().int().min(0).optional().default(0),
+  paymentMode: z.enum(['CASH', 'MANUAL_UPI', 'GATEWAY']).optional().default('CASH'),
+  createLogin: z.boolean().optional(),
+  loginEmail: z.string().trim().email().optional(),
+  loginPassword: z.string().min(6).optional(),
+  enquiryId: z.string().optional(),
 });
 
 const statusSchema = z.object({
   action: z.literal('setStatus'),
   customerId: z.string().min(1),
   status: z.enum(['ACTIVE', 'HOLD', 'INACTIVE']),
-  holdUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  holdUntil: z.string().optional().nullable(),
 });
 
-const schema = z.discriminatedUnion('action', [createSchema, statusSchema]);
+const createLoginSchema = z.object({
+  action: z.literal('createLogin'),
+  customerId: z.string().min(1),
+  email: z.string().trim().email(),
+  password: z.string().min(6),
+});
+
+const startCarServiceSchema = z.object({
+  action: z.literal('startCarService'),
+  customerId: z.string().min(1),
+  carId: z.string().min(1),
+  assignedStaffId: z.string().optional().nullable(),
+  note: z.string().max(300).optional().nullable(),
+});
+
+const updateCustomerSchema = z.object({
+  action: z.literal('updateCustomer'),
+  customerId: z.string().min(1),
+  name: z.string().trim().min(2).optional(),
+  phone: z.string().trim().min(6).optional(),
+  altPhone: z.string().trim().optional().nullable(),
+  address: z.string().trim().min(4).optional(),
+  landmark: z.string().trim().optional().nullable(),
+  areaId: z.string().min(1).optional(),
+  source: z.enum(LEAD_SOURCES).optional(),
+  note: z.string().max(500).optional().nullable(),
+  status: z.enum(['ACTIVE', 'HOLD', 'INACTIVE']).optional(),
+});
+
+const updateCarSchema = z.object({
+  action: z.literal('updateCar'),
+  customerId: z.string().min(1),
+  carId: z.string().min(1),
+  make: z.string().trim().min(1).optional(),
+  model: z.string().trim().min(1).optional(),
+  colour: z.string().trim().min(1).optional(),
+  plate: z.string().trim().min(3).optional(),
+  packageId: z.string().min(1).optional(),
+  assignedStaffId: z.string().optional().nullable(),
+  schedulePattern: z.enum(WEEKDAY_PATTERNS).optional(),
+  scheduleTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  specialInstructions: z.string().max(300).optional().nullable(),
+  active: z.boolean().optional(),
+});
+
+const addCarSchema = z.object({
+  action: z.literal('addCar'),
+  customerId: z.string().min(1),
+  make: z.string().trim().min(1),
+  model: z.string().trim().min(1),
+  colour: z.string().trim().min(1),
+  plate: z.string().trim().min(3),
+  packageId: z.string().min(1),
+  schedulePattern: z.enum(WEEKDAY_PATTERNS),
+  scheduleTime: z.string().regex(/^\d{2}:\d{2}$/),
+  assignedStaffId: z.string().optional().nullable(),
+  specialInstructions: z.string().max(300).optional().nullable(),
+  autoStartService: z.boolean().optional(),
+});
+
+const deleteCarSchema = z.object({
+  action: z.literal('deleteCar'),
+  customerId: z.string().min(1),
+  carId: z.string().min(1),
+});
+
+const schema = z.discriminatedUnion('action', [
+  createSchema,
+  statusSchema,
+  createLoginSchema,
+  startCarServiceSchema,
+  updateCustomerSchema,
+  updateCarSchema,
+  addCarSchema,
+  deleteCarSchema,
+]);
 
 export async function POST(request: Request) {
   try {
@@ -87,11 +197,290 @@ export async function POST(request: Request) {
         );
       }
 
+      revalidateCustomerPages();
       return NextResponse.json({ ok: true, customer: updated });
+    }
+
+    if (parsed.data.action === 'createLogin') {
+      const customer = await store.customers.get(parsed.data.customerId);
+      if (!customer) throw new HttpError(404, 'Customer not found.');
+      assertInScope(session, customer.areaId);
+
+      const existingUser = await store.users.findOne({
+        where: { email: parsed.data.email.toLowerCase() },
+      });
+      if (existingUser && existingUser.id !== customer.userId) {
+        throw new HttpError(409, 'Someone already uses that email.');
+      }
+
+      let userId = customer.userId;
+      if (userId) {
+        await store.users.update(userId, {
+          email: parsed.data.email.toLowerCase(),
+          phone: customer.phone,
+          active: true,
+        });
+        await store.setCredential(userId, await hashPassword(parsed.data.password));
+      } else {
+        const user = await store.users.create({
+          name: customer.name,
+          email: parsed.data.email.toLowerCase(),
+          phone: customer.phone,
+          role: 'CUSTOMER',
+          regionId: null,
+          areaId: customer.areaId,
+          customerId: customer.id,
+          staffId: null,
+          language: 'en',
+          active: true,
+          createdAt: new Date().toISOString(),
+        });
+        userId = user.id;
+        await store.customers.update(customer.id, { userId });
+        await store.setCredential(user.id, await hashPassword(parsed.data.password));
+      }
+
+      revalidateCustomerPages();
+      return NextResponse.json({
+        ok: true,
+        message: `App login created for ${customer.name} (${parsed.data.email.toLowerCase()}).`,
+      });
+    }
+
+    if (parsed.data.action === 'startCarService') {
+      const customer = await store.customers.get(parsed.data.customerId);
+      if (!customer) throw new HttpError(404, 'Customer not found.');
+      assertInScope(session, customer.areaId);
+
+      const car = await store.cars.get(parsed.data.carId);
+      if (!car || car.customerId !== customer.id) {
+        throw new HttpError(404, 'Car not found for this customer.');
+      }
+
+      if (car.serviceStarted) {
+        revalidateCustomerPages();
+        return NextResponse.json({
+          ok: true,
+          car,
+          message: 'Service is already active for this car.',
+        });
+      }
+
+      const patch: Partial<Car> = {
+        serviceStarted: true,
+        serviceStartedAt: new Date().toISOString(),
+        serviceStartedBeforePayment: true,
+        serviceStartedByUserId: session.user.id,
+        serviceStartNote: parsed.data.note?.trim() || 'Started manually before payment by manager/admin',
+      };
+      if (parsed.data.assignedStaffId !== undefined) {
+        patch.assignedStaffId = parsed.data.assignedStaffId || null;
+      }
+
+      const updatedCar = await store.cars.update(car.id, patch);
+
+      const cycle = currentCycle();
+      await generateVisitsForCar(store, updatedCar, customer, cycle);
+
+      if (updatedCar.assignedStaffId) {
+        await store.visits.updateMany(
+          { carId: car.id, status: 'PENDING', scheduledDate: { gte: todayISO() } } as never,
+          { staffId: updatedCar.assignedStaffId },
+        );
+      }
+
+      revalidateCustomerPages();
+      return NextResponse.json({
+        ok: true,
+        car: updatedCar,
+        message: `Service started for ${car.make} ${car.model}. Washes scheduled immediately.`,
+      });
+    }
+
+    if (parsed.data.action === 'updateCustomer') {
+      const customer = await store.customers.get(parsed.data.customerId);
+      if (!customer) throw new HttpError(404, 'Customer not found.');
+      assertInScope(session, customer.areaId);
+      if (parsed.data.areaId && parsed.data.areaId !== customer.areaId) {
+        assertInScope(session, parsed.data.areaId);
+      }
+
+      const patch: Partial<Customer> = {};
+      if (parsed.data.name !== undefined) patch.name = parsed.data.name;
+      if (parsed.data.phone !== undefined) patch.phone = parsed.data.phone;
+      if (parsed.data.altPhone !== undefined) patch.altPhone = parsed.data.altPhone;
+      if (parsed.data.address !== undefined) patch.address = parsed.data.address;
+      if (parsed.data.landmark !== undefined) patch.landmark = parsed.data.landmark;
+      if (parsed.data.areaId !== undefined) patch.areaId = parsed.data.areaId;
+      if (parsed.data.source !== undefined) patch.source = parsed.data.source;
+      if (parsed.data.note !== undefined) patch.note = parsed.data.note;
+      if (parsed.data.status !== undefined) patch.status = parsed.data.status;
+
+      const updated = await store.customers.update(customer.id, patch);
+
+      // If area changed, also update customer's cars and pending visits areaId
+      if (parsed.data.areaId && parsed.data.areaId !== customer.areaId) {
+        await store.visits.updateMany(
+          { customerId: customer.id, status: 'PENDING', scheduledDate: { gte: todayISO() } } as never,
+          { areaId: parsed.data.areaId },
+        );
+      }
+
+      revalidateCustomerPages();
+      return NextResponse.json({
+        ok: true,
+        customer: updated,
+        message: 'Customer details updated successfully.',
+      });
+    }
+
+    if (parsed.data.action === 'updateCar') {
+      const customer = await store.customers.get(parsed.data.customerId);
+      if (!customer) throw new HttpError(404, 'Customer not found.');
+      assertInScope(session, customer.areaId);
+
+      const car = await store.cars.get(parsed.data.carId);
+      if (!car || car.customerId !== customer.id) throw new HttpError(404, 'Car not found.');
+
+      if (parsed.data.assignedStaffId) {
+        const assignee = await store.staff.get(parsed.data.assignedStaffId);
+        if (!assignee) throw new HttpError(404, 'That staff member was not found.');
+        if (!assignee.active) {
+          throw new HttpError(400, `${assignee.name} is deactivated and cannot be assigned washes.`);
+        }
+      }
+
+      if (parsed.data.plate !== undefined) {
+        await assertPlateAvailable(store, parsed.data.plate.toUpperCase(), car.id);
+      }
+
+      const patch: Partial<Car> = {};
+      if (parsed.data.make !== undefined) patch.make = parsed.data.make;
+      if (parsed.data.model !== undefined) patch.model = parsed.data.model;
+      if (parsed.data.colour !== undefined) patch.colour = parsed.data.colour;
+      if (parsed.data.plate !== undefined) patch.plate = parsed.data.plate.toUpperCase();
+      if (parsed.data.packageId !== undefined) patch.packageId = parsed.data.packageId;
+      if (parsed.data.assignedStaffId !== undefined) patch.assignedStaffId = parsed.data.assignedStaffId;
+      if (parsed.data.schedulePattern !== undefined) patch.schedulePattern = parsed.data.schedulePattern;
+      if (parsed.data.scheduleTime !== undefined) patch.scheduleTime = parsed.data.scheduleTime;
+      if (parsed.data.specialInstructions !== undefined) patch.specialInstructions = parsed.data.specialInstructions;
+      if (parsed.data.active !== undefined) patch.active = parsed.data.active;
+
+      const updatedCar = await store.cars.update(car.id, patch);
+
+      // If staff assignment changed, update pending future visits
+      if (parsed.data.assignedStaffId !== undefined) {
+        await store.visits.updateMany(
+          { carId: car.id, status: 'PENDING', scheduledDate: { gte: todayISO() } } as never,
+          { staffId: parsed.data.assignedStaffId },
+        );
+      }
+
+      revalidateCustomerPages();
+      return NextResponse.json({
+        ok: true,
+        car: updatedCar,
+        message: `${updatedCar.make} ${updatedCar.model} updated successfully.`,
+      });
+    }
+
+    if (parsed.data.action === 'addCar') {
+      const customer = await store.customers.get(parsed.data.customerId);
+      if (!customer) throw new HttpError(404, 'Customer not found.');
+      assertInScope(session, customer.areaId);
+
+      const pkg = await store.packages.get(parsed.data.packageId);
+      if (!pkg) throw new HttpError(400, 'Selected package not found.');
+
+      await assertPlateAvailable(store, parsed.data.plate.toUpperCase());
+
+      const car = await store.cars.create({
+        customerId: customer.id,
+        model: parsed.data.model,
+        make: parsed.data.make,
+        colour: parsed.data.colour,
+        plate: parsed.data.plate.toUpperCase(),
+        packageId: parsed.data.packageId,
+        assignedStaffId: parsed.data.assignedStaffId || null,
+        schedulePattern: parsed.data.schedulePattern,
+        scheduleTime: parsed.data.scheduleTime,
+        specialInstructions: parsed.data.specialInstructions || null,
+        active: true,
+        serviceStarted: parsed.data.autoStartService ?? true,
+        serviceStartedAt: (parsed.data.autoStartService ?? true) ? new Date().toISOString() : null,
+        serviceStartedBeforePayment: false,
+        serviceStartedByUserId: session.user.id,
+        serviceStartNote: 'Added from Customer Management',
+      });
+
+      const cycle = currentCycle();
+      if (car.serviceStarted) {
+        await generateVisitsForCar(store, car, customer, cycle);
+      }
+
+      revalidateCustomerPages();
+      return NextResponse.json({
+        ok: true,
+        car,
+        message: `Added ${car.make} ${car.model} (${car.plate}). Schedule generated.`,
+      });
+    }
+
+    if (parsed.data.action === 'deleteCar') {
+      const customer = await store.customers.get(parsed.data.customerId);
+      if (!customer) throw new HttpError(404, 'Customer not found.');
+      assertInScope(session, customer.areaId);
+
+      const car = await store.cars.get(parsed.data.carId);
+      if (!car || car.customerId !== customer.id) throw new HttpError(404, 'Car not found.');
+
+      const completedCount = await store.visits.count({ carId: car.id, status: 'DONE' } as never);
+      if (completedCount > 0) {
+        await store.cars.update(car.id, { active: false });
+        await store.visits.updateMany(
+          { carId: car.id, status: 'PENDING', scheduledDate: { gte: todayISO() } } as never,
+          { status: 'MISSED', missReason: 'CUSTOMER_CANCELLED', missNote: 'Car deactivated by admin' } as never,
+        );
+        revalidateCustomerPages();
+        return NextResponse.json({
+          ok: true,
+          message: `${car.make} ${car.model} has past wash history and was marked inactive. Future visits cancelled.`,
+        });
+      } else {
+        await store.visits.deleteMany({ carId: car.id, status: 'PENDING' } as never);
+        await store.cars.delete(car.id);
+        revalidateCustomerPages();
+        return NextResponse.json({
+          ok: true,
+          message: `${car.make} ${car.model} deleted.`,
+        });
+      }
     }
 
     const data = parsed.data;
     assertInScope(session, data.areaId);
+
+    if (data.createLogin && data.loginEmail) {
+      const existing = await store.users.findOne({
+        where: { email: data.loginEmail.toLowerCase() },
+      });
+      if (existing) {
+        throw new HttpError(409, 'Someone already uses that login email.');
+      }
+    }
+
+    // Check every car's plate before creating anything, so a duplicate plate
+    // on the second car of a multi-car signup doesn't leave a half-created
+    // customer behind.
+    const requestedPlates = new Set<string>();
+    for (const input of data.cars) {
+      const plate = input.plate.toUpperCase();
+      if (requestedPlates.has(plate)) {
+        throw new HttpError(409, `Plate ${plate} was entered for more than one car in this request.`);
+      }
+      requestedPlates.add(plate);
+      await assertPlateAvailable(store, plate);
+    }
 
     const cycle = currentCycle();
     const customer = await store.customers.create({
@@ -102,8 +491,8 @@ export async function POST(request: Request) {
       altPhone: data.altPhone || null,
       address: data.address,
       landmark: data.landmark || null,
-      lat: null,
-      lng: null,
+      lat: data.lat ?? null,
+      lng: data.lng ?? null,
       source: data.source,
       referredById: data.referredById || null,
       status: 'ACTIVE',
@@ -112,7 +501,27 @@ export async function POST(request: Request) {
       joinedOn: todayISO(),
     } as Omit<Customer, 'id'>);
 
+    if (data.createLogin && data.loginEmail && data.loginPassword) {
+      const user = await store.users.create({
+        name: data.name,
+        email: data.loginEmail.toLowerCase(),
+        phone: data.phone,
+        role: 'CUSTOMER',
+        regionId: null,
+        areaId: data.areaId,
+        customerId: customer.id,
+        staffId: null,
+        language: 'en',
+        active: true,
+        createdAt: new Date().toISOString(),
+      });
+      await store.customers.update(customer.id, { userId: user.id });
+      await store.setCredential(user.id, await hashPassword(data.loginPassword));
+    }
+
     let monthly = 0;
+    const isPrepaidPaid = data.advance > 0;
+
     for (const input of data.cars) {
       const pkg = await store.packages.get(input.packageId);
       if (!pkg) throw new HttpError(400, 'Unknown package on one of the cars.');
@@ -126,15 +535,20 @@ export async function POST(request: Request) {
         plate: input.plate.toUpperCase(),
         packageId: input.packageId,
         assignedStaffId: data.assignedStaffId || null,
-        schedulePattern: data.schedulePattern,
+        schedulePattern: input.schedulePattern,
         scheduleTime: input.scheduleTime,
         specialInstructions: input.specialInstructions || null,
         active: true,
+        serviceStarted: isPrepaidPaid,
+        serviceStartedAt: isPrepaidPaid ? new Date().toISOString() : null,
+        serviceStartedBeforePayment: false,
+        serviceStartedByUserId: isPrepaidPaid ? session.user.id : null,
+        serviceStartNote: null,
       });
 
-      // Saving the customer creates the month's visits, so the wash boy's
-      // route is populated the same day rather than the next month.
-      await generateVisitsForCar(store, car, customer, cycle);
+      if (isPrepaidPaid) {
+        await generateVisitsForCar(store, car, customer, cycle);
+      }
     }
 
     await store.invoices.create({
@@ -160,8 +574,21 @@ export async function POST(request: Request) {
       });
     }
 
+    if (data.enquiryId) {
+      const enq = await store.enquiries.get(data.enquiryId);
+      if (enq) {
+        await store.enquiries.update(enq.id, {
+          status: 'CONVERTED',
+          convertedCustomerId: customer.id,
+          handledByUserId: session.user.id,
+          handledAt: new Date().toISOString(),
+        });
+      }
+    }
+
     const visits = await store.visits.count({ customerId: customer.id, cycle });
 
+    revalidateCustomerPages();
     return NextResponse.json({
       ok: true,
       customer,

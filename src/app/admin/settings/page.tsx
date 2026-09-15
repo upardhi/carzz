@@ -3,11 +3,11 @@ import { Card, CardHeading, Note, Row } from '@/components/ui/primitives';
 import { requirePermission } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { money } from '@/lib/util/format';
-import { LANGUAGE_LABEL } from '@/lib/util/labels';
 import {
   OperatingRulesForm,
   PayoutBaseForm,
   PayoutRulesForm,
+  PhotoPurgeButton,
 } from './SettingsForms';
 
 export const metadata = { title: 'Settings' };
@@ -16,15 +16,36 @@ export default async function AdminSettings() {
   await requirePermission('settings:manage');
   const store = await getStore();
 
-  const [app, payout, visits] = await Promise.all([
+  const [app, payout, allVisits] = await Promise.all([
     store.getAppSettings(),
     store.getPayoutSettings(),
-    store.visits.count({ status: 'DONE' }),
+    store.visits.find(),
   ]);
 
-  // Two photos per completed wash, at roughly a quarter of a megabyte each.
-  const photosStored = visits * 2;
-  const storageGb = (photosStored * 0.25) / 1024;
+  // Compute exact stored photo count and actual bytes
+  let photosStored = 0;
+  let totalBytes = 0;
+
+  for (const v of allVisits) {
+    if (v.beforePhotoUrl) {
+      photosStored += 1;
+      totalBytes += v.beforePhotoBytes ?? 250000;
+    }
+    if (v.afterPhotoUrl) {
+      photosStored += 1;
+      totalBytes += v.afterPhotoBytes ?? 250000;
+    }
+  }
+
+  // Format actual storage size dynamically
+  let formattedSize = '0 MB';
+  if (totalBytes < 1024 * 1024) {
+    formattedSize = `${(totalBytes / 1024).toFixed(1)} KB`;
+  } else if (totalBytes < 1024 * 1024 * 1024) {
+    formattedSize = `${(totalBytes / (1024 * 1024)).toFixed(1)} MB`;
+  } else {
+    formattedSize = `${(totalBytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+  }
 
   return (
     <>
@@ -61,7 +82,7 @@ export default async function AdminSettings() {
           <CardHeading>Photo storage</CardHeading>
           <Row label="Kept for" value={`${app.photoRetentionMonths} months`} />
           <Row label="Photos stored" value={photosStored.toLocaleString('en-IN')} />
-          <Row label="Approximate size" value={`${storageGb.toFixed(1)} GB`} />
+          <Row label="Storage used" value={formattedSize} />
           <Row
             label="Both photos required"
             value={app.requireBothPhotos ? 'Yes' : 'No'}
@@ -74,6 +95,7 @@ export default async function AdminSettings() {
               never on a guessable public address.
             </Note>
           </div>
+          <PhotoPurgeButton />
         </Card>
 
         <Card className="p-4">
@@ -83,7 +105,7 @@ export default async function AdminSettings() {
             value={
               payout.baseMode === 'PER_WASH'
                 ? `${money(payout.perWashRate)} per wash`
-                : `Slab ${payout.slabByCarIndex.map((v) => money(v)).join(' / ')}`
+                : `Slab ${(payout.slabByCarIndex as number[]).map((v) => money(v)).join(' / ')}`
             }
           />
           <Row label="On-time bonus" value={money(payout.onTimeBonus)} />
@@ -97,10 +119,6 @@ export default async function AdminSettings() {
             value={`${payout.pocketWeeklyCapPercent}% weekly, ${money(payout.pocketMinimumBalance)} must stay`}
           />
           <Row label="Reminder channel" value={app.reminderChannel} />
-          <Row
-            label="Staff app languages"
-            value={app.languages.map((l) => LANGUAGE_LABEL[l]).join(', ')}
-          />
           <Row label="Tea break" value={`${app.teaBreakMinutes} minutes`} />
         </Card>
       </div>

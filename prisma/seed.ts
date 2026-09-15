@@ -1,25 +1,33 @@
 /**
- * Loads the starter dataset into a Postgres database.
+ * Loads the dataset into a Postgres database.
  *
  *   npm run db:push && npm run db:seed
+ *   npm run db:push && npm run db:seed:prod
  *
  * This CLEARS every table first, so run it on a fresh database or one you are
- * deliberately resetting. The deployment path does not use it directly: see
- * `prisma/setup.ts`, which seeds only a database that is completely empty.
+ * deliberately resetting.
  */
 import { createPrismaClient } from './client';
 import { seedDemoData } from './seed-demo';
+import { seedProdData } from './seed-prod';
 
 const prisma = createPrismaClient();
 
-seedDemoData(prisma)
+const isProd = process.env.SEED_MODE === 'production' || process.env.PROD_SEED === 'true';
+
+const run = isProd ? seedProdData(prisma) : seedDemoData(prisma);
+
+run
   .then(() => {
-    process.stdout.write(
-      '\nDone. Sign in as owner@carzz.app / owner123 with DATA_PROVIDER=prisma.\n',
-    );
+    if (!isProd) {
+      process.stdout.write(
+        '\nDone. Sign in as owner@carzz.app / owner123 with DATA_PROVIDER=prisma.\n',
+      );
+    }
   })
   .catch((error) => {
     process.stderr.write(`\nSeed failed: ${String(error)}\n`);
     process.exitCode = 1;
   })
   .finally(() => prisma.$disconnect());
+

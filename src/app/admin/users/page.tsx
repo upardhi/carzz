@@ -1,165 +1,109 @@
+import Link from 'next/link';
 import { PageHeader } from '@/components/shell/ConsoleShell';
-import {
-  Card,
-  CardHeading,
-  Kpi,
-  KpiGrid,
-  Note,
-  Table,
-  TableWrap,
-  Tag,
-  Td,
-  Th,
-} from '@/components/ui/primitives';
-import { ActionButton } from '@/components/console/ActionButton';
 import { requirePermission } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
-import { ROLES } from '@/lib/data/types';
-import { formatDateFull } from '@/lib/util/format';
-import { ROLE_BLURB, ROLE_LABEL } from '@/lib/util/labels';
-import { AddUserForm } from './AddUserForm';
+import { ROLES, type Role } from '@/lib/data/types';
+import { UsersClient } from './UsersClient';
 
-export const metadata = { title: 'People & roles' };
+export const metadata = { title: 'Company People' };
 
-export default async function AdminUsers() {
+export default async function AdminUsers({
+  searchParams,
+}: {
+  searchParams: Promise<{ role?: string }>;
+}) {
   const session = await requirePermission('user:manage');
   const store = await getStore();
+  const { role } = await searchParams;
+  const initialRoleFilter: 'ALL' | Role =
+    role && ROLES.includes(role as Role) ? (role as Role) : 'ALL';
+  const initialWhere =
+    initialRoleFilter === 'ALL'
+      ? { role: { ne: 'CUSTOMER' } as never }
+      : { role: initialRoleFilter };
 
-  const [users, areas, regions] = await Promise.all([
-    store.users.find({ orderBy: [{ field: 'name' }] }),
+  const [
+    initialStaffUsers,
+    totalStaffMatching,
+    countSuperAdmin,
+    countAreaAdmin,
+    countManager,
+    countEmployee,
+    countCustomer,
+    countAllStaff,
+    countActiveStaff,
+    countDisabledStaff,
+    areas,
+    regions,
+  ] = await Promise.all([
+    store.users.find({
+      where: initialWhere,
+      orderBy: [{ field: 'name', dir: 'asc' }],
+      limit: 10,
+      offset: 0,
+    }),
+    store.users.count(initialWhere),
+    store.users.count({ role: 'SUPER_ADMIN' }),
+    store.users.count({ role: 'AREA_ADMIN' }),
+    store.users.count({ role: 'MANAGER' }),
+    store.users.count({ role: 'EMPLOYEE' }),
+    store.users.count({ role: 'CUSTOMER' }),
+    store.users.count({ role: { ne: 'CUSTOMER' } as never }),
+    store.users.count({ role: { ne: 'CUSTOMER' } as never, active: true }),
+    store.users.count({ role: { ne: 'CUSTOMER' } as never, active: false }),
     store.areas.find({ orderBy: [{ field: 'name' }] }),
-    store.regions.find(),
+    store.regions.find({ orderBy: [{ field: 'name' }] }),
   ]);
 
-  const areaById = new Map(areas.map((a) => [a.id, a]));
-  const regionById = new Map(regions.map((r) => [r.id, r]));
+  const initialKpiCounts: Record<Role, number> = {
+    SUPER_ADMIN: countSuperAdmin,
+    AREA_ADMIN: countAreaAdmin,
+    MANAGER: countManager,
+    EMPLOYEE: countEmployee,
+    CUSTOMER: countCustomer,
+  };
 
-  // Customers are listed under Customers, not here — this screen is the staff
-  // org chart and who can reach what.
-  const staffUsers = users.filter((u) => u.role !== 'CUSTOMER');
-  const countByRole = new Map(
-    ROLES.map((role) => [role, users.filter((u) => u.role === role).length]),
-  );
+  const initialStatusCounts = {
+    all: countAllStaff,
+    active: countActiveStaff,
+    disabled: countDisabledStaff,
+  };
+
+  const titleByRole: Record<'ALL' | Role, string> = {
+    ALL: 'Company People',
+    SUPER_ADMIN: 'Super Admins',
+    AREA_ADMIN: 'Area Admins',
+    MANAGER: 'Area Managers',
+    EMPLOYEE: 'Boys',
+    CUSTOMER: 'Customers',
+  };
 
   return (
-    <>
+    <div className="space-y-4">
       <PageHeader
-        title="People & roles"
+        title={titleByRole[initialRoleFilter]}
         description="Who exists, and what each of them can reach"
+        actions={
+          <Link
+            href="/admin/users/new"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 cursor-pointer"
+          >
+            <span>+</span> Add Person
+          </Link>
+        }
       />
 
-      <KpiGrid>
-        {ROLES.map((role) => (
-          <Kpi
-            key={role}
-            label={ROLE_LABEL[role]}
-            value={countByRole.get(role) ?? 0}
-            hint={role === 'CUSTOMER' ? 'app logins' : undefined}
-          />
-        ))}
-      </KpiGrid>
-
-      <div className="mt-4 grid gap-3 xl:grid-cols-[2fr_1fr]">
-        <div>
-          <TableWrap>
-            <Table>
-              <thead>
-                <tr>
-                  <Th>Name</Th>
-                  <Th>Role</Th>
-                  <Th>Reaches</Th>
-                  <Th>Email</Th>
-                  <Th>Mobile</Th>
-                  <Th>Added</Th>
-                  <Th>Status</Th>
-                  <Th>Action</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {staffUsers.map((user) => (
-                  <tr key={user.id}>
-                    <Td className="font-bold">{user.name}</Td>
-                    <Td>
-                      <Tag tone={user.role === 'SUPER_ADMIN' ? 'info' : 'neutral'}>
-                        {ROLE_LABEL[user.role]}
-                      </Tag>
-                    </Td>
-                    <Td className="text-[12px] text-ink-mute">
-                      {user.role === 'SUPER_ADMIN'
-                        ? 'Every area'
-                        : user.regionId
-                          ? `${regionById.get(user.regionId)?.name ?? '—'} region`
-                          : user.areaId
-                            ? (areaById.get(user.areaId)?.name ?? '—')
-                            : '—'}
-                    </Td>
-                    <Td className="text-[12px] text-ink-mute">{user.email}</Td>
-                    <Td className="text-[12px] text-ink-mute">{user.phone}</Td>
-                    <Td className="whitespace-nowrap text-[12px] text-ink-mute">
-                      {formatDateFull(user.createdAt)}
-                    </Td>
-                    <Td>
-                      <Tag tone={user.active ? 'ok' : 'bad'}>
-                        {user.active ? 'Active' : 'Disabled'}
-                      </Tag>
-                    </Td>
-                    <Td>
-                      {user.id === session.user.id ? (
-                        <span className="text-[12px] text-ink-faint">You</span>
-                      ) : (
-                        <ActionButton
-                          endpoint="/api/admin/users"
-                          variant={user.active ? 'secondary' : 'primary'}
-                          payload={{
-                            action: 'setActive',
-                            userId: user.id,
-                            active: !user.active,
-                          }}
-                          confirm={
-                            user.active
-                              ? `Deactivate ${user.name}? Their login stops working immediately.`
-                              : undefined
-                          }
-                        >
-                          {user.active ? 'Deactivate' : 'Reactivate'}
-                        </ActionButton>
-                      )}
-                    </Td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          </TableWrap>
-
-          <Card className="mt-3 p-4">
-            <CardHeading>What each role can reach</CardHeading>
-            {ROLES.map((role) => (
-              <div
-                key={role}
-                className="flex items-baseline justify-between gap-3 border-b border-dashed border-line-soft py-1.5 text-sm last:border-0"
-              >
-                <span className="font-bold">{ROLE_LABEL[role]}</span>
-                <span className="text-right text-ink-mute">{ROLE_BLURB[role]}</span>
-              </div>
-            ))}
-            <div className="mt-3">
-              <Note>
-                Scope is enforced on every read and write, not just hidden in
-                the menu — a manager cannot reach another area&rsquo;s records
-                even by editing the address bar.
-              </Note>
-            </div>
-          </Card>
-        </div>
-
-        <Card className="p-4">
-          <CardHeading>Add someone</CardHeading>
-          <AddUserForm
-            regions={regions.map((r) => ({ id: r.id, name: r.name }))}
-            areas={areas.map((a) => ({ id: a.id, name: a.name }))}
-          />
-        </Card>
-      </div>
-    </>
+      <UsersClient
+        initialUsers={initialStaffUsers}
+        initialAreas={areas}
+        initialRegions={regions}
+        initialKpiCounts={initialKpiCounts}
+        initialStatusCounts={initialStatusCounts}
+        initialTotalItems={totalStaffMatching}
+        initialRoleFilter={initialRoleFilter}
+        currentUserId={session.user.id}
+      />
+    </div>
   );
 }
+

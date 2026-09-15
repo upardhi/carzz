@@ -1,7 +1,18 @@
+import { revalidatePath } from 'next/cache';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { HttpError, requireApiSession } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
+import { invalidatePayoutRunCache } from '@/lib/services/payroll';
+
+function revalidateSettingsPages() {
+  try {
+    revalidatePath('/admin/settings');
+    revalidatePath('/admin/payout');
+  } catch {
+    // ignore — running outside a request context
+  }
+}
 
 const appSchema = z.object({
   scope: z.literal('app'),
@@ -16,6 +27,8 @@ const appSchema = z.object({
   reminderChannel: z.enum(['WHATSAPP', 'SMS', 'PUSH']).optional(),
   teaBreakMinutes: z.number().int().min(0).max(120).optional(),
   autoApprovePurchaseUnder: z.number().int().min(0).optional(),
+  minWashMinutes: z.number().int().min(0).max(120).optional(),
+  maxWashMinutes: z.number().int().min(1).max(240).optional(),
 });
 
 const payoutSchema = z.object({
@@ -62,6 +75,7 @@ export async function POST(request: Request) {
     if (parsed.data.scope === 'app') {
       const { scope: _scope, ...patch } = parsed.data;
       const saved = await store.saveAppSettings(patch);
+      revalidateSettingsPages();
       return NextResponse.json({
         ok: true,
         settings: saved,
@@ -71,6 +85,8 @@ export async function POST(request: Request) {
 
     const { scope: _scope, ...patch } = parsed.data;
     const saved = await store.savePayoutSettings(patch);
+    invalidatePayoutRunCache();
+    revalidateSettingsPages();
     return NextResponse.json({
       ok: true,
       settings: saved,

@@ -10,7 +10,7 @@
  *   - Anything that mutates (POST/PATCH/DELETE): never cached.
  */
 
-const VERSION = 'v1';
+const VERSION = 'v4';
 const SHELL_CACHE = `carzz-shell-${VERSION}`;
 const PAGE_CACHE = `carzz-pages-${VERSION}`;
 const API_CACHE = `carzz-api-${VERSION}`;
@@ -21,6 +21,7 @@ const SHELL_ASSETS = [
   '/icons/icon-192.png',
   '/icons/icon-512.png',
   '/icons/apple-touch-icon.png',
+  '/favicon-32.png',
 ];
 
 self.addEventListener('install', (event) => {
@@ -62,11 +63,27 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
-  // Never serve a stale session decision.
-  if (url.pathname.startsWith('/api/auth')) return;
+  // Never serve a stale session decision or webpack HMR.
+  if (
+    url.pathname.startsWith('/api/auth') ||
+    url.pathname.includes('webpack-hmr') ||
+    url.pathname.includes('hot-update')
+  ) {
+    return;
+  }
 
   if (request.mode === 'navigate') {
     event.respondWith(handleNavigation(request));
+    return;
+  }
+
+  // Next.js App Router client navigation RSC payloads
+  if (
+    request.headers.get('RSC') === '1' ||
+    request.headers.get('Next-Router-State-Tree') ||
+    url.searchParams.has('_rsc')
+  ) {
+    event.respondWith(networkFirst(request, PAGE_CACHE));
     return;
   }
 
@@ -90,6 +107,15 @@ async function handleNavigation(request) {
     if (response.ok) {
       const cache = await caches.open(PAGE_CACHE);
       cache.put(request, response.clone());
+      return response;
+    }
+    // If the server returned a 5xx error (e.g. database unreachable when offline),
+    // serve the cached version or fallback to /offline rather than showing raw server error.
+    if (response.status >= 500) {
+      const cached = await caches.match(request);
+      if (cached) return cached;
+      const offline = await caches.match('/offline');
+      if (offline) return offline;
     }
     return response;
   } catch {
@@ -98,10 +124,13 @@ async function handleNavigation(request) {
     const offline = await caches.match('/offline');
     return (
       offline ??
-      new Response('You are offline.', {
-        status: 503,
-        headers: { 'Content-Type': 'text/plain' },
-      })
+      new Response(
+        '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Offline · Carz</title><style>body{background:#081429;color:#fff;font-family:system-ui,-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px;box-sizing:border-box;text-align:center}.card{background:#0e203f;border:1px solid #1e3a6a;border-radius:16px;padding:32px 24px;max-width:400px;width:100%}h1{font-size:22px;margin:0 0 10px;font-weight:800}p{color:#94a3b8;font-size:14px;line-height:1.5;margin:0 0 20px}button{background:#2563eb;color:#fff;border:none;padding:12px 24px;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;width:100%}</style></head><body><div class="card"><h1>You are offline</h1><p>Carz will reload automatically when your connection returns. Last loaded data is saved.</p><button onclick="window.location.reload()">Retry Connection</button></div></body></html>',
+        {
+          status: 503,
+          headers: { 'Content-Type': 'text/html; charset=utf-8' },
+        },
+      )
     );
   }
 }
@@ -109,15 +138,6 @@ async function handleNavigation(request) {
 async function cacheFirst(request, cacheName) {
   const cached = await caches.match(request);
   if (cached) return cached;
-  const response = await fetch(request);
-  if (response.ok) {
-    const cache = await caches.open(cacheName);
-    cache.put(request, response.clone());
-  }
-  return response;
-}
-
-async function networkFirst(request, cacheName) {
   try {
     const response = await fetch(request);
     if (response.ok) {
@@ -126,10 +146,28 @@ async function networkFirst(request, cacheName) {
     }
     return response;
   } catch {
+    return new Response('', { status: 408 });
+  }
+}
+
+async function networkFirst(request, cacheName) {
+  try {
+    const response = await fetch(request);
+    if (response.ok) {
+      const cache = await caches.open(cacheName);
+      cache.put(request, response.clone());
+      return response;
+    }
+    if (response.status >= 500) {
+      const cached = await caches.match(request);
+      if (cached) return cached;
+    }
+    return response;
+  } catch {
     const cached = await caches.match(request);
     if (cached) return cached;
     return new Response(
-      JSON.stringify({ error: 'offline', message: 'No connection.' }),
+      JSON.stringify({ error: 'offline', message: 'No connection.', offline: true }),
       { status: 503, headers: { 'Content-Type': 'application/json' } },
     );
   }

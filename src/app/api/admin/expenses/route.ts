@@ -1,8 +1,10 @@
+import { revalidatePath } from 'next/cache';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { HttpError, requireApiSession } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { EXPENSE_HEADS } from '@/lib/data/types';
+import { invalidateAreaPerformanceCache } from '@/lib/services/reports';
 
 const schema = z.object({
   head: z.enum(EXPENSE_HEADS),
@@ -34,6 +36,12 @@ export async function POST(request: Request) {
       createdAt: new Date().toISOString(),
     });
 
+    invalidateAreaPerformanceCache();
+    try {
+      revalidatePath('/admin/accounting');
+    } catch {
+      // ignore — running outside a request context
+    }
     return NextResponse.json({ ok: true, message: 'Expense recorded.' });
   } catch (error) {
     if (error instanceof HttpError) {
