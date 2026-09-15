@@ -29,7 +29,7 @@ interface CarDraft {
 
 export interface IntakeOptions {
   areas: { id: string; name: string }[];
-  packages: { id: string; name: string; price: number; washesPerMonth: number }[];
+  packages: { id: string; name: string; price: number; washesPerMonth: number; services?: string[] }[];
   staff: { id: string; name: string; areaId: string }[];
   defaultAreaId: string;
 }
@@ -649,6 +649,30 @@ export function AddCustomerForm({
                           </option>
                         ))}
                       </select>
+                      {(() => {
+                        const pkg = options.packages.find((p) => p.id === car.packageId);
+                        if (!pkg?.services || pkg.services.length === 0) return null;
+                        
+                        return (
+                          <div className="mt-2 space-y-1.5 rounded-xl border border-slate-100 bg-slate-50 p-2.5">
+                            {pkg.services.map((s, i) => {
+                              const [name, count] = s.split(':');
+                              const frequency = count || pkg.washesPerMonth;
+                              return (
+                                <div key={i} className="flex items-center justify-between text-xs font-medium text-slate-600">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-100 text-[9px] text-emerald-600">
+                                      ✓
+                                    </span>
+                                    {name}
+                                  </div>
+                                  <span className="text-[11px] text-slate-500">{frequency} / mo</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     {/* Preferred time */}

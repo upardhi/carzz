@@ -847,25 +847,25 @@ export function AreaManagementClient({
                         {region ? region.name : ''}
                       </p>
                       {area.area.address ? (
-                        <p
-                          className="mt-0.5 text-[11px] text-ink-soft line-clamp-1"
+                        <div
+                          className="mt-1 flex items-start gap-1 text-[11px] text-ink-soft"
                           title={area.area.address}
                         >
+                          <span className="shrink-0 pt-0.5">📍</span>
                           {area.area.lat !== null && area.area.lat !== undefined && area.area.lng !== null && area.area.lng !== undefined ? (
                             <a
                               href={`https://www.google.com/maps/search/?api=1&query=${area.area.lat},${area.area.lng}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="hover:text-blue-600 hover:underline inline-flex items-center gap-0.5"
+                              className="hover:text-blue-600 hover:underline inline-flex items-center gap-0.5 leading-snug break-words line-clamp-2"
                             >
-                              <span>📍</span>
                               <span>{area.area.address}</span>
-                              <span className="text-[9px] text-blue-600">↗</span>
+                              <span className="text-[9px] text-blue-600 shrink-0 mt-0.5 self-start">↗</span>
                             </a>
                           ) : (
-                            <span>📍 {area.area.address}</span>
+                            <span className="leading-snug break-words line-clamp-2">{area.area.address}</span>
                           )}
-                        </p>
+                        </div>
                       ) : null}
                     </div>
                     <div className="flex items-center gap-1.5">

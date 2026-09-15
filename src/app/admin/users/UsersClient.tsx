@@ -132,6 +132,22 @@ export function UsersClient({
     fetchUsers(page, pageSize);
   }, [page, pageSize, roleFilter, statusFilter, debouncedSearch, sortBy, sortDir, fetchUsers]);
 
+  // Sync state with props when Next.js soft-navigates (e.g. from sidebar links)
+  useEffect(() => {
+    setRoleFilter(initialRoleFilter);
+    setUsers(initialUsers);
+    setPagination(prev => ({
+      ...prev,
+      page: 1,
+      totalItems: initialTotalItems,
+      totalPages: Math.max(1, Math.ceil(initialTotalItems / prev.pageSize)),
+      hasNext: initialTotalItems > prev.pageSize,
+      hasPrev: false,
+    }));
+    setKpiCounts(initialKpiCounts);
+    setStatusCounts(initialStatusCounts);
+  }, [initialRoleFilter, initialUsers, initialTotalItems, initialKpiCounts, initialStatusCounts]);
+
   const areaById = new Map(areas.map((a) => [a.id, a]));
   const regionById = new Map(regions.map((r) => [r.id, r]));
 

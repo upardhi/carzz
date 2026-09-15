@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { Note } from '@/components/ui/primitives';
 import { useToast } from '@/components/ui/ToastProvider';
 import { DocumentUploadPreview } from '@/components/ui/DocumentUploadPreview';
+import { LocationPickerMap } from '@/components/ui/LocationPickerMap';
 import type { Role, Area, Region } from '@/lib/data/types';
 import { ROLE_LABEL } from '@/lib/util/labels';
 
@@ -85,6 +86,8 @@ export function AddPersonClient({
 
   // 3. Address & Personal
   const [address, setAddress] = useState('');
+  const [lat, setLat] = useState<number | null>(null);
+  const [lng, setLng] = useState<number | null>(null);
   const [emergencyContactName, setEmergencyContactName] = useState('');
   const [emergencyPhone, setEmergencyPhone] = useState('');
   const [dob, setDob] = useState('');
@@ -642,81 +645,82 @@ export function AddPersonClient({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="sm:col-span-2 lg:col-span-1">
-                <label className="block text-xs font-bold text-navy-950 mb-1" htmlFor="new-address">
-                  Residential Address
-                </label>
-                <div className="relative">
-                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                    </svg>
-                  </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-navy-950 mb-1" htmlFor="new-address">
+                    Residential Address
+                  </label>
                   <input
                     id="new-address"
-                    className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-xs sm:text-sm text-navy-950 placeholder:text-slate-400 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600 shadow-xs"
-                    placeholder="e.g. Flat 302, Sai Residency, College Road, Nashik"
+                    className="w-full rounded-xl border border-slate-200 bg-white py-2.5 px-3 text-xs sm:text-sm text-navy-950 placeholder:text-slate-400 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600 shadow-xs"
+                    placeholder="Flat/House No, Building, Street, City, Pincode"
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
                   />
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-xs font-bold text-navy-950 mb-1" htmlFor="new-emer-name">
-                  Emergency Contact Name
-                </label>
-                <div className="relative">
-                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
+                <hr className="border-slate-100" />
+
+                <div className="pt-1">
+                  <h3 className="text-sm font-bold text-navy-950">Emergency Contact Details</h3>
+                  <p className="text-[11px] text-slate-500 mb-3">Person to be contacted in case of emergency</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-navy-950 mb-1" htmlFor="new-emer-name">
+                        Emergency Contact Name
+                      </label>
+                      <input
+                        id="new-emer-name"
+                        className="w-full rounded-xl border border-slate-200 bg-white py-2.5 px-3 text-xs sm:text-sm text-navy-950 placeholder:text-slate-400 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600 shadow-xs"
+                        placeholder="e.g. Ramesh (Father / Spouse)"
+                        value={emergencyContactName}
+                        onChange={(e) => setEmergencyContactName(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-navy-950 mb-1" htmlFor="new-emer-phone">
+                        Emergency Mobile Phone
+                      </label>
+                      <input
+                        id="new-emer-phone"
+                        inputMode="tel"
+                        className="w-full rounded-xl border border-slate-200 bg-white py-2.5 px-3 text-xs sm:text-sm text-navy-950 placeholder:text-slate-400 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600 shadow-xs"
+                        placeholder="e.g. 9822100099"
+                        value={emergencyPhone}
+                        onChange={(e) => setEmergencyPhone(e.target.value)}
+                      />
+                    </div>
                   </div>
-                  <input
-                    id="new-emer-name"
-                    className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-xs sm:text-sm text-navy-950 placeholder:text-slate-400 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600 shadow-xs"
-                    placeholder="e.g. Ramesh (Father / Spouse)"
-                    value={emergencyContactName}
-                    onChange={(e) => setEmergencyContactName(e.target.value)}
-                  />
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-xs font-bold text-navy-950 mb-1" htmlFor="new-emer-phone">
-                  Emergency Mobile Phone
-                </label>
-                <div className="relative">
-                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                    </svg>
-                  </div>
-                  <input
-                    id="new-emer-phone"
-                    inputMode="tel"
-                    className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-xs sm:text-sm text-navy-950 placeholder:text-slate-400 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600 shadow-xs"
-                    placeholder="e.g. 9822100099"
-                    value={emergencyPhone}
-                    onChange={(e) => setEmergencyPhone(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-navy-950 mb-1" htmlFor="new-dob">
-                  Date of Birth
-                </label>
-                <div className="relative">
+                <div className="pt-2">
+                  <label className="block text-xs font-bold text-navy-950 mb-1" htmlFor="new-dob">
+                    Date of Birth
+                  </label>
                   <input
                     id="new-dob"
                     type="date"
-                    className="w-full rounded-xl border border-slate-200 bg-white py-2.5 px-3 text-xs sm:text-sm text-navy-950 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600 shadow-xs"
+                    className="w-full sm:w-1/2 rounded-xl border border-slate-200 bg-white py-2.5 px-3 text-xs sm:text-sm text-navy-950 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600 shadow-xs"
                     value={dob}
                     onChange={(e) => setDob(e.target.value)}
                   />
                 </div>
+              </div>
+
+              <div>
+                <LocationPickerMap
+                  address={address}
+                  lat={lat}
+                  lng={lng}
+                  city="Nagpur"
+                  hideAddressInput
+                  onAddressChange={(newAddress) => setAddress(newAddress)}
+                  onCoordinatesChange={(newLat, newLng) => {
+                    setLat(newLat);
+                    setLng(newLng);
+                  }}
+                />
               </div>
             </div>
           </div>

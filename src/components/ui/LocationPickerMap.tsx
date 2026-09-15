@@ -22,6 +22,10 @@ interface LocationPickerMapProps {
   city?: string;
   /** Whether the text address is mandatory to submit the form it's in — false (optional) by default. */
   addressRequired?: boolean;
+  /** Custom label for the address field */
+  addressLabel?: string;
+  /** Hides the address text input if we want to render it outside */
+  hideAddressInput?: boolean;
   onAddressChange: (address: string) => void;
   onCoordinatesChange: (lat: number | null, lng: number | null) => void;
 }
@@ -106,6 +110,8 @@ export function LocationPickerMap({
   lng,
   city = 'Nagpur',
   addressRequired = false,
+  addressLabel,
+  hideAddressInput = false,
   onAddressChange,
   onCoordinatesChange,
 }: LocationPickerMapProps) {
@@ -331,19 +337,23 @@ export function LocationPickerMap({
   return (
     <div className="space-y-3">
       {/* Address Text Field */}
-      <div>
-        <label className="field-label" htmlFor="garage-address">
-          {addressRequired ? 'Garage / Hub Address *' : 'Garage / Hub Address (Optional)'}
-        </label>
-        <input
-          id="garage-address"
-          className="field text-sm"
-          placeholder="e.g. Plot 14, MIDC Area, Near Toll Plaza"
-          value={address}
-          onChange={(e) => onAddressChange(e.target.value)}
-          required={addressRequired}
-        />
-      </div>
+      {!hideAddressInput && (
+        <div>
+          <label className="field-label" htmlFor="garage-address">
+            {addressRequired
+              ? `${addressLabel || 'Garage / Hub Address'} *`
+              : `${addressLabel || 'Garage / Hub Address'} (Optional)`}
+          </label>
+          <input
+            id="garage-address"
+            className="field text-sm"
+            placeholder="e.g. Plot 14, MIDC Area, Near Toll Plaza"
+            value={address}
+            onChange={(e) => onAddressChange(e.target.value)}
+            required={addressRequired}
+          />
+        </div>
+      )}
 
       {/* Interactive Map & Search Section */}
       <div className="rounded-xl border border-line bg-surface-elevated p-3 space-y-2.5">

@@ -7,6 +7,7 @@ import { toast } from '@/components/ui/ToastProvider';
 import { money } from '@/lib/util/format';
 
 import { DocumentUploadPreview } from '@/components/ui/DocumentUploadPreview';
+import { LocationPickerMap } from '@/components/ui/LocationPickerMap';
 
 const OTHER_DOC_TYPES = [
   { value: 'driving_license', label: 'Driving License' },
@@ -50,6 +51,8 @@ export function AddStaffForm({
   // Personal & Emergency Contact
   const [dob, setDob] = useState('');
   const [address, setAddress] = useState('');
+  const [lat, setLat] = useState<number | null>(null);
+  const [lng, setLng] = useState<number | null>(null);
   const [emergencyContactName, setEmergencyContactName] = useState('');
   const [emergencyPhone, setEmergencyPhone] = useState('');
 
@@ -482,12 +485,16 @@ export function AddStaffForm({
           <label className="block text-[10px] font-semibold uppercase tracking-wider text-ink-mute mb-1" htmlFor="st-address">
             Residential Address
           </label>
-          <input
-            id="st-address"
-            className="w-full rounded-xl border border-line bg-surface px-3 py-2 text-xs sm:text-sm text-ink placeholder:text-ink-faint focus:border-navy-500 focus:outline-none shadow-2xs"
-            placeholder="House / Flat No., Landmark, City, Pincode"
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
+          <LocationPickerMap
+            address={address}
+            lat={lat}
+            lng={lng}
+            city="Nagpur"
+            onAddressChange={(newAddress) => setAddress(newAddress)}
+            onCoordinatesChange={(newLat, newLng) => {
+              setLat(newLat);
+              setLng(newLng);
+            }}
           />
         </div>
 

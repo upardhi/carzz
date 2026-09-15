@@ -223,111 +223,120 @@ async function AdminDashboardContent() {
           </div>
 
           <div className="space-y-3">
-            {unapproved.length > 0 ? (
-              <Link href="/admin/payout" className="block group">
-                <div className="flex items-center justify-between rounded-xl border border-line-soft border-l-4 border-l-rose-500 bg-white p-3.5 shadow-xs transition-all hover:bg-slate-50/70 hover:shadow-sm">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-rose-50 text-rose-600">
-                      <IconRupee width={18} height={18} strokeWidth={2.2} />
+            {!(unapproved.length > 0 || purchases > 0 || escalatedComplaints > 0 || summary.outstanding > 0 || (worstSource && worstSource.costPerActiveCar > 1000)) ? (
+              <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 py-8 text-center bg-slate-50/50">
+                <p className="text-sm font-semibold text-slate-700">You're all caught up!</p>
+                <p className="text-xs text-slate-500 mt-1">No urgent actions require your attention.</p>
+              </div>
+            ) : (
+              <>
+                {unapproved.length > 0 ? (
+                  <Link href="/admin/payout" className="block group">
+                    <div className="flex items-center justify-between rounded-xl border border-line-soft border-l-4 border-l-rose-500 bg-white p-3.5 shadow-xs transition-all hover:bg-slate-50/70 hover:shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-rose-50 text-rose-600">
+                          <IconRupee width={18} height={18} strokeWidth={2.2} />
+                        </div>
+                        <div>
+                          <b className="text-sm font-semibold text-navy-950 group-hover:text-blue-600 transition-colors">
+                            Staff payout pending approval
+                          </b>
+                          <p className="mt-0.5 text-xs text-ink-mute">
+                            {unapproved.length} staff members · {money(unapproved.reduce((s, p) => s + p.net, 0))} total · Click to approve.
+                          </p>
+                        </div>
+                      </div>
+                      <IconChevronRight width={16} height={16} className="text-slate-400 group-hover:text-blue-600 transition-colors" />
                     </div>
-                    <div>
-                      <b className="text-sm font-semibold text-navy-950 group-hover:text-blue-600 transition-colors">
-                        Staff payout pending approval
-                      </b>
-                      <p className="mt-0.5 text-xs text-ink-mute">
-                        {unapproved.length} staff members · {money(unapproved.reduce((s, p) => s + p.net, 0))} total · Click to approve.
-                      </p>
-                    </div>
-                  </div>
-                  <IconChevronRight width={16} height={16} className="text-slate-400 group-hover:text-blue-600 transition-colors" />
-                </div>
-              </Link>
-            ) : null}
+                  </Link>
+                ) : null}
 
-            {purchases > 0 ? (
-              <Link href="/admin/inventory" className="block group">
-                <div className="flex items-center justify-between rounded-xl border border-line-soft border-l-4 border-l-amber-500 bg-white p-3.5 shadow-xs transition-all hover:bg-slate-50/70 hover:shadow-sm">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
-                      <IconClock width={18} height={18} strokeWidth={2.2} />
+                {purchases > 0 ? (
+                  <Link href="/admin/inventory" className="block group">
+                    <div className="flex items-center justify-between rounded-xl border border-line-soft border-l-4 border-l-amber-500 bg-white p-3.5 shadow-xs transition-all hover:bg-slate-50/70 hover:shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
+                          <IconClock width={18} height={18} strokeWidth={2.2} />
+                        </div>
+                        <div>
+                          <b className="text-sm font-semibold text-navy-950 group-hover:text-blue-600 transition-colors">
+                            {purchases} inventory purchase {purchases === 1 ? 'request' : 'requests'} waiting
+                          </b>
+                          <p className="mt-0.5 text-xs text-ink-mute">
+                            Stock replenishment awaiting owner sign-off.
+                          </p>
+                        </div>
+                      </div>
+                      <IconChevronRight width={16} height={16} className="text-slate-400 group-hover:text-blue-600 transition-colors" />
                     </div>
-                    <div>
-                      <b className="text-sm font-semibold text-navy-950 group-hover:text-blue-600 transition-colors">
-                        {purchases} inventory purchase {purchases === 1 ? 'request' : 'requests'} waiting
-                      </b>
-                      <p className="mt-0.5 text-xs text-ink-mute">
-                        Stock replenishment awaiting owner sign-off.
-                      </p>
-                    </div>
-                  </div>
-                  <IconChevronRight width={16} height={16} className="text-slate-400 group-hover:text-blue-600 transition-colors" />
-                </div>
-              </Link>
-            ) : null}
+                  </Link>
+                ) : null}
 
-            {escalatedComplaints > 0 ? (
-              <Link href="/admin/complaints" className="block group">
-                <div className="flex items-center justify-between rounded-xl border border-line-soft border-l-4 border-l-rose-500 bg-white p-3.5 shadow-xs transition-all hover:bg-slate-50/70 hover:shadow-sm">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-rose-50 text-rose-600">
-                      <IconAlert width={18} height={18} strokeWidth={2.2} />
+                {escalatedComplaints > 0 ? (
+                  <Link href="/admin/complaints" className="block group">
+                    <div className="flex items-center justify-between rounded-xl border border-line-soft border-l-4 border-l-rose-500 bg-white p-3.5 shadow-xs transition-all hover:bg-slate-50/70 hover:shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-rose-50 text-rose-600">
+                          <IconAlert width={18} height={18} strokeWidth={2.2} />
+                        </div>
+                        <div>
+                          <b className="text-sm font-semibold text-rose-950 group-hover:text-rose-700 transition-colors">
+                            {escalatedComplaints} escalated customer {escalatedComplaints === 1 ? 'complaint' : 'complaints'}
+                          </b>
+                          <p className="mt-0.5 text-xs text-ink-mute">
+                            Urgent issue flagged to the business owner.
+                          </p>
+                        </div>
+                      </div>
+                      <IconChevronRight width={16} height={16} className="text-slate-400 group-hover:text-blue-600 transition-colors" />
                     </div>
-                    <div>
-                      <b className="text-sm font-semibold text-rose-950 group-hover:text-rose-700 transition-colors">
-                        {escalatedComplaints} escalated customer {escalatedComplaints === 1 ? 'complaint' : 'complaints'}
-                      </b>
-                      <p className="mt-0.5 text-xs text-ink-mute">
-                        Urgent issue flagged to the business owner.
-                      </p>
-                    </div>
-                  </div>
-                  <IconChevronRight width={16} height={16} className="text-slate-400 group-hover:text-blue-600 transition-colors" />
-                </div>
-              </Link>
-            ) : null}
+                  </Link>
+                ) : null}
 
-            {summary.outstanding > 0 ? (
-              <Link href="/admin/reports" className="block group">
-                <div className="flex items-center justify-between rounded-xl border border-line-soft border-l-4 border-l-amber-500 bg-white p-3.5 shadow-xs transition-all hover:bg-slate-50/70 hover:shadow-sm">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
-                      <IconClock width={18} height={18} strokeWidth={2.2} />
+                {summary.outstanding > 0 ? (
+                  <Link href="/admin/reports" className="block group">
+                    <div className="flex items-center justify-between rounded-xl border border-line-soft border-l-4 border-l-amber-500 bg-white p-3.5 shadow-xs transition-all hover:bg-slate-50/70 hover:shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
+                          <IconClock width={18} height={18} strokeWidth={2.2} />
+                        </div>
+                        <div>
+                          <b className="text-sm font-semibold text-navy-950 group-hover:text-blue-600 transition-colors">
+                            {money(summary.outstanding)} outstanding receivables
+                          </b>
+                          <p className="mt-0.5 text-xs text-ink-mute">
+                            Collecting this would add {money(summary.outstanding)} straight to profit.
+                          </p>
+                        </div>
+                      </div>
+                      <IconChevronRight width={16} height={16} className="text-slate-400 group-hover:text-blue-600 transition-colors" />
                     </div>
-                    <div>
-                      <b className="text-sm font-semibold text-navy-950 group-hover:text-blue-600 transition-colors">
-                        {money(summary.outstanding)} outstanding receivables
-                      </b>
-                      <p className="mt-0.5 text-xs text-ink-mute">
-                        Collecting this would add {money(summary.outstanding)} straight to profit.
-                      </p>
-                    </div>
-                  </div>
-                  <IconChevronRight width={16} height={16} className="text-slate-400 group-hover:text-blue-600 transition-colors" />
-                </div>
-              </Link>
-            ) : null}
+                  </Link>
+                ) : null}
 
-            {worstSource && worstSource.costPerActiveCar > 1000 ? (
-              <Link href="/admin/sources" className="block group">
-                <div className="flex items-center justify-between rounded-xl border border-line-soft border-l-4 border-l-navy-800 bg-white p-3.5 shadow-xs transition-all hover:bg-slate-50/70 hover:shadow-sm">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
-                      <IconUsers width={18} height={18} strokeWidth={2.2} />
+                {worstSource && worstSource.costPerActiveCar > 1000 ? (
+                  <Link href="/admin/sources" className="block group">
+                    <div className="flex items-center justify-between rounded-xl border border-line-soft border-l-4 border-l-navy-800 bg-white p-3.5 shadow-xs transition-all hover:bg-slate-50/70 hover:shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
+                          <IconUsers width={18} height={18} strokeWidth={2.2} />
+                        </div>
+                        <div>
+                          <b className="text-sm font-semibold text-navy-950 group-hover:text-blue-600 transition-colors">
+                            {LEAD_SOURCE_LABEL[worstSource.source]} marketing high CAC
+                          </b>
+                          <p className="mt-0.5 text-xs text-ink-mute">
+                            {money(worstSource.cost)} spent, {worstSource.joined} joined —{' '}
+                            {money(worstSource.costPerActiveCar)} per active subscriber.
+                          </p>
+                        </div>
+                      </div>
+                      <IconChevronRight width={16} height={16} className="text-slate-400 group-hover:text-blue-600 transition-colors" />
                     </div>
-                    <div>
-                      <b className="text-sm font-semibold text-navy-950 group-hover:text-blue-600 transition-colors">
-                        {LEAD_SOURCE_LABEL[worstSource.source]} marketing high CAC
-                      </b>
-                      <p className="mt-0.5 text-xs text-ink-mute">
-                        {money(worstSource.cost)} spent, {worstSource.joined} joined —{' '}
-                        {money(worstSource.costPerActiveCar)} per active subscriber.
-                      </p>
-                    </div>
-                  </div>
-                  <IconChevronRight width={16} height={16} className="text-slate-400 group-hover:text-blue-600 transition-colors" />
-                </div>
-              </Link>
-            ) : null}
+                  </Link>
+                ) : null}
+              </>
+            )}
           </div>
         </Card>
 
