@@ -28,7 +28,7 @@ interface CarDraft {
 }
 
 export interface IntakeOptions {
-  areas: { id: string; name: string }[];
+  areas: { id: string; name: string; city: string }[];
   packages: { id: string; name: string; price: number; washesPerMonth: number; services?: string[] }[];
   staff: { id: string; name: string; areaId: string }[];
   defaultAreaId: string;
@@ -172,6 +172,7 @@ export function AddCustomerForm({
   const [loginPassword, setLoginPassword] = useState('');
   const [advance, setAdvance] = useState('');
   const [paymentMode, setPaymentMode] = useState<'CASH' | 'MANUAL_UPI' | 'GATEWAY'>('CASH');
+  const [startDate, setStartDate] = useState(() => new Date().toISOString().slice(0, 10));
 
   const handleNameChange = (newName: string) => {
     setName(newName);
@@ -269,6 +270,7 @@ export function AddCustomerForm({
         advance: advance ? Math.round(Number(advance)) : undefined,
         paymentMode,
         enquiryId: initialEnquiry?.enquiryId || undefined,
+        startDate: startDate || undefined,
         cars: cars.map((car) => ({
           make: car.make,
           model: car.model,
@@ -507,7 +509,7 @@ export function AddCustomerForm({
                   address={address}
                   lat={lat}
                   lng={lng}
-                  city={currentArea?.name || 'Nagpur'}
+                  city={currentArea?.city || 'Nagpur'}
                   addressRequired
                   onAddressChange={(newAddress) => setAddress(newAddress)}
                   onCoordinatesChange={(newLat, newLng) => {
@@ -858,6 +860,24 @@ export function AddCustomerForm({
                   </select>
                 </div>
               </div>
+
+              {Number(advance) > 0 && (
+                <div className="mt-4 pt-4 border-t border-slate-100">
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Service Start Date
+                  </label>
+                  <p className="text-[11px] text-slate-500 mb-2">
+                    Because payment is being collected, service starts immediately. Choose the date from which the first wash schedule should be generated based on the car&apos;s pattern.
+                  </p>
+                  <input
+                    type="date"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    required
+                  />
+                </div>
+              )}
             </div>
           </div>
 

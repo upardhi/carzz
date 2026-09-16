@@ -31,6 +31,7 @@ import { ActionButton } from './ActionButton';
 import { CustomerLoginAction } from './CustomerLoginAction';
 import { RecordPaymentForm } from './RecordPaymentForm';
 import { StartCarServiceAction } from './StartCarServiceAction';
+import { WashTodayAction } from './WashTodayAction';
 import { QuickAssignStaff } from './QuickAssignStaff';
 import {
   AddCarModalButton,
@@ -211,6 +212,16 @@ export async function ConsoleCustomerDetail({
                       )
                     ) : (
                       <Tag tone="warn">Pending Payment · Not Started</Tag>
+                    )}
+                    {isStarted && (
+                      <WashTodayAction
+                        customerId={customer.id}
+                        carId={car.id}
+                        carName={`${car.make} ${car.model}`}
+                        carPlate={car.plate}
+                        currentAssignedStaffId={car.assignedStaffId}
+                        staffList={staff}
+                      />
                     )}
                     <EditCarModalButton
                       customerId={customer.id}

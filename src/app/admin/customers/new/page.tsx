@@ -49,7 +49,7 @@ export default async function AdminAddCustomer({
         onSavedHref="/admin/customers"
         initialEnquiry={initialEnquiry}
         options={{
-          areas: areas.map((a) => ({ id: a.id, name: a.name })),
+          areas: areas.map((a) => ({ id: a.id, name: a.name, city: a.city })),
           packages: packages.map((p) => ({
             id: p.id,
             name: p.name,

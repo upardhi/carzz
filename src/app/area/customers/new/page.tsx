@@ -55,7 +55,7 @@ export default async function AreaAddCustomer({
         onSavedHref="/area/customers"
         initialEnquiry={initialEnquiry}
         options={{
-          areas: scopedAreas.map((a) => ({ id: a.id, name: a.name })),
+          areas: scopedAreas.map((a) => ({ id: a.id, name: a.name, city: a.city })),
           packages: packages.map((p) => ({
             id: p.id,
             name: p.name,

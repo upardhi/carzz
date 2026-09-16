@@ -21,7 +21,7 @@ export function AddStaffForm({
   staff,
   referralBonus,
 }: {
-  areas: { id: string; name: string }[];
+  areas: { id: string; name: string; city: string }[];
   staff: { id: string; name: string }[];
   referralBonus: number;
 }) {
@@ -489,7 +489,7 @@ export function AddStaffForm({
             address={address}
             lat={lat}
             lng={lng}
-            city="Nagpur"
+            city={areas.find(a => a.id === areaId)?.city || 'Nagpur'}
             onAddressChange={(newAddress) => setAddress(newAddress)}
             onCoordinatesChange={(newLat, newLng) => {
               setLat(newLat);

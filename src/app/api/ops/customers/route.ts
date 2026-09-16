@@ -53,8 +53,6 @@ const carSchema = z.object({
 
 const createSchema = z.object({
   action: z.literal('create'),
-  // Step 1 of the wizard: the lead source is compulsory, because it is the
-  // only way the owner ever learns which marketing actually works.
   source: z.enum(LEAD_SOURCES),
   referredById: z.string().optional(),
   name: z.string().trim().min(2),
@@ -75,6 +73,7 @@ const createSchema = z.object({
   loginEmail: z.string().trim().email().optional(),
   loginPassword: z.string().min(6).optional(),
   enquiryId: z.string().optional(),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
 });
 
 const statusSchema = z.object({
@@ -97,6 +96,7 @@ const startCarServiceSchema = z.object({
   carId: z.string().min(1),
   assignedStaffId: z.string().optional().nullable(),
   note: z.string().max(300).optional().nullable(),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
 });
 
 const updateCustomerSchema = z.object({
@@ -142,12 +142,21 @@ const addCarSchema = z.object({
   assignedStaffId: z.string().optional().nullable(),
   specialInstructions: z.string().max(300).optional().nullable(),
   autoStartService: z.boolean().optional(),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
 });
 
 const deleteCarSchema = z.object({
   action: z.literal('deleteCar'),
   customerId: z.string().min(1),
   carId: z.string().min(1),
+});
+
+const adhocWashSchema = z.object({
+  action: z.literal('adhocWash'),
+  customerId: z.string().min(1),
+  carId: z.string().min(1),
+  assignedStaffId: z.string().min(1),
+  note: z.string().max(300).optional().nullable(),
 });
 
 const schema = z.discriminatedUnion('action', [
@@ -159,6 +168,7 @@ const schema = z.discriminatedUnion('action', [
   updateCarSchema,
   addCarSchema,
   deleteCarSchema,
+  adhocWashSchema,
 ]);
 
 export async function POST(request: Request) {
@@ -280,7 +290,7 @@ export async function POST(request: Request) {
       const updatedCar = await store.cars.update(car.id, patch);
 
       const cycle = currentCycle();
-      await generateVisitsForCar(store, updatedCar, customer, cycle);
+      await generateVisitsForCar(store, updatedCar, customer, cycle, parsed.data.startDate ?? undefined);
 
       if (updatedCar.assignedStaffId) {
         await store.visits.updateMany(
@@ -294,6 +304,71 @@ export async function POST(request: Request) {
         ok: true,
         car: updatedCar,
         message: `Service started for ${car.make} ${car.model}. Washes scheduled immediately.`,
+      });
+    }
+
+    if (parsed.data.action === 'adhocWash') {
+      const customer = await store.customers.get(parsed.data.customerId);
+      if (!customer) throw new HttpError(404, 'Customer not found.');
+      assertInScope(session, customer.areaId);
+
+      const car = await store.cars.get(parsed.data.carId);
+      if (!car || car.customerId !== customer.id) {
+        throw new HttpError(404, 'Car not found for this customer.');
+      }
+      if (!car.serviceStarted) {
+        throw new HttpError(400, 'Service is not active for this car. Start service first.');
+      }
+      
+      const staff = await store.staff.get(parsed.data.assignedStaffId);
+      if (!staff || staff.areaId !== customer.areaId) {
+        throw new HttpError(400, 'Invalid staff selected.');
+      }
+
+      const cycle = currentCycle();
+      const today = todayISO();
+      
+      // Delete any existing PENDING visit for today to avoid duplicate washes on the same day
+      const existingToday = await store.visits.find({
+        where: { carId: car.id, scheduledDate: today, status: 'PENDING' } as never,
+      });
+      for (const v of existingToday) {
+        await store.visits.delete(v.id);
+      }
+
+      const visit = await store.visits.create({
+        carId: car.id,
+        customerId: customer.id,
+        areaId: customer.areaId,
+        staffId: staff.id,
+        cycle,
+        scheduledDate: today,
+        scheduledTime: car.scheduleTime || '09:00',
+        status: 'PENDING',
+        startedAt: null,
+        completedAt: null,
+        servicesDone: [],
+        beforePhotoUrl: null,
+        afterPhotoUrl: null,
+        beforePhotoBytes: null,
+        afterPhotoBytes: null,
+        missReason: null,
+        missNote: null,
+        rescheduledToVisitId: null,
+        rating: null,
+        ratingComment: null,
+        onTime: false,
+        managerRating: null,
+        managerRatingComment: null,
+        managerRatedAt: null,
+        managerRatedByUserId: null,
+      });
+
+      revalidateCustomerPages();
+      return NextResponse.json({
+        ok: true,
+        visit,
+        message: `Ad-hoc wash scheduled for today and assigned to ${staff.name}.`,
       });
     }
 
@@ -415,7 +490,7 @@ export async function POST(request: Request) {
 
       const cycle = currentCycle();
       if (car.serviceStarted) {
-        await generateVisitsForCar(store, car, customer, cycle);
+        await generateVisitsForCar(store, car, customer, cycle, parsed.data.startDate ?? undefined);
       }
 
       revalidateCustomerPages();
@@ -547,7 +622,7 @@ export async function POST(request: Request) {
       });
 
       if (isPrepaidPaid) {
-        await generateVisitsForCar(store, car, customer, cycle);
+        await generateVisitsForCar(store, car, customer, cycle, data.startDate ?? undefined);
       }
     }
 

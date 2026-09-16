@@ -669,7 +669,7 @@ export function EditPersonClient({
                   address={address}
                   lat={lat}
                   lng={lng}
-                  city="Nagpur"
+                  city={areas.find(a => a.id === areaId)?.city || 'Nagpur'}
                   hideAddressInput
                   onAddressChange={(newAddress) => setAddress(newAddress)}
                   onCoordinatesChange={(newLat, newLng) => {

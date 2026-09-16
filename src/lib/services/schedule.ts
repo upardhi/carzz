@@ -146,8 +146,9 @@ export async function generateVisitsForCar(
   car: Car,
   customer: Customer,
   cycle: string,
+  fromDate?: DateOnly,
 ): Promise<WashVisit[]> {
-  const visit = await scheduleNextVisitForCar(store, car, customer, cycle);
+  const visit = await scheduleNextVisitForCar(store, car, customer, cycle, fromDate);
   return visit ? [visit] : [];
 }
 
