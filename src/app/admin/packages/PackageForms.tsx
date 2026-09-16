@@ -258,7 +258,7 @@ export function CreatePackageForm() {
 
       <Button
         block
-        className="mt-4"
+        className="mt-4 inline-flex items-center justify-center gap-2"
         disabled={!valid || pending}
         onClick={() =>
           save({
@@ -271,7 +271,10 @@ export function CreatePackageForm() {
           })
         }
       >
-        {pending ? 'Creating…' : 'Create package'}
+        {pending && (
+          <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+        )}
+        <span>{pending ? 'Creating…' : 'Create package'}</span>
       </Button>
 
       <Feedback state={state} />
@@ -297,6 +300,7 @@ export function EditPackageForm({
   active: boolean;
 }) {
   const { save, pending, state } = useSave();
+  const [loadingAction, setLoadingAction] = useState<'toggle' | 'delete' | 'confirm_delete' | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [impactModalOpen, setImpactModalOpen] = useState(false);
@@ -350,32 +354,47 @@ export function EditPackageForm({
   );
 
   async function handleDeleteClick() {
-    const res = await save({ action: 'impact', packageId });
-    if (res.ok && res.data) {
-      const impacted = res.data.impacted || [];
-      if (impacted.length > 0) {
-        setImpactedCars(impacted);
-        setImpactModalOpen(true);
-      } else {
-        setDeleteConfirmOpen(true);
+    setLoadingAction('delete');
+    try {
+      const res = await save({ action: 'impact', packageId });
+      if (res.ok && res.data) {
+        const impacted = res.data.impacted || [];
+        if (impacted.length > 0) {
+          setImpactedCars(impacted);
+          setImpactModalOpen(true);
+        } else {
+          setDeleteConfirmOpen(true);
+        }
       }
+    } finally {
+      setLoadingAction(null);
     }
   }
 
   async function confirmDelete() {
-    const res = await save({ action: 'delete', packageId });
-    if (res.ok) {
-      setDeleteConfirmOpen(false);
-      setModalOpen(false);
+    setLoadingAction('confirm_delete');
+    try {
+      const res = await save({ action: 'delete', packageId });
+      if (res.ok) {
+        setDeleteConfirmOpen(false);
+        setModalOpen(false);
+      }
+    } finally {
+      setLoadingAction(null);
     }
   }
 
   async function handleToggleActive() {
-    await save({
-      action: 'update',
-      packageId,
-      active: !active,
-    });
+    setLoadingAction('toggle');
+    try {
+      await save({
+        action: 'update',
+        packageId,
+        active: !active,
+      });
+    } finally {
+      setLoadingAction(null);
+    }
   }
 
   async function handleSavePackage() {
@@ -400,7 +419,8 @@ export function EditPackageForm({
         <button
           type="button"
           onClick={() => setModalOpen(true)}
-          className="flex-1 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition-all text-center"
+          disabled={pending || loadingAction !== null}
+          className="flex-1 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition-all text-center disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Edit package & services
         </button>
@@ -408,25 +428,43 @@ export function EditPackageForm({
         <button
           type="button"
           onClick={handleToggleActive}
-          disabled={pending}
-          className={`px-3 py-2 text-xs font-bold rounded-xl border shadow-sm transition-all ${
+          disabled={pending || loadingAction !== null}
+          className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl border shadow-sm transition-all ${
+            pending || loadingAction !== null ? 'opacity-60 cursor-not-allowed' : ''
+          } ${
             active
               ? 'border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100'
               : 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
           }`}
           title={active ? 'Disable package (hides from new signups)' : 'Activate package'}
         >
-          {active ? 'Disable' : 'Enable'}
+          {loadingAction === 'toggle' && (
+            <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+          )}
+          <span>
+            {loadingAction === 'toggle'
+              ? active
+                ? 'Disabling…'
+                : 'Enabling…'
+              : active
+                ? 'Disable'
+                : 'Enable'}
+          </span>
         </button>
 
         <button
           type="button"
           onClick={handleDeleteClick}
-          disabled={pending}
-          className="rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 px-3 py-2 text-xs font-bold text-rose-700 shadow-sm transition-all"
+          disabled={pending || loadingAction !== null}
+          className={`inline-flex items-center justify-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 px-3 py-2 text-xs font-bold text-rose-700 shadow-sm transition-all ${
+            pending || loadingAction !== null ? 'opacity-60 cursor-not-allowed' : ''
+          }`}
           title="Delete package"
         >
-          Delete
+          {loadingAction === 'delete' && (
+            <span className="h-3 w-3 animate-spin rounded-full border-2 border-rose-700 border-t-transparent" />
+          )}
+          <span>{loadingAction === 'delete' ? 'Deleting…' : 'Delete'}</span>
         </button>
       </div>
 
@@ -608,7 +646,8 @@ export function EditPackageForm({
               <button
                 type="button"
                 onClick={() => setModalOpen(false)}
-                className="flex-1 rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                disabled={pending}
+                className="flex-1 rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -616,9 +655,12 @@ export function EditPackageForm({
                 type="button"
                 disabled={pending || serviceItems.length === 0 || !Number(nextPrice)}
                 onClick={handleSavePackage}
-                className="flex-1 rounded-xl bg-blue-600 hover:bg-blue-700 text-white py-2.5 text-xs font-bold disabled:opacity-50 shadow-sm"
+                className="flex-1 rounded-xl bg-blue-600 hover:bg-blue-700 text-white py-2.5 text-xs font-bold disabled:opacity-50 shadow-sm inline-flex items-center justify-center gap-1.5"
               >
-                {pending ? 'Saving…' : 'Save changes'}
+                {pending && (
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                )}
+                <span>{pending ? 'Saving…' : 'Save changes'}</span>
               </button>
             </div>
           </div>
@@ -665,20 +707,25 @@ export function EditPackageForm({
               <button
                 type="button"
                 onClick={() => setImpactModalOpen(false)}
-                className="flex-1 rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                disabled={loadingAction === 'toggle' || pending}
+                className="flex-1 rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
               >
                 Close
               </button>
               {active && (
                 <button
                   type="button"
+                  disabled={loadingAction === 'toggle' || pending}
                   onClick={async () => {
                     await handleToggleActive();
                     setImpactModalOpen(false);
                   }}
-                  className="flex-1 rounded-xl bg-amber-600 hover:bg-amber-700 text-white py-2.5 text-xs font-bold shadow-sm"
+                  className="flex-1 rounded-xl bg-amber-600 hover:bg-amber-700 text-white py-2.5 text-xs font-bold shadow-sm inline-flex items-center justify-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  Disable package now
+                  {loadingAction === 'toggle' && (
+                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  )}
+                  <span>{loadingAction === 'toggle' ? 'Disabling…' : 'Disable package now'}</span>
                 </button>
               )}
             </div>
@@ -700,16 +747,21 @@ export function EditPackageForm({
               <button
                 type="button"
                 onClick={() => setDeleteConfirmOpen(false)}
-                className="flex-1 rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                disabled={loadingAction === 'confirm_delete' || pending}
+                className="flex-1 rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={confirmDelete}
-                className="flex-1 rounded-xl bg-rose-600 hover:bg-rose-700 text-white py-2.5 text-xs font-bold shadow-sm"
+                disabled={loadingAction === 'confirm_delete' || pending}
+                className="flex-1 rounded-xl bg-rose-600 hover:bg-rose-700 text-white py-2.5 text-xs font-bold shadow-sm inline-flex items-center justify-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Yes, delete
+                {loadingAction === 'confirm_delete' && (
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                )}
+                <span>{loadingAction === 'confirm_delete' ? 'Deleting…' : 'Yes, delete'}</span>
               </button>
             </div>
           </div>

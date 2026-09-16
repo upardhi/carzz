@@ -225,7 +225,7 @@ async function AdminDashboardContent() {
           <div className="space-y-3">
             {!(unapproved.length > 0 || purchases > 0 || escalatedComplaints > 0 || summary.outstanding > 0 || (worstSource && worstSource.costPerActiveCar > 1000)) ? (
               <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 py-8 text-center bg-slate-50/50">
-                <p className="text-sm font-semibold text-slate-700">You're all caught up!</p>
+                <p className="text-sm font-semibold text-slate-700">You&apos;re all caught up!</p>
                 <p className="text-xs text-slate-500 mt-1">No urgent actions require your attention.</p>
               </div>
             ) : (
