@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
-import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import {
   Card,
   CardHeading,
@@ -43,48 +43,15 @@ export function UsersClient({
   currentUserId,
 }: UsersClientProps) {
   const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
   const { toast } = useToast();
   const showConfirm = useConfirm();
 
-  // Get active role from URL
-  const roleParam = searchParams.get('role');
-  const activeRoleFromUrl: 'ALL' | Role =
-    roleParam && ROLES.includes(roleParam as Role) ? (roleParam as Role) : 'ALL';
-
   // Filter & Search State
-  const [roleFilter, setRoleFilter] = useState<'ALL' | Role>(activeRoleFromUrl);
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'DISABLED'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery, 300);
   const [sortBy, setSortBy] = useState<'name' | 'createdAt' | 'role' | 'email'>('name');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
-
-  // Handle role filter change and sync to URL
-  const handleRoleChange = (newRole: 'ALL' | Role) => {
-    if (roleFilter === newRole) return;
-    setRoleFilter(newRole);
-    setPage(1);
-
-    const next = new URLSearchParams(searchParams ? searchParams.toString() : '');
-    if (newRole === 'ALL') {
-      next.delete('role');
-    } else {
-      next.set('role', newRole);
-    }
-    next.delete('page');
-    const queryString = next.toString();
-    router.push(queryString ? `${pathname}?${queryString}` : pathname);
-  };
-
-  // Keep roleFilter in sync if URL search parameter changes (e.g. browser back/forward or sidebar links)
-  useEffect(() => {
-    if (activeRoleFromUrl !== roleFilter) {
-      setRoleFilter(activeRoleFromUrl);
-      setPage(1);
-    }
-  }, [activeRoleFromUrl, roleFilter]);
 
   // Pagination State
   const [page, setPage] = useState(1);
@@ -122,7 +89,7 @@ export function UsersClient({
         const params = new URLSearchParams({
           page: String(targetPage),
           pageSize: String(targetPageSize),
-          role: roleFilter,
+          role: initialRoleFilter,
           status: statusFilter,
           search: debouncedSearch,
           sortBy,
@@ -152,7 +119,7 @@ export function UsersClient({
         setIsLoading(false);
       }
     },
-    [page, pageSize, roleFilter, statusFilter, debouncedSearch, sortBy, sortDir, toast],
+    [page, pageSize, initialRoleFilter, statusFilter, debouncedSearch, sortBy, sortDir, toast],
   );
 
   // Sync when filters change (skip initial mount since server rendered)
@@ -161,13 +128,41 @@ export function UsersClient({
       isFirstRender.current = false;
       return;
     }
+    // Only fetch if client-side filters/pagination change. 
+    // We don't trigger fetch when initialRoleFilter changes because Next.js RSC already fetched the new data for us.
     fetchUsers(page, pageSize);
-  }, [page, pageSize, roleFilter, statusFilter, debouncedSearch, sortBy, sortDir, fetchUsers]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, pageSize, statusFilter, debouncedSearch, sortBy, sortDir]);
+
+  // Keep track of previous initialRoleFilter to detect role changes
+  const prevRoleFilterRef = useRef(initialRoleFilter);
 
   // Sync state with props when Next.js soft-navigates (e.g. from sidebar links or URL changes)
   useEffect(() => {
-    setRoleFilter(initialRoleFilter);
-    if (!debouncedSearch && statusFilter === 'ALL') {
+    const roleChanged = prevRoleFilterRef.current !== initialRoleFilter;
+    prevRoleFilterRef.current = initialRoleFilter;
+
+    if (roleChanged) {
+      // Role changed from URL: Reset all client-side filters
+      isFirstRender.current = true; // Skip the subsequent redundant fetch
+      setPage(1);
+      setSearchQuery('');
+      setStatusFilter('ALL');
+      setSortBy('name');
+      setSortDir('asc');
+      
+      // Apply the server-rendered data immediately
+      setUsers(initialUsers);
+      setPagination(prev => ({
+        ...prev,
+        page: 1,
+        totalItems: initialTotalItems,
+        totalPages: Math.max(1, Math.ceil(initialTotalItems / prev.pageSize)),
+        hasNext: initialTotalItems > prev.pageSize,
+        hasPrev: false,
+      }));
+    } else if (!debouncedSearch && statusFilter === 'ALL' && sortBy === 'name' && sortDir === 'asc' && page === 1) {
+      // Not a role change, but we are in default state (e.g. initial load or manual reset)
       setUsers(initialUsers);
       setPagination(prev => ({
         ...prev,
@@ -178,6 +173,7 @@ export function UsersClient({
         hasPrev: false,
       }));
     }
+
     setKpiCounts(initialKpiCounts);
     setStatusCounts(initialStatusCounts);
   }, [
@@ -188,6 +184,9 @@ export function UsersClient({
     initialStatusCounts,
     debouncedSearch,
     statusFilter,
+    sortBy,
+    sortDir,
+    page,
   ]);
 
   const areaById = new Map(areas.map((a) => [a.id, a]));
@@ -347,33 +346,30 @@ export function UsersClient({
 
           {/* Role Filter Chips & Sorting */}
           <div className="p-3 px-4 border-b border-line bg-surface-elevated/40 flex flex-wrap items-center justify-between gap-3 text-xs">
-            {/* Role Filter Chips */}
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="text-ink-mute font-medium mr-1">Role:</span>
-              <button
-                type="button"
-                onClick={() => handleRoleChange('ALL')}
+              <Link
+                href="/admin/users"
                 className={`rounded-full px-2.5 py-1 text-xs font-semibold transition-all ${
-                  roleFilter === 'ALL'
+                  initialRoleFilter === 'ALL'
                     ? 'bg-navy-900 text-white dark:bg-navy-100 dark:text-navy-950'
                     : 'bg-surface border border-line text-ink-mute hover:text-ink'
                 }`}
               >
                 All Staff ({statusCounts.all})
-              </button>
+              </Link>
               {ROLES.filter((r) => r !== 'CUSTOMER').map((r) => (
-                <button
+                <Link
                   key={r}
-                  type="button"
-                  onClick={() => handleRoleChange(r)}
+                  href={`/admin/users?role=${r}`}
                   className={`rounded-full px-2.5 py-1 text-xs font-semibold transition-all ${
-                    roleFilter === r
+                    initialRoleFilter === r
                       ? 'bg-navy-900 text-white dark:bg-navy-100 dark:text-navy-950'
                       : 'bg-surface border border-line text-ink-mute hover:text-ink'
                   }`}
                 >
                   {ROLE_LABEL[r]} ({kpiCounts[r] ?? 0})
-                </button>
+                </Link>
               ))}
             </div>
 
@@ -465,7 +461,7 @@ export function UsersClient({
                         </svg>
                         <p className="font-semibold text-sm text-ink">No staff users found</p>
                         <p className="text-xs">
-                          {searchQuery || roleFilter !== 'ALL' || statusFilter !== 'ALL'
+                          {searchQuery || initialRoleFilter !== 'ALL' || statusFilter !== 'ALL'
                             ? 'Try clearing your search or filter options.'
                             : 'Add a new manager, area admin, or wash boy using the form.'}
                         </p>
