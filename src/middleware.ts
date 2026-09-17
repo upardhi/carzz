@@ -21,7 +21,8 @@ export async function middleware(request: NextRequest) {
 
   if (pathname === '/login') {
     if (claims) {
-      return NextResponse.redirect(new URL(homeFor(claims.role), request.url));
+      const next = request.nextUrl.searchParams.get('next');
+      return NextResponse.redirect(new URL(next || homeFor(claims.role), request.url));
     }
     return NextResponse.next();
   }

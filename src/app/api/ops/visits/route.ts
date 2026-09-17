@@ -1,9 +1,22 @@
+import { revalidatePath } from 'next/cache';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { HttpError, requireApiSession } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { reassignVisit } from '@/lib/services/visits';
 import { assertInScope, opsError } from '../_guard';
+
+function revalidateVisitPages() {
+  try {
+    for (const base of ['/admin', '/manager', '/area']) {
+      revalidatePath(`${base}/schedule`);
+      revalidatePath(`${base}/areas/[areaId]`, 'page');
+      revalidatePath(`${base}/customers/[customerId]`, 'page');
+    }
+  } catch {
+    // ignore — running outside a request context
+  }
+}
 
 const schema = z.discriminatedUnion('action', [
   z.object({
@@ -16,16 +29,47 @@ const schema = z.discriminatedUnion('action', [
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     areaId: z.string().min(1),
   }),
+  z.object({
+    action: z.literal('rateWash'),
+    visitId: z.string().min(1),
+    rating: z.number().int().min(1).max(5),
+    comment: z.string().max(500).optional(),
+  }),
 ]);
 
 export async function POST(request: Request) {
   try {
-    const session = await requireApiSession('visit:assign');
-    const parsed = schema.safeParse(await request.json().catch(() => null));
+    const raw = await request.json().catch(() => null);
+    const parsed = schema.safeParse(raw);
     if (!parsed.success) {
       return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
     }
+    const session = await requireApiSession(
+      parsed.data.action === 'rateWash' ? 'visit:rate' : 'visit:assign',
+    );
     const store = await getStore();
+
+    if (parsed.data.action === 'rateWash') {
+      const visit = await store.visits.get(parsed.data.visitId);
+      if (!visit) throw new HttpError(404, 'That wash was not found.');
+      assertInScope(session, visit.areaId);
+      if (visit.status !== 'DONE') {
+        throw new HttpError(400, 'Only a completed wash can be rated.');
+      }
+
+      const updated = await store.visits.update(visit.id, {
+        managerRating: parsed.data.rating,
+        managerRatingComment: parsed.data.comment?.trim() || null,
+        managerRatedAt: new Date().toISOString(),
+        managerRatedByUserId: session.user.id,
+      });
+      revalidateVisitPages();
+      return NextResponse.json({
+        ok: true,
+        visit: updated,
+        message: 'Rating saved.',
+      });
+    }
 
     if (parsed.data.action === 'assign') {
       const visit = await store.visits.get(parsed.data.visitId);
@@ -39,9 +83,13 @@ export async function POST(request: Request) {
         if (staff.areaId !== visit.areaId) {
           throw new HttpError(400, 'That staff member works in another area.');
         }
+        if (!staff.active) {
+          throw new HttpError(400, `${staff.name} is deactivated and cannot be assigned washes.`);
+        }
       }
 
       const updated = await reassignVisit(store, visit.id, parsed.data.staffId);
+      revalidateVisitPages();
       return NextResponse.json({ ok: true, visit: updated });
     }
 
@@ -82,15 +130,20 @@ export async function POST(request: Request) {
       }
     }
 
-    let assigned = 0;
+    const updates: { visitId: string; staffId: string }[] = [];
     for (const visit of visits) {
       if (visit.staffId || visit.status !== 'PENDING') continue;
       const lightest = [...load.entries()].sort((a, b) => a[1] - b[1])[0];
-      await store.visits.update(visit.id, { staffId: lightest[0] });
+      updates.push({ visitId: visit.id, staffId: lightest[0] });
       load.set(lightest[0], lightest[1] + 1);
-      assigned += 1;
     }
 
+    await Promise.all(
+      updates.map((u) => store.visits.update(u.visitId, { staffId: u.staffId })),
+    );
+    const assigned = updates.length;
+
+    revalidateVisitPages();
     return NextResponse.json({
       ok: true,
       assigned,

@@ -14,7 +14,8 @@ export function BrandMark({
       height={size}
       viewBox="0 0 100 100"
       className={clsx('shrink-0', className)}
-      aria-hidden
+      aria-hidden="true"
+      suppressHydrationWarning
     >
       <rect width="100" height="100" rx="22" fill="#0e2748" />
       <path
@@ -47,13 +48,13 @@ export function BrandLockup({
   className?: string;
 }) {
   return (
-    <div className={clsx('flex items-center gap-2.5', className)}>
+    <div className={clsx('flex items-center gap-2.5', className)} suppressHydrationWarning>
       <BrandMark size={36} />
-      <div className="leading-tight">
-        <div className="text-[15px] font-extrabold tracking-tight text-white">
+      <div className="leading-tight" suppressHydrationWarning>
+        <div className="text-[15px] font-bold tracking-tight text-white" suppressHydrationWarning>
           CARZ<span className="text-gold-500">.</span>
         </div>
-        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-navy-300">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-navy-300" suppressHydrationWarning>
           {subtitle ?? 'Management'}
         </div>
       </div>

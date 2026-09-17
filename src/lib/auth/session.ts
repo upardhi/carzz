@@ -45,7 +45,8 @@ export async function verifySession(
   try {
     const { payload } = await jwtVerify(token, secret(), { issuer: ISSUER });
     return payload as unknown as SessionClaims;
-  } catch {
+  } catch (err) {
+    console.error("verifySession error:", err);
     return null;
   }
 }
@@ -53,7 +54,7 @@ export async function verifySession(
 export const sessionCookieOptions = {
   httpOnly: true,
   sameSite: 'lax' as const,
-  secure: process.env.NODE_ENV === 'production',
+  secure: process.env.NODE_ENV === 'production' && process.env.VERCEL !== '1', // Temporarily false if not on Vercel to fix localhost HTTP issues
   path: '/',
   maxAge: MAX_AGE_SECONDS,
 };

@@ -49,6 +49,25 @@ enum PocketRequestStatus {
   PAID
 }
 
+enum LeaveType {
+  PLANNED
+  ON_THE_SPOT
+  EMERGENCY
+  SICK
+  CASUAL
+  HALF_DAY
+  UNINFORMED
+  OTHER
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+
 enum LeadSource {
   GUARD_REF
   CUSTOMER_REF
@@ -171,24 +190,41 @@ enum ReminderChannel {
 }
 
 model User {
-  id         String   @id @default(cuid())
-  name       String
-  email      String   @unique
-  phone      String
-  role       Role
-  regionId   String?
-  areaId     String?
-  customerId String?
-  staffId    String?
-  language   Language @default(en)
-  active     Boolean  @default(true)
-  createdAt  DateTime @default(now())
+  id                   String   @id @default(cuid())
+  name                 String
+  email                String   @unique
+  phone                String
+  role                 Role
+  regionId             String?
+  areaId               String?
+  customerId           String?
+  staffId              String?
+  language             Language @default(en)
+  active               Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  aadharNumber         String?
+  aadharCardUrl        String?
+  panNumber            String?
+  panCardUrl           String?
+  address              String?
+  emergencyPhone       String?
+  emergencyContactName String?
+  bankName             String?
+  accountNumber        String?
+  ifscCode             String?
+  upiId                String?
+  dob                  DateTime? @db.Date
 
   credential UserCredential?
 
   @@index([role])
   @@index([areaId])
   @@index([regionId])
+  @@index([phone])
+  @@index([customerId])
+  @@index([staffId])
+  @@index([active])
+  @@index([createdAt])
 }
 
 model UserCredential {
@@ -201,8 +237,11 @@ model Region {
   id          String   @id @default(cuid())
   name        String
   areaAdminId String?
+  active      Boolean  @default(true)
   createdAt   DateTime @default(now())
   areas       Area[]
+
+  @@index([active])
 }
 
 model Area {
@@ -210,7 +249,11 @@ model Area {
   regionId  String
   name      String
   city      String
+  address   String?
+  lat       Float?
+  lng       Float?
   managerId String?
+  active    Boolean  @default(true)
   createdAt DateTime @default(now())
 
   region    Region   @relation(fields: [regionId], references: [id])
@@ -218,22 +261,38 @@ model Area {
   customers Customer[]
 
   @@index([regionId])
+  @@index([active])
 }
 
 model Staff {
-  id                String    @id @default(cuid())
-  userId            String    @unique
-  name              String
-  phone             String
-  areaId            String
-  role              StaffRole
-  joinedOn          DateTime  @db.Date
-  referredByStaffId String?
-  active            Boolean   @default(true)
+  id                   String    @id @default(cuid())
+  userId               String    @unique
+  name                 String
+  phone                String
+  areaId               String
+  role                 StaffRole
+  joinedOn             DateTime  @db.Date
+  referredByStaffId    String?
+  active               Boolean   @default(true)
+  documentUrl          String?
+  documentType         String?
+  aadharNumber         String?
+  aadharCardUrl        String?
+  panNumber            String?
+  panCardUrl           String?
+  address              String?
+  emergencyPhone       String?
+  emergencyContactName String?
+  bankName             String?
+  bankAccountNumber    String?
+  bankIfsc             String?
+  upiId                String?
+  dob                  DateTime? @db.Date
 
   area        Area                 @relation(fields: [areaId], references: [id])
   attendance  Attendance[]
   pocket      PocketMoneyRequest[]
+  leaves      StaffLeave[]
   cars        Car[]
   visits      WashVisit[]
   payouts     StaffPayout[]
@@ -241,6 +300,8 @@ model Staff {
   stockIssues StockIssue[]
 
   @@index([areaId, role])
+  @@index([active])
+  @@index([userId])
 }
 
 model Attendance {
@@ -273,6 +334,29 @@ model PocketMoneyRequest {
   @@index([staffId, status])
 }
 
+model StaffLeave {
+  id              String      @id @default(cuid())
+  staffId         String
+  startDate       DateTime    @db.Date
+  endDate         DateTime    @db.Date
+  daysCount       Int         @default(1)
+  type            LeaveType   @default(PLANNED)
+  reason          String
+  status          LeaveStatus @default(PENDING)
+  appliedBy       String      @default("STAFF")
+  appliedAt       DateTime    @default(now())
+  decidedByUserId String?
+  decidedAt       DateTime?
+  rejectionReason String?
+  note            String?
+
+  staff Staff @relation(fields: [staffId], references: [id])
+
+  @@index([staffId, status])
+  @@index([startDate, endDate])
+}
+
+
 model Customer {
   id           String         @id @default(cuid())
   userId       String?        @unique
@@ -300,6 +384,7 @@ model Customer {
 
   @@index([areaId, status])
   @@index([phone])
+  @@index([referredById, joinedOn])
 }
 
 model ServicePackage {
@@ -327,6 +412,11 @@ model Car {
   scheduleTime        String
   specialInstructions String?
   active              Boolean        @default(true)
+  serviceStarted      Boolean        @default(false)
+  serviceStartedAt    DateTime?
+  serviceStartedBeforePayment Boolean @default(false)
+  serviceStartedByUserId String?
+  serviceStartNote    String?
 
   customer      Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
   servicePackage ServicePackage @relation(fields: [packageId], references: [id])
@@ -334,6 +424,7 @@ model Car {
   visits        WashVisit[]
 
   @@index([customerId])
+  @@index([customerId, active])
   @@index([assignedStaffId])
   @@index([plate])
 }
@@ -353,21 +444,35 @@ model WashVisit {
   servicesDone         String[]
   beforePhotoUrl       String?
   afterPhotoUrl        String?
+  beforePhotoBytes     Int?
+  afterPhotoBytes      Int?
   missReason           MissReason?
   missNote             String?
   rescheduledToVisitId String?
   rating               Int?
   ratingComment        String?
   onTime               Boolean     @default(false)
+  // Separate from the customer's own rating — a manager (or above) checking
+  // the before/after photos and rating how the wash was actually done. This
+  // feeds the boy's performance record alongside the customer rating.
+  managerRating        Int?
+  managerRatingComment String?
+  managerRatedAt       DateTime?
+  managerRatedByUserId String?
 
   car      Car      @relation(fields: [carId], references: [id], onDelete: Cascade)
   customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
   staff    Staff?   @relation(fields: [staffId], references: [id])
 
   @@index([areaId, scheduledDate])
+  @@index([scheduledDate, areaId])
+  @@index([scheduledDate])
+  @@index([scheduledDate, status])
   @@index([staffId, scheduledDate])
   @@index([customerId, scheduledDate])
+  @@index([customerId, cycle])
   @@index([cycle, status])
+  @@index([staffId, cycle, status])
 }
 
 model Payment {
@@ -375,7 +480,7 @@ model Payment {
   customerId       String
   areaId           String
   amount           Int
-  kind             PaymentKind
+  kind             PaymentKind   @default(PACKAGE)
   mode             PaymentMode
   status           PaymentStatus @default(PENDING)
   cycle            String
@@ -405,6 +510,7 @@ model Invoice {
 
   @@unique([customerId, cycle])
   @@index([areaId, status])
+  @@index([status, areaId])
 }
 
 model Expense {
@@ -548,6 +654,10 @@ model AppSettings {
   autoApprovePurchaseUnder Int             @default(0)
   teaBreakMinutes          Int             @default(15)
   languages                Language[]
+  // A wash finished faster than this is flagged as possibly rushed/skipped;
+  // slower than this is flagged as taking too long. Minutes, per car.
+  minWashMinutes           Int             @default(8)
+  maxWashMinutes           Int             @default(45)
 }
 
 enum PayoutBaseMode {

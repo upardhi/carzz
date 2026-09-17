@@ -1,19 +1,26 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/primitives';
 
 export function LoginForm({ next }: { next?: string }) {
-  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [show, setShow] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
+  const emailRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
+
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
+
+    // Read from state; fall back to DOM value in case hydration timing left
+    // state empty (e.g. autofill or demo-account fill that raced hydration).
+    const emailVal = email || emailRef.current?.value || '';
+    const passwordVal = password || passwordRef.current?.value || '';
+
     setPending(true);
     setError(null);
 
@@ -21,7 +28,7 @@ export function LoginForm({ next }: { next?: string }) {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: emailVal, password: passwordVal }),
       });
       const data = (await response.json()) as {
         error?: string;
@@ -32,10 +39,7 @@ export function LoginForm({ next }: { next?: string }) {
         setError(data.error ?? 'Could not sign you in.');
         return;
       }
-      // `refresh` first so the new session cookie is picked up by server
-      // components on the destination page.
-      router.refresh();
-      router.replace(next || data.redirect || '/');
+      window.location.href = next || data.redirect || '/';
     } catch {
       setError('No connection. Check your network and try again.');
     } finally {
@@ -44,112 +48,67 @@ export function LoginForm({ next }: { next?: string }) {
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-3">
-      <div>
-        <label className="field-label" htmlFor="email">
-          Email or mobile number
-        </label>
-        <input
-          id="email"
-          name="email"
-          className="field"
-          autoComplete="username"
-          inputMode="email"
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@carzz.app"
-        />
-      </div>
-
-      <div>
-        <label className="field-label" htmlFor="password">
-          Password
-        </label>
-        <div className="relative">
+    <>
+      <form onSubmit={onSubmit} className="space-y-3">
+        <div>
+          <label className="field-label" htmlFor="email">
+            Email or mobile number
+          </label>
           <input
-            id="password"
-            name="password"
-            className="field pr-16"
-            type={show ? 'text' : 'password'}
-            autoComplete="current-password"
+            ref={emailRef}
+            id="email"
+            name="email"
+            className="field"
+            autoComplete="username"
+            inputMode="email"
             required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@carzz.app"
           />
-          <button
-            type="button"
-            onClick={() => setShow((v) => !v)}
-            className="absolute inset-y-0 right-2 px-2 text-xs font-bold text-navy-800"
-          >
-            {show ? 'Hide' : 'Show'}
-          </button>
         </div>
-      </div>
 
-      {error ? (
-        <p
-          role="alert"
-          className="rounded-lg border border-danger-300 bg-danger-50 px-3 py-2 text-sm font-semibold text-danger-600"
-        >
-          {error}
-        </p>
-      ) : null}
+        <div>
+          <label className="field-label" htmlFor="password">
+            Password
+          </label>
+          <div className="relative">
+            <input
+              ref={passwordRef}
+              id="password"
+              name="password"
+              className="field pr-16"
+              type={show ? 'text' : 'password'}
+              autoComplete="current-password"
+              required
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            <button
+              type="button"
+              onClick={() => setShow((v) => !v)}
+              className="absolute inset-y-0 right-2 px-2 text-xs font-bold text-navy-800"
+            >
+              {show ? 'Hide' : 'Show'}
+            </button>
+          </div>
+        </div>
 
-      <Button type="submit" block size="lg" disabled={pending}>
-        {pending ? 'Signing in…' : 'Sign in'}
-      </Button>
-    </form>
-  );
-}
-
-/** One-tap fill for the demo accounts, so a walkthrough needs no typing. */
-export function DemoAccounts() {
-  const accounts = [
-    { role: 'Super Admin', email: 'owner@carzz.app', password: 'owner123' },
-    { role: 'Area Admin', email: 'areaadmin@carzz.app', password: 'area123' },
-    { role: 'Manager', email: 'manager.wadi@carzz.app', password: 'manager123' },
-    { role: 'Wash Staff', email: 'rahul1@carzz.app', password: 'staff123' },
-    { role: 'Customer', email: 'customer@carzz.app', password: 'customer123' },
-  ];
-
-  return (
-    <div className="mt-6 rounded-card border border-navy-600 bg-navy-850 p-3">
-      <p className="mb-2 text-[11px] font-extrabold uppercase tracking-wider text-navy-300">
-        Demo sign-ins
-      </p>
-      <div className="space-y-1">
-        {accounts.map((a) => (
-          <button
-            key={a.email}
-            type="button"
-            onClick={() => {
-              const form = document.querySelector('form');
-              const email = form?.querySelector<HTMLInputElement>('#email');
-              const password = form?.querySelector<HTMLInputElement>('#password');
-              if (!email || !password) return;
-              // Set through the native setter so React registers the change.
-              setNativeValue(email, a.email);
-              setNativeValue(password, a.password);
-            }}
-            className="flex w-full items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left text-xs text-slate-300 hover:bg-navy-700"
+        {error ? (
+          <p
+            role="alert"
+            className="rounded-lg border border-danger-300 bg-danger-50 px-3 py-2 text-sm font-semibold text-danger-600"
           >
-            <span className="font-bold text-white">{a.role}</span>
-            <span className="truncate font-mono text-[11px] text-navy-300">
-              {a.email}
-            </span>
-          </button>
-        ))}
-      </div>
-    </div>
+            {error}
+          </p>
+        ) : null}
+
+        <Button type="submit" block size="lg" disabled={pending}>
+          {pending ? 'Signing in…' : 'Sign in'}
+        </Button>
+      </form>
+    </>
   );
 }
 
-function setNativeValue(input: HTMLInputElement, value: string) {
-  const setter = Object.getOwnPropertyDescriptor(
-    window.HTMLInputElement.prototype,
-    'value',
-  )?.set;
-  setter?.call(input, value);
-  input.dispatchEvent(new Event('input', { bubbles: true }));
-}

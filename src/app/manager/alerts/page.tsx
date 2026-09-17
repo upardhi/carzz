@@ -3,7 +3,17 @@ import { requirePermission } from '@/lib/auth/server';
 
 export const metadata = { title: 'Red alerts' };
 
-export default async function ManagerAlerts() {
+export default async function ManagerAlerts({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | undefined>>;
+}) {
   const session = await requirePermission('payment:view');
-  return <ConsoleAlerts session={session} base="/manager" />;
+  return (
+    <ConsoleAlerts
+      session={session}
+      base="/manager"
+      searchParams={await searchParams}
+    />
+  );
 }

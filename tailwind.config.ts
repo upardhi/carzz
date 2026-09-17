@@ -1,136 +1,198 @@
 import type { Config } from 'tailwindcss';
 
 /**
- * Carz Management design tokens, taken from the supplied reference screens.
+ * Carz Management design tokens (FleetGuard palette).
  *
- * The system is deep blue navy + gold, not navy + teal:
+ * Deep blue navy + gold, not navy + teal:
  *   - navy   is the shell AND the primary action colour (the "Sign in" button
  *            and the action cards in the reference are solid navy blue)
  *   - gold   is the accent — the active sidebar item, the highlight line in
  *            the hero copy, the brand mark
- *   - green  marks positive state (the "Exited" pill), orange marks an exit
- *            or outbound action, red marks a problem
+ *   - success/warning/danger mark positive, caution and problem states
  *
  * Everything in the UI is expressed with these semantic names, so a rebrand is
  * a change to this file rather than a sweep through components.
  */
+const colors = {
+  // Brand Palette (Navy spectrum)
+  brand: {
+    50: '#f0f5fb',
+    100: '#dae7f4',
+    200: '#b6cfe8',
+    300: '#84adda',
+    400: '#4f86c6',
+    500: '#2f66ae',
+    600: '#214f92',
+    700: '#1b4078',
+    800: '#163363',
+    850: '#112848',
+    900: '#0f2347',
+    950: '#081429',
+  },
+
+  // Accent Palette (Gold/Amber)
+  accent: {
+    50: '#fffaeb',
+    100: '#fef0c7',
+    200: '#fde08a',
+    300: '#fbc84c',
+    400: '#fab224',
+    500: '#f59e0b',
+    600: '#d97706',
+    700: '#b45309',
+    800: '#92400e',
+    900: '#78350f',
+  },
+
+  // Success Palette (Emerald)
+  success: {
+    50: '#ecfdf5',
+    100: '#d1fae5',
+    200: '#a7f3d0',
+    300: '#6ee7b7',
+    400: '#34d399',
+    500: '#10b981',
+    600: '#059669',
+    700: '#047857',
+    800: '#065f46',
+    tagBg: '#d1fae5',
+    main: '#059669',
+    text: '#047857',
+  },
+
+  // Warning Palette (Amber)
+  warning: {
+    50: '#fffbeb',
+    100: '#fef3c7',
+    500: '#f59e0b',
+    600: '#d97706',
+    700: '#b45309',
+    bg: '#fffaeb',
+    border: '#fde08a',
+    lightBorder: '#fef0c7',
+    text: '#b45309',
+    main: '#d97706',
+  },
+
+  // Danger Palette (Rose/Red)
+  danger: {
+    50: '#fff1f2',
+    100: '#ffe4e6',
+    200: '#fecdd3',
+    300: '#fda4af',
+    400: '#fb7185',
+    500: '#f43f5e',
+    600: '#e11d48',
+    700: '#be123c',
+    800: '#9f1239',
+    bg: '#fff1f2',
+    tagBg: '#ffe4e6',
+    border: '#fda4af',
+    dark: '#be123c',
+    main: '#e11d48',
+  },
+
+  // Semantic Surfaces
+  surface: {
+    DEFAULT: '#ffffff',
+    app: '#f5f7fa',
+    card: '#ffffff',
+    muted: '#eef2f7',
+    sunken: '#f5f7fa',
+    raised: '#e2e8f0',
+    sidebar: '#0f2347',
+    sidebar2: '#081429',
+  },
+
+  // Semantic Text / Ink
+  ink: {
+    DEFAULT: '#0f172a',
+    primary: '#0f172a',
+    soft: '#475569',
+    secondary: '#475569',
+    mute: '#64748b',
+    muted: '#64748b',
+    faint: '#94a3b8',
+    subtle: '#94a3b8',
+    light: '#ffffff',
+  },
+
+  // Semantic Borders
+  line: {
+    DEFAULT: '#e2e8f0',
+    soft: '#f1f5f9',
+    strong: '#cbd5e1',
+  },
+};
+
 const config: Config = {
   content: ['./src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {
-        // Shell, chrome and primary actions
-        navy: {
-          50: '#f1f6fb',
-          100: '#e1ebf5',
-          200: '#c3d8ec',
-          300: '#8fb3d9',
-          400: '#5b8cbe',
-          500: '#3a6ea5',
-          600: '#22558a',
-          700: '#17456f',
-          800: '#123a63',
-          850: '#0e2748',
-          900: '#0a1f3d',
-          950: '#061529',
-        },
-        // Accent — active nav, brand highlight, "needs a decision"
-        gold: {
-          50: '#fff9ec',
-          100: '#fcefd2',
-          200: '#f7e3b5',
-          300: '#fad98a',
-          400: '#f5c453',
-          500: '#e8a317',
-          600: '#b87a0f',
-          700: '#8a5a0b',
-        },
-        // Positive state
-        success: {
-          50: '#eef8f3',
-          100: '#dcf2e4',
-          200: '#b6e3ce',
-          500: '#0f8560',
-          600: '#0b6b4f',
-          700: '#07553d',
-        },
-        // Outbound / exit actions
-        orange: {
-          50: '#fdf3ea',
-          100: '#fae2cd',
-          500: '#c85e0d',
-          600: '#b4530a',
-          700: '#8d4108',
-        },
-        danger: {
-          50: '#fef3f2',
-          100: '#f8dad8',
-          300: '#e39a95',
-          500: '#b3261e',
-          600: '#8f1d18',
-        },
-        // Content
-        ink: {
-          DEFAULT: '#10233d',
-          soft: '#4a5f7a',
-          mute: '#64788f',
-          faint: '#8fa3b8',
-        },
-        surface: {
-          DEFAULT: '#ffffff',
-          muted: '#f4f7fa',
-          sunken: '#eef3f8',
-          raised: '#e3eaf2',
-        },
-        line: {
-          DEFAULT: '#dce5ef',
-          soft: '#edf2f7',
-          strong: '#c8d5e3',
-        },
+        navy: colors.brand,
+        gold: colors.accent,
+        success: colors.success,
+        warning: colors.warning,
+        danger: colors.danger,
+        ink: colors.ink,
+        surface: colors.surface,
+        line: colors.line,
       },
+
       fontFamily: {
-        sans: [
-          // Already expands to `Geist, "Geist Fallback"`.
-          'var(--font-geist-sans)',
-          '-apple-system',
-          'BlinkMacSystemFont',
-          'Segoe UI',
-          'Helvetica Neue',
-          'sans-serif',
-        ],
-        mono: [
-          'var(--font-geist-mono)',
-          'ui-monospace',
-          'SFMono-Regular',
-          'Menlo',
-          'monospace',
-        ],
+        sans: ['var(--font-geist-sans)', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Helvetica Neue', 'sans-serif'],
+        mono: ['var(--font-geist-mono)', 'ui-monospace', 'SF Mono', 'Roboto Mono', 'Menlo', 'monospace'],
+        display: ['var(--font-geist-sans)', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
       },
+
       borderRadius: {
         card: '12px',
         pill: '999px',
       },
+
       boxShadow: {
-        card: '0 1px 2px rgba(16,35,61,.06), 0 1px 3px rgba(16,35,61,.05)',
-        raised: '0 8px 24px rgba(6,21,41,.14)',
-        float: '0 14px 40px rgba(6,21,41,.45)',
+        card: '0 1px 2px rgba(15,35,71,.06), 0 1px 3px rgba(15,35,71,.05)',
+        raised: '0 8px 24px rgba(8,20,41,.14)',
+        float: '0 14px 40px rgba(8,20,41,.45)',
       },
+
       backgroundImage: {
-        // The faint grid the reference screens carry over their navy panels.
         'navy-grid':
           'linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),' +
           'linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px)',
       },
+
       backgroundSize: {
         grid: '44px 44px',
       },
+
       keyframes: {
         'fade-up': {
           from: { opacity: '0', transform: 'translateY(6px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
         },
+        'slide-in-right': {
+          from: { transform: 'translateX(16px)', opacity: '0' },
+          to: { transform: 'translateX(0)', opacity: '1' },
+        },
+        shimmer: {
+          '0%': { backgroundPosition: '-400px 0' },
+          '100%': { backgroundPosition: '400px 0' },
+        },
+        'pulse-ring': {
+          '0%': { boxShadow: '0 0 0 0 rgba(16,185,129,0.55)' },
+          '70%': { boxShadow: '0 0 0 10px rgba(16,185,129,0)' },
+          '100%': { boxShadow: '0 0 0 0 rgba(16,185,129,0)' },
+        },
       },
-      animation: { 'fade-up': 'fade-up .22s ease-out both' },
+
+      animation: {
+        'fade-up': 'fade-up 220ms ease-out both',
+        'slide-in': 'slide-in-right 220ms ease-out both',
+        shimmer: 'shimmer 1.6s linear infinite',
+        'pulse-ring': 'pulse-ring 2s infinite',
+      },
     },
   },
   plugins: [],

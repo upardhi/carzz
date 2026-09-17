@@ -19,15 +19,27 @@ export async function GET(
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
-  const file = await getPhotoStorage().get(decoded);
-  if (!file) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  const storage = getPhotoStorage();
+  const file = await storage.get(decoded);
+
+  if (file?.url) {
+    return NextResponse.redirect(file.url, { status: 307 });
   }
 
-  return new NextResponse(Buffer.from(file.data), {
-    headers: {
-      'Content-Type': file.contentType,
-      'Cache-Control': 'public, max-age=31536000, immutable',
-    },
-  });
+  if (file?.data) {
+    return new NextResponse(Buffer.from(file.data), {
+      headers: {
+        'Content-Type': file.contentType,
+        'Cache-Control': 'public, max-age=31536000, immutable',
+      },
+    });
+  }
+
+  const externalUrl = storage.urlFor(decoded);
+  if (externalUrl.startsWith('http://') || externalUrl.startsWith('https://')) {
+    return NextResponse.redirect(externalUrl, { status: 307 });
+  }
+
+  return NextResponse.json({ error: 'Not found' }, { status: 404 });
 }
+

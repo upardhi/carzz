@@ -19,6 +19,7 @@ import type {
   ServicePackage,
   SiteContent,
   Staff,
+  StaffLeave,
   StaffPayout,
   StockIssue,
   StockLevel,
@@ -36,7 +37,9 @@ export interface Db {
   staff: Staff[];
   attendance: Attendance[];
   pocketRequests: PocketMoneyRequest[];
+  leaves: StaffLeave[];
   customers: Customer[];
+
   cars: Car[];
   packages: ServicePackage[];
   visits: WashVisit[];
@@ -228,13 +231,13 @@ export function buildSeed(today = new Date()): Db {
 
   /* ---- org ---- */
   const regions: Region[] = [
-    { id: 'rg_nagpur', name: 'Nagpur', areaAdminId: 'usr_areaadmin', createdAt: now },
+    { id: 'rg_nagpur', name: 'Nagpur', areaAdminId: 'usr_areaadmin', active: true, createdAt: now },
   ];
 
   const areaSpec = [
-    { id: 'ar_wadi', name: 'Wadi', managerName: 'Sunita Kale', employees: 4 },
-    { id: 'ar_bajaj', name: 'Bajaj Nagar', managerName: 'Manoj Pawar', employees: 5 },
-    { id: 'ar_civil', name: 'Civil Lines', managerName: 'Rekha Joshi', employees: 5 },
+    { id: 'ar_wadi', name: 'Wadi', address: 'Plot 14, MIDC Area, Near Toll Plaza, Wadi', managerName: 'Sunita Kale', employees: 4 },
+    { id: 'ar_bajaj', name: 'Bajaj Nagar', address: 'Shop 3-4, Laxmi Complex, WHC Road, Bajaj Nagar', managerName: 'Manoj Pawar', employees: 5 },
+    { id: 'ar_civil', name: 'Civil Lines', address: 'Garage Bay 2, Opp. High Court, Temple Rd, Civil Lines', managerName: 'Rekha Joshi', employees: 5 },
   ];
 
   const areas: Area[] = [];
@@ -266,7 +269,8 @@ export function buildSeed(today = new Date()): Db {
 
     areas.push({
       id: spec.id, regionId: 'rg_nagpur', name: spec.name, city: 'Nagpur',
-      managerId: managerStaffId, createdAt: now,
+      address: spec.address,
+      managerId: managerStaffId, active: true, createdAt: now,
     });
 
     addUser({
@@ -371,6 +375,11 @@ export function buildSeed(today = new Date()): Db {
           scheduleTime: slotTimes[Math.min(baseSlot + k, slotTimes.length - 1)],
           specialInstructions: k === 0 ? null : 'Second car — same building',
           active: status !== 'INACTIVE',
+          serviceStarted: status === 'ACTIVE',
+          serviceStartedAt: status === 'ACTIVE' ? '2026-08-01T00:00:00.000Z' : null,
+          serviceStartedBeforePayment: false,
+          serviceStartedByUserId: null,
+          serviceStartNote: null,
         });
       }
     }
@@ -463,12 +472,18 @@ export function buildSeed(today = new Date()): Db {
           servicesDone: status === 'DONE' ? pkg.services.slice(0, int(1, pkg.services.length)) : [],
           beforePhotoUrl: status === 'DONE' ? `/api/photos/${car.id}-${cyc}-${index}-before` : null,
           afterPhotoUrl: status === 'DONE' ? `/api/photos/${car.id}-${cyc}-${index}-after` : null,
+          beforePhotoBytes: status === 'DONE' ? 245000 : null,
+          afterPhotoBytes: status === 'DONE' ? 255000 : null,
           missReason, missNote: null, rescheduledToVisitId: null,
           rating: status === 'DONE' && rand() > 0.35 ? int(3, 5) : null,
           // Most people rate without writing; a minority leave a comment.
           ratingComment:
             status === 'DONE' && rand() > 0.72 ? pick(RATING_COMMENTS) : null,
           onTime: status === 'DONE' ? rand() > 0.16 : false,
+          managerRating: null,
+          managerRatingComment: null,
+          managerRatedAt: null,
+          managerRatedByUserId: null,
         });
       });
     }
@@ -505,6 +520,8 @@ export function buildSeed(today = new Date()): Db {
       servicesDone: delivered ? ['Exterior wash', 'Interior vacuum'] : [],
       beforePhotoUrl: delivered ? `/api/photos/${replacementId}-before` : null,
       afterPhotoUrl: delivered ? `/api/photos/${replacementId}-after` : null,
+      beforePhotoBytes: delivered ? 245000 : null,
+      afterPhotoBytes: delivered ? 255000 : null,
       missReason: null,
       missNote: null,
       rescheduledToVisitId: null,
@@ -754,6 +771,8 @@ export function buildSeed(today = new Date()): Db {
     autoApprovePurchaseUnder: 0,
     teaBreakMinutes: 15,
     languages: ['en', 'hi', 'mr'],
+    minWashMinutes: 8,
+    maxWashMinutes: 45,
   };
 
   /* ---- website ---- */
@@ -778,6 +797,7 @@ export function buildSeed(today = new Date()): Db {
 
   return {
     users, credentials, regions, areas, staff, attendance, pocketRequests,
+    leaves: [] as StaffLeave[],
     customers, cars, packages, visits, payments, invoices, expenses,
     payouts: [] as StaffPayout[], complaints, inventoryItems, stockLevels,
     purchaseRequests, stockIssues, notifications: [] as Notification[],
@@ -786,3 +806,4 @@ export function buildSeed(today = new Date()): Db {
     enquiries,
   };
 }
+

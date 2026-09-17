@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 import { Button, Note, Tag } from '@/components/ui/primitives';
+import { toast } from '@/components/ui/ToastProvider';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { IconCheck } from '@/components/shell/icons';
 import type { AppSettings, PaymentMode, PayoutSettings } from '@/lib/data/types';
 import { money } from '@/lib/util/format';
@@ -24,13 +26,18 @@ function useSettings(scope: 'app' | 'payout') {
       });
       const data = (await response.json()) as { message?: string; error?: string };
       if (!response.ok) {
-        setState({ error: data.error ?? 'Could not save.' });
+        const err = data.error ?? 'Could not save.';
+        setState({ error: err });
+        toast.error(err);
         return;
       }
-      setState({ ok: data.message ?? 'Saved.' });
+      const msg = data.message ?? 'Saved.';
+      setState({ ok: msg });
+      toast.success(msg);
       router.refresh();
     } catch {
       setState({ error: 'No connection.' });
+      toast.error('No connection.');
     } finally {
       setPending(false);
     }
@@ -40,7 +47,6 @@ function useSettings(scope: 'app' | 'payout') {
 }
 
 function Feedback({ state }: { state: { ok?: string; error?: string } }) {
-  if (state.ok) return <div className="mt-2"><Note tone="success">{state.ok}</Note></div>;
   if (state.error) return <div className="mt-2"><Note tone="danger">{state.error}</Note></div>;
   return null;
 }
@@ -349,3 +355,67 @@ export function OperatingRulesForm({ settings }: { settings: AppSettings }) {
     </div>
   );
 }
+
+export function PhotoPurgeButton() {
+  const router = useRouter();
+  const showConfirm = useConfirm();
+  const [pending, setPending] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+
+  async function handlePurge() {
+    const ok = await showConfirm({
+      title: 'Clean Up Expired Photos',
+      message:
+        'Are you sure you want to clean up wash photos older than the retention period? This cannot be undone.',
+      tone: 'danger',
+      confirmText: 'Clean up photos',
+      cancelText: 'Cancel',
+    });
+    if (!ok) return;
+
+    setPending(true);
+    setResult(null);
+    try {
+      const res = await fetch('/api/admin/maintenance/purge-photos', {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const err = data.error || 'Failed to purge photos.';
+        setResult({ ok: false, message: err });
+        toast.error(err);
+      } else {
+        setResult({ ok: true, message: data.message });
+        toast.success(data.message);
+        router.refresh();
+      }
+    } catch {
+      const err = 'Network error while attempting cleanup.';
+      setResult({ ok: false, message: err });
+      toast.error(err);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <div className="mt-3 pt-3 border-t border-slate-100">
+      <Button
+        variant="secondary"
+        size="sm"
+        disabled={pending}
+        onClick={handlePurge}
+      >
+        {pending ? 'Purging expired photos…' : '🧹 Clean up expired photos now'}
+      </Button>
+      {result ? (
+        <div className="mt-2">
+          <Note tone={result.ok ? 'success' : 'danger'}>
+            {result.message}
+          </Note>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
