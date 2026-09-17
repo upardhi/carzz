@@ -20,6 +20,7 @@ import type {
   ServicePackage,
   SiteContent,
   Staff,
+  StaffLeave,
   StaffPayout,
   StockIssue,
   StockLevel,
@@ -42,6 +43,7 @@ export interface DataStore {
   readonly staff: Repository<Staff>;
   readonly attendance: Repository<Attendance>;
   readonly pocketRequests: Repository<PocketMoneyRequest>;
+  readonly leaves: Repository<StaffLeave>;
   readonly customers: Repository<Customer>;
   readonly cars: Repository<Car>;
   readonly packages: Repository<ServicePackage>;
@@ -57,6 +59,7 @@ export interface DataStore {
   readonly stockIssues: Repository<StockIssue>;
   readonly notifications: Repository<Notification>;
   readonly enquiries: Repository<Enquiry>;
+
 
   /** Credentials are kept apart so a password hash never rides on a `User`. */
   getCredential(userId: Id): Promise<UserCredential | null>;

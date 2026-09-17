@@ -13,7 +13,7 @@ export const ROLE_LABEL: Record<Role, string> = {
   SUPER_ADMIN: 'Super Admin',
   AREA_ADMIN: 'Area Admin',
   MANAGER: 'Manager',
-  EMPLOYEE: 'Wash Staff',
+  EMPLOYEE: 'Wash Boys',
   CUSTOMER: 'Customer',
 };
 

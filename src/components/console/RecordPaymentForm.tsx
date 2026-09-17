@@ -6,6 +6,8 @@ import { Button, Note } from '@/components/ui/primitives';
 import type { PaymentMode } from '@/lib/data/types';
 import { PAYMENT_MODE_LABEL } from '@/lib/util/labels';
 
+import { safeOfflineFetch } from '@/lib/util/offlineQueue';
+
 export function RecordPaymentForm({
   customerId,
   suggested,
@@ -28,20 +30,27 @@ export function RecordPaymentForm({
     setPending(true);
     setState({});
     try {
-      const response = await fetch('/api/ops/payments', {
+      const result = await safeOfflineFetch<{ message?: string; error?: string }>('/api/ops/payments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'record', customerId, amount: value, mode }),
+        body: { action: 'record', customerId, amount: value, mode },
+        label: `Record Payment ₹${value} (${mode})`,
       });
-      const data = (await response.json()) as { message?: string; error?: string };
-      if (!response.ok) {
-        setState({ error: data.error ?? 'Could not record that.' });
+
+      if (!result.ok) {
+        setState({ error: result.error ?? 'Could not record that.' });
         return;
       }
-      setState({ ok: data.message ?? 'Recorded.' });
+
+      if (result.queuedOffline) {
+        setState({ ok: 'Saved offline! Payment will sync automatically when you are back online.' });
+      } else {
+        setState({ ok: result.data?.message ?? 'Payment recorded.' });
+      }
+
       router.refresh();
     } catch {
-      setState({ error: 'No connection.' });
+      setState({ error: 'Something unexpected happened.' });
     } finally {
       setPending(false);
     }

@@ -1,4 +1,5 @@
 import 'server-only';
+import { cache } from 'react';
 
 import type { DataStore } from './ports/store';
 import { MemoryStore } from './memory/store';
@@ -16,10 +17,16 @@ export type DataProvider = 'memory' | 'prisma' | 'firebase';
  * The adapters are imported lazily so the app boots on `memory` without
  * `@prisma/client` or `firebase-admin` present.
  */
-const globalForStore = globalThis as unknown as { __carzzStore?: DataStore };
+const globalForStore = globalThis as unknown as {
+  __carzzStore?: DataStore;
+  __carzzPrisma?: unknown;
+  __carzzPgPool?: unknown;
+};
 
-export async function getStore(): Promise<DataStore> {
-  if (globalForStore.__carzzStore) return globalForStore.__carzzStore;
+export const getStore = cache(async function getStore(): Promise<DataStore> {
+  if (process.env.NODE_ENV !== 'development' && globalForStore.__carzzStore) {
+    return globalForStore.__carzzStore;
+  }
 
   const provider = (process.env.DATA_PROVIDER ?? 'memory') as DataProvider;
   warnIfUnpooled(provider);
@@ -33,11 +40,28 @@ export async function getStore(): Promise<DataStore> {
       // the deployed bundle entirely, and every request that touched the
       // database failed with "the Prisma packages are not installed" — on the
       // host only, never locally, where node_modules is right there.
-      const [{ PrismaStore }, prismaModule, adapterModule] = await Promise.all([
-        import('./prisma/store'),
-        import('@prisma/client').catch(() => null),
-        import('@prisma/adapter-pg').catch(() => null),
-      ]);
+      let prismaModule = await import('@prisma/client').catch(() => null);
+      if (!prismaModule) {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          prismaModule = require('@prisma/client');
+        } catch {
+          // ignore
+        }
+      }
+
+      let adapterModule = await import('@prisma/adapter-pg').catch(() => null);
+      if (!adapterModule) {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          adapterModule = require('@prisma/adapter-pg');
+        } catch {
+          // ignore
+        }
+      }
+
+      const { PrismaStore } = await import('./prisma/store');
+
       if (!prismaModule || !adapterModule) {
         throw new Error(
           'DATA_PROVIDER=prisma but the Prisma packages are not installed.\n' +
@@ -45,28 +69,60 @@ export async function getStore(): Promise<DataStore> {
         );
       }
 
+      let pgModule = await import('pg').catch(() => null);
+      if (!pgModule) {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          pgModule = require('pg');
+        } catch {
+          // ignore
+        }
+      }
+
       const { PrismaClient } = prismaModule as {
         PrismaClient: new (options?: unknown) => unknown;
       };
       const { PrismaPg } = adapterModule as {
-        PrismaPg: new (options: { connectionString: string }) => unknown;
+        PrismaPg: new (poolOrConfig: unknown) => unknown;
+      };
+      const { Pool } = (pgModule ?? {}) as {
+        Pool?: new (options: unknown) => unknown;
       };
 
-      // One client per process, reused across requests. A fresh client per
-      // invocation would open its own connection pool every time and exhaust
-      // the database's connection limit on a serverless host.
-      const globalForPrisma = globalThis as unknown as { __carzzPrisma?: unknown };
-      globalForPrisma.__carzzPrisma ??= new PrismaClient({
-        // Prisma 7 connects through a driver adapter. node-postgres speaks to
-        // any Postgres — Neon, Supabase, RDS, a plain server — so the host
-        // stays a deployment choice rather than a code one.
-        adapter: new PrismaPg({
-          connectionString: requireEnv('DATABASE_URL'),
-        }),
-        log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
-      });
+      // One client and one connection pool per process, reused across requests.
+      // Passing an explicit pg.Pool instance keeps connections warm and avoids
+      // destroying and recreating sockets on every query.
+      if (!globalForStore.__carzzPrisma) {
+        let connectionString = requireEnv('DATABASE_URL');
+        if (connectionString.includes('sslmode=require') && !connectionString.includes('uselibpqcompat=true')) {
+          connectionString = connectionString.replace('sslmode=require', 'sslmode=verify-full');
+        }
+        let adapter: unknown;
+        if (Pool) {
+          const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+          const maxConnections = process.env.DB_POOL_MAX
+            ? parseInt(process.env.DB_POOL_MAX, 10)
+            : (isServerless ? 1 : 3);
 
-      store = new PrismaStore(globalForPrisma.__carzzPrisma as never);
+          globalForStore.__carzzPgPool ??= new Pool({
+            connectionString,
+            max: maxConnections,
+            idleTimeoutMillis: 5000,
+            connectionTimeoutMillis: 8000,
+            allowExitOnIdle: true,
+          });
+          adapter = new PrismaPg(globalForStore.__carzzPgPool);
+        } else {
+          adapter = new PrismaPg({ connectionString });
+        }
+
+        globalForStore.__carzzPrisma = new PrismaClient({
+          adapter,
+          log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
+        });
+      }
+
+      store = new PrismaStore(globalForStore.__carzzPrisma as never);
       break;
     }
 
@@ -112,7 +168,7 @@ export async function getStore(): Promise<DataStore> {
 
   globalForStore.__carzzStore = store;
   return store;
-}
+});
 
 /**
  * The memory store is a fresh copy of the demo seed in every process — right

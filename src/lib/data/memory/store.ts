@@ -23,6 +23,7 @@ export class MemoryStore implements DataStore {
   readonly staff;
   readonly attendance;
   readonly pocketRequests;
+  readonly leaves;
   readonly customers;
   readonly cars;
   readonly packages;
@@ -51,7 +52,9 @@ export class MemoryStore implements DataStore {
     this.staff = new MemoryRepository(db.staff, 'stf');
     this.attendance = new MemoryRepository(db.attendance, 'att');
     this.pocketRequests = new MemoryRepository(db.pocketRequests, 'pkt');
+    this.leaves = new MemoryRepository(db.leaves, 'lea');
     this.customers = new MemoryRepository(db.customers, 'cus');
+
     this.cars = new MemoryRepository(db.cars, 'car');
     this.packages = new MemoryRepository(db.packages, 'pkg');
     this.visits = new MemoryRepository(db.visits, 'vst');

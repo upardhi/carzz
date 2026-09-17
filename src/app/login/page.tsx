@@ -1,5 +1,10 @@
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 import { BrandLockup } from '@/components/shell/Brand';
-import { DemoAccounts, LoginForm } from './LoginForm';
+import { homeFor } from '@/lib/auth/rbac';
+import { getSession } from '@/lib/auth/server';
+import { SESSION_COOKIE } from '@/lib/auth/session';
+import { LoginForm } from './LoginForm';
 
 export const metadata = { title: 'Sign in' };
 
@@ -9,6 +14,18 @@ export default async function LoginPage({
   searchParams: Promise<{ next?: string }>;
 }) {
   const { next } = await searchParams;
+  const session = await getSession();
+  if (session && !next) {
+    redirect(homeFor(session.user.role));
+  }
+  if (!session) {
+    try {
+      const jar = await cookies();
+      jar.delete(SESSION_COOKIE);
+    } catch {
+      /* ignore */
+    }
+  }
 
   return (
     <main className="min-h-[100dvh] bg-navy-900 lg:grid lg:grid-cols-2">
@@ -22,10 +39,10 @@ export default async function LoginPage({
         <BrandLockup subtitle="Management" className="relative" />
 
         <div className="relative">
-          <span className="inline-flex items-center gap-2 rounded-pill border border-gold-500/50 px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.14em] text-gold-500">
+          <span className="inline-flex items-center gap-2 rounded-pill border border-gold-500/50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-gold-500">
             Every wash, on record
           </span>
-          <h1 className="mt-5 text-4xl font-extrabold leading-tight tracking-tight text-white">
+          <h1 className="mt-5 text-4xl font-bold leading-tight tracking-tight text-white">
             Run every area.
             <br />
             <span className="text-gold-500">Prove every wash.</span>
@@ -43,7 +60,7 @@ export default async function LoginPage({
               ['Works offline', 'installable'],
             ].map(([value, label]) => (
               <div key={label}>
-                <dt className="text-sm font-extrabold text-white">{value}</dt>
+                <dt className="text-sm font-semibold text-white">{value}</dt>
                 <dd className="text-[11px] uppercase tracking-wide text-navy-300">
                   {label}
                 </dd>
@@ -52,7 +69,7 @@ export default async function LoginPage({
           </dl>
         </div>
 
-        <p className="relative text-[11px] text-navy-400">
+        <p className="relative text-[11px] text-navy-400" suppressHydrationWarning>
           © {new Date().getFullYear()} Carz Management
         </p>
       </section>
@@ -64,10 +81,10 @@ export default async function LoginPage({
           </div>
 
           <div className="rounded-card border border-navy-600 bg-navy-850 p-6 shadow-raised lg:border-line lg:bg-white">
-            <p className="text-[11px] font-extrabold uppercase tracking-wider text-navy-300 lg:text-navy-800">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-navy-300 lg:text-navy-800">
               Welcome back
             </p>
-            <h2 className="mt-1 text-xl font-extrabold text-white lg:text-ink">
+            <h2 className="mt-1 text-xl font-bold text-white lg:text-ink">
               Sign in to Carz
             </h2>
             <p className="mb-5 mt-1 text-sm text-slate-300 lg:text-ink-mute">
@@ -78,8 +95,6 @@ export default async function LoginPage({
               <LoginForm next={next} />
             </div>
           </div>
-
-          <DemoAccounts />
         </div>
       </section>
     </main>

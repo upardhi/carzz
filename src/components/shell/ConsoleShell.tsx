@@ -2,8 +2,8 @@
 
 import clsx from 'clsx';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useState, type ReactNode } from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
+import { useState, useEffect, type ReactNode } from 'react';
 import { BrandLockup } from './Brand';
 import { IconLogout, IconMenu } from './icons';
 
@@ -41,22 +41,55 @@ export function ConsoleShell({
   children: ReactNode;
 }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('carzz_last_portal', pathname.startsWith('/console') ? pathname : '/console');
+      localStorage.setItem('carzz_portal', 'console');
+    } catch {
+      // ignore
+    }
+  }, [pathname]);
 
   // The section index (`/manager`) is a prefix of every page beneath it, so a
   // plain startsWith would light two items at once. Pick the single longest
-  // href that matches instead.
+  // href that matches instead. Hrefs carrying a query string (e.g. the "Boys"
+  // shortcut, `/admin/users?role=EMPLOYEE`) must match pathname + search
+  // exactly, so a role-filtered link doesn't light up for every role.
+  const currentSearch = searchParams.toString();
+  const currentFull = currentSearch ? `${pathname}?${currentSearch}` : pathname;
   const activeHref = nav
     .flatMap((group) => group.items.map((item) => item.href))
-    .filter(
-      (href) => pathname === href || pathname.startsWith(`${href}/`),
-    )
+    .filter((href) => {
+      const [hrefPath] = href.split('#');
+      if (hrefPath.includes('?')) return hrefPath === currentFull;
+      return pathname === hrefPath || pathname.startsWith(`${hrefPath}/`);
+    })
     .sort((a, b) => b.length - a.length)[0];
 
   const sidebar = (
     <div className="flex h-full flex-col bg-gradient-to-b from-navy-850 to-navy-950">
-      <div className="border-b border-navy-700 px-4 py-4">
-        <BrandLockup subtitle={roleLabel} />
+      <div className="border-b border-navy-700 px-4 py-4" suppressHydrationWarning>
+        <div className="flex items-center justify-between" suppressHydrationWarning>
+          <BrandLockup subtitle={roleLabel} />
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            aria-label="Close menu"
+            className={clsx(
+              "flex h-8 w-8 items-center justify-center rounded-lg bg-navy-800 text-navy-300 hover:bg-navy-700 hover:text-white lg:hidden",
+              !open && "hidden"
+            )}
+            suppressHydrationWarning
+          >
+            <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
         <div className="mt-3 rounded-lg border border-navy-700 bg-navy-900 px-3 py-2">
           <div className="text-[10px] font-bold uppercase tracking-wider text-navy-300">
             Scope
@@ -77,12 +110,13 @@ export function ConsoleShell({
                 <Link
                   key={item.href}
                   href={item.href}
+                  prefetch={true}
                   onClick={() => setOpen(false)}
                   aria-current={active ? 'page' : undefined}
                   className={clsx(
                     'mb-0.5 flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-semibold transition-colors',
                     active
-                      ? 'bg-gold-500 text-navy-950'
+                      ? 'bg-gold-500 text-navy-950 font-bold shadow-sm'
                       : 'text-navy-200/80 hover:bg-navy-700 hover:text-white',
                   )}
                 >
@@ -91,7 +125,7 @@ export function ConsoleShell({
                   {item.badge ? (
                     <span
                       className={clsx(
-                        'rounded-pill px-1.5 py-0.5 text-[10px] font-extrabold',
+                        'rounded-pill px-1.5 py-0.5 text-[10px] font-semibold',
                         active ? 'bg-navy-900 text-gold-400' : 'bg-danger-500 text-white',
                       )}
                     >
@@ -107,7 +141,7 @@ export function ConsoleShell({
 
       <div className="border-t border-navy-700 p-3">
         <div className="flex items-center gap-2.5 rounded-lg bg-navy-900 px-3 py-2">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-navy-600 text-xs font-extrabold text-white">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-navy-600 text-xs font-semibold text-white">
             {userName.slice(0, 2).toUpperCase()}
           </div>
           <div className="min-w-0 flex-1">
@@ -141,25 +175,35 @@ export function ConsoleShell({
             type="button"
             aria-label="Close menu"
             onClick={() => setOpen(false)}
-            className="absolute inset-0 bg-navy-950/60"
+            className="absolute inset-0 bg-navy-950/70 backdrop-blur-sm transition-opacity"
           />
-          <div className="absolute inset-y-0 left-0 w-72 max-w-[85vw] shadow-raised">
+          <div className="absolute inset-y-0 left-0 w-72 max-w-[85vw] shadow-2xl animate-in slide-in-from-left duration-200">
             {sidebar}
           </div>
         </div>
       ) : null}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-40 flex items-center gap-3 border-b border-navy-700 bg-navy-900 px-4 py-3 pt-safe text-white lg:hidden">
-          <button
-            type="button"
-            onClick={() => setOpen(true)}
-            aria-label="Open menu"
-            className="rounded-lg p-1 text-navy-300 hover:bg-navy-800"
-          >
-            <IconMenu />
-          </button>
-          <BrandLockup subtitle={roleLabel} />
+        <header className="sticky top-0 z-40 flex items-center justify-between gap-3 border-b border-navy-700 bg-navy-900 px-4 py-3 pt-safe text-white lg:hidden" suppressHydrationWarning>
+          <div className="flex items-center gap-3" suppressHydrationWarning>
+            <button
+              type="button"
+              onClick={() => setOpen(true)}
+              aria-label="Open menu"
+              className="flex h-9 w-9 items-center justify-center rounded-xl bg-navy-800 text-gold-400 border border-navy-700 hover:bg-navy-750 hover:border-gold-500/50 transition-all shadow-sm active:scale-95"
+            >
+              <IconMenu width={20} height={20} />
+            </button>
+            <BrandLockup subtitle={roleLabel} />
+          </div>
+          <div className="flex items-center gap-2">
+            <div
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-navy-700 text-xs font-bold text-white border border-navy-600"
+              suppressHydrationWarning
+            >
+              {userName.slice(0, 2).toUpperCase()}
+            </div>
+          </div>
         </header>
 
         <main className="min-w-0 flex-1 p-3 sm:p-5">{children}</main>
@@ -181,7 +225,7 @@ export function PageHeader({
   return (
     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
       <div>
-        <h1 className="text-xl font-extrabold tracking-tight text-ink">{title}</h1>
+        <h1 className="text-xl font-bold tracking-tight text-ink">{title}</h1>
         {description ? (
           <p className="mt-0.5 text-sm text-ink-mute">{description}</p>
         ) : null}

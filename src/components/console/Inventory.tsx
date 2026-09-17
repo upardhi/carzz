@@ -5,33 +5,16 @@ import {
   Kpi,
   KpiGrid,
   Note,
-  Table,
-  TableWrap,
   Tag,
-  Td,
-  Th,
 } from '@/components/ui/primitives';
-import { scopeAreaFilter } from '@/lib/auth/rbac';
+import { scopeAreaFilter, can } from '@/lib/auth/rbac';
 import type { Session } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
-import { stockForArea, type StockRow } from '@/lib/services/inventory';
+import { stockForAreas } from '@/lib/services/inventory';
 import { formatDateFull, money } from '@/lib/util/format';
-import { ActionButton } from './ActionButton';
-import { IssueStockForm, PurchaseRequestForm } from './InventoryForms';
-
-const STATUS_TONE = {
-  OUT: 'bad',
-  CRITICAL: 'bad',
-  LOW: 'warn',
-  OK: 'ok',
-} as const;
-
-const STATUS_LABEL = {
-  OUT: 'Out of stock',
-  CRITICAL: 'Order now',
-  LOW: 'Low',
-  OK: 'OK',
-} as const;
+import { ActionButton } from '@/components/console/ActionButton';
+import { InventoryClient } from '@/components/console/InventoryClient';
+import { IssueStockForm, PurchaseRequestForm } from '@/components/console/InventoryForms';
 
 export async function ConsoleInventory({ session }: { session: Session }) {
   const store = await getStore();
@@ -41,13 +24,9 @@ export async function ConsoleInventory({ session }: { session: Session }) {
     (a) => session.scope.areaIds === null || session.scope.areaIds.includes(a.id),
   );
 
-  const [stockByArea, items, staff, requests] = await Promise.all([
-    Promise.all(
-      areas.map(async (area) => ({
-        area,
-        rows: await stockForArea(store, area.id),
-      })),
-    ),
+  const areaIds = areas.map((a) => a.id);
+  const [stockMap, items, staff, requests] = await Promise.all([
+    stockForAreas(store, areaIds),
     store.inventoryItems.find({ where: { active: true } }),
     store.staff.find({ where: { role: 'EMPLOYEE', active: true, ...areaFilter } as never }),
     store.purchaseRequests.find({
@@ -56,10 +35,14 @@ export async function ConsoleInventory({ session }: { session: Session }) {
     }),
   ]);
 
+  const stockByArea = areas.map((area) => ({
+    area,
+    rows: stockMap.get(area.id) ?? [],
+  }));
+
   const itemById = new Map(items.map((i) => [i.id, i]));
   const areaById = new Map(areas.map((a) => [a.id, a]));
   const allRows = stockByArea.flatMap((s) => s.rows);
-  const urgent = allRows.filter((r) => r.status === 'OUT' || r.status === 'CRITICAL');
 
   return (
     <>
@@ -68,106 +51,61 @@ export async function ConsoleInventory({ session }: { session: Session }) {
         description="Stock, usage and purchase requests"
       />
 
-      <KpiGrid>
-        <Kpi label="Items tracked" value={items.length} />
+      <KpiGrid columns={6}>
         <Kpi
-          label="Out of stock"
+          label="ITEMS TRACKED"
+          value={items.length}
+          tone="blue"
+          subtext="Active inventory catalog"
+        />
+        <Kpi
+          label="OUT OF STOCK"
           value={allRows.filter((r) => r.status === 'OUT').length}
-          tone="danger"
+          tone="rose"
+          subtext={
+            allRows.filter((r) => r.status === 'OUT').length > 0
+              ? 'Replenish immediately'
+              : 'All items stocked'
+          }
         />
         <Kpi
-          label="Order now"
+          label="ORDER NOW"
           value={allRows.filter((r) => r.status === 'CRITICAL').length}
-          tone="danger"
+          tone="rose"
+          subtext="Below safety stock"
         />
         <Kpi
-          label="Low"
+          label="LOW STOCK"
           value={allRows.filter((r) => r.status === 'LOW').length}
-          tone="gold"
+          tone="amber"
+          subtext="Approaching reorder point"
         />
         <Kpi
-          label="Stock value"
+          label="STOCK VALUE"
           value={money(allRows.reduce((sum, r) => sum + r.value, 0))}
+          tone="purple"
+          subtext="Total assets on hand"
         />
         <Kpi
-          label="Open requests"
+          label="OPEN REQUESTS"
           value={requests.filter((r) => r.status === 'PENDING').length}
-          tone="gold"
+          tone="amber"
+          subtext="Awaiting purchase review"
         />
       </KpiGrid>
 
-      {urgent.length > 0 ? (
-        <Card tone="danger" accent="danger" className="mt-4 p-4">
-          <h3 className="text-sm font-extrabold">
-            {urgent.length} {urgent.length === 1 ? 'item' : 'items'} will run out
-            before a normal delivery arrives
-          </h3>
-          <p className="mt-1 text-sm text-ink-mute">
-            Days of cover are worked out from this area&rsquo;s real wash volume,
-            not a flat reorder level — a busy area burns stock faster.
-          </p>
-        </Card>
-      ) : null}
+      <div className="mt-6">
+        <InventoryClient
+          stockByArea={stockByArea}
+          items={items}
+          areas={areas}
+          staff={staff}
+          requests={requests}
+          canApprovePurchase={can(session.user.role, 'purchase:approve')}
+        />
+      </div>
 
-      {stockByArea.map(({ area, rows }) => (
-        <div key={area.id} className="mt-4">
-          <h3 className="mb-2 text-sm font-extrabold">{area.name}</h3>
-          <TableWrap>
-            <Table>
-              <thead>
-                <tr>
-                  <Th>Item</Th>
-                  <Th>In stock</Th>
-                  <Th>Used per day</Th>
-                  <Th>Days left</Th>
-                  <Th>Reorder at</Th>
-                  <Th>Status</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row: StockRow) => (
-                  <tr key={row.item.id}>
-                    <Td className="font-bold">{row.item.name}</Td>
-                    <Td
-                      className={
-                        row.status === 'OUT' || row.status === 'CRITICAL'
-                          ? 'font-bold text-danger-500'
-                          : ''
-                      }
-                    >
-                      {row.quantity} {row.item.unit}
-                    </Td>
-                    <Td>
-                      {row.usagePerDay > 0
-                        ? `${row.usagePerDay.toFixed(2)} ${row.item.unit}`
-                        : '—'}
-                    </Td>
-                    <Td
-                      className={
-                        row.daysLeft !== null && row.daysLeft < 2
-                          ? 'font-extrabold text-danger-500'
-                          : ''
-                      }
-                    >
-                      {row.daysLeft !== null ? row.daysLeft.toFixed(1) : '—'}
-                    </Td>
-                    <Td>
-                      {row.item.reorderLevel} {row.item.unit}
-                    </Td>
-                    <Td>
-                      <Tag tone={STATUS_TONE[row.status]}>
-                        {STATUS_LABEL[row.status]}
-                      </Tag>
-                    </Td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          </TableWrap>
-        </div>
-      ))}
-
-      <div className="mt-4 grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+      <div className="mt-8 grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
         <Card className="p-4">
           <CardHeading>Purchase requests</CardHeading>
           {requests.slice(0, 6).map((request) => (

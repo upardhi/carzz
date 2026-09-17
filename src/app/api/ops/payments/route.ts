@@ -1,3 +1,4 @@
+import { revalidatePath } from 'next/cache';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { HttpError, requireApiSession } from '@/lib/auth/server';
@@ -5,6 +6,19 @@ import { getStore } from '@/lib/data';
 import { recordPayment } from '@/lib/services/accounts';
 import { currentCycle } from '@/lib/util/format';
 import { assertInScope, opsError } from '../_guard';
+
+function revalidatePaymentPages() {
+  try {
+    for (const base of ['/admin', '/manager', '/area']) {
+      revalidatePath(`${base}/customers`);
+      revalidatePath(`${base}/customers/[customerId]`, 'page');
+    }
+    revalidatePath('/admin/accounting');
+    revalidatePath('/admin');
+  } catch {
+    // ignore — running outside a request context
+  }
+}
 
 const schema = z.discriminatedUnion('action', [
   z.object({
@@ -53,6 +67,7 @@ export async function POST(request: Request) {
         status: 'CONFIRMED',
       });
 
+      revalidatePaymentPages();
       return NextResponse.json({
         ok: true,
         payment: settled,
@@ -74,6 +89,7 @@ export async function POST(request: Request) {
       status: 'CONFIRMED',
     });
 
+    revalidatePaymentPages();
     return NextResponse.json({
       ok: true,
       payment,

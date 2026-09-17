@@ -1,4 +1,5 @@
 import 'server-only';
+import { cache } from 'react';
 
 import type { DataStore } from '../data/ports/store';
 import type {
@@ -12,11 +13,19 @@ import type {
   WashVisit,
 } from '../data/types';
 import { tallyVisits, type VisitTally } from './visits';
+import { generateVisitsForCar, scheduleNextVisitForCar } from './schedule';
+import { resolvePublicPhotoUrl } from '../util/photoUrl';
+import { todayISO } from '../util/format';
+import { invalidateAreaPerformanceCache } from './reports';
 
 /** Everything the customer app and the manager's customer page both need. */
 export interface CustomerAccount {
   customer: Customer;
-  cars: (Car & { package: ServicePackage | null; tally: VisitTally })[];
+  cars: (Car & {
+    package: ServicePackage | null;
+    tally: VisitTally;
+    serviceStartedByUser?: { id: Id; name: string; role: string; email?: string } | null;
+  })[];
   visits: WashVisit[];
   payments: Payment[];
   invoices: Invoice[];
@@ -67,13 +76,105 @@ export async function loadCustomerAccount(
   ]);
 
   const packageById = new Map(packages.map((p) => [p.id, p]));
-  const cycleVisits = visits.filter((v) => v.cycle === cycle);
 
-  const carsWithDetail = cars.map((car) => ({
-    ...car,
-    package: packageById.get(car.packageId) ?? null,
-    tally: tallyVisits(cycleVisits.filter((v) => v.carId === car.id)),
-  }));
+  const starterUserIds = Array.from(
+    new Set(cars.map((c) => c.serviceStartedByUserId).filter(Boolean) as string[]),
+  );
+  const starterUsers = starterUserIds.length
+    ? await store.users.find({ where: { id: { in: starterUserIds } } as never })
+    : [];
+  const userById = new Map(starterUsers.map((u) => [u.id, u]));
+
+  const today = todayISO();
+  let effectiveVisits = visits;
+
+  // 1. Clean up stale past pending visits that were never executed
+  const pastPending = effectiveVisits.filter(
+    (v) => v.status === 'PENDING' && v.scheduledDate < today,
+  );
+  if (pastPending.length > 0) {
+    for (const p of pastPending) {
+      await store.visits.delete(p.id);
+    }
+    effectiveVisits = effectiveVisits.filter(
+      (v) => !pastPending.some((p) => p.id === v.id),
+    );
+  }
+
+  // 2. Prune any redundant future pending visits beyond the first upcoming visit per car
+  const prunedVisitIds = new Set<string>();
+  for (const car of cars) {
+    const carPending = effectiveVisits
+      .filter((v) => v.carId === car.id && v.cycle === cycle && v.status === 'PENDING')
+      .sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate));
+    if (carPending.length > 1) {
+      const redundant = carPending.slice(1);
+      for (const r of redundant) {
+        prunedVisitIds.add(r.id);
+        await store.visits.delete(r.id);
+      }
+    }
+  }
+  effectiveVisits = effectiveVisits.filter((v) => !prunedVisitIds.has(v.id));
+
+  // 3. Ensure cars with active service have their upcoming pending visit scheduled on or after today
+  for (const car of cars) {
+    const isStarted = car.serviceStarted ?? true;
+    if (!isStarted || !car.active) continue;
+
+    const carDoneThisCycle = effectiveVisits.filter(
+      (v) => v.carId === car.id && v.cycle === cycle && v.status === 'DONE',
+    ).length;
+    const pkg = packageById.get(car.packageId);
+    const quota = pkg?.washesPerMonth ?? 8;
+
+    if (carDoneThisCycle < quota) {
+      const hasUpcomingOpen = effectiveVisits.some(
+        (v) =>
+          v.carId === car.id &&
+          (v.status === 'PENDING' || v.status === 'IN_PROGRESS') &&
+          v.scheduledDate >= today,
+      );
+
+      if (!hasUpcomingOpen) {
+        const created = await scheduleNextVisitForCar(
+          store,
+          car,
+          customer,
+          cycle,
+          today,
+        );
+        if (created) {
+          effectiveVisits.push(created);
+        }
+      }
+    }
+  }
+
+  const effectiveCycleVisits = effectiveVisits.filter((v) => v.cycle === cycle);
+
+  const carsWithDetail = cars.map((car) => {
+    const starterUser = car.serviceStartedByUserId
+      ? userById.get(car.serviceStartedByUserId)
+      : null;
+    const pkg = packageById.get(car.packageId) ?? null;
+    return {
+      ...car,
+      package: pkg,
+      tally: tallyVisits(
+        effectiveCycleVisits.filter((v) => v.carId === car.id),
+        pkg?.washesPerMonth,
+      ),
+      serviceStartedByUser: starterUser
+        ? {
+            id: starterUser.id,
+            name: starterUser.name,
+            role: starterUser.role,
+            email: starterUser.email,
+          }
+        : null,
+    };
+  });
 
   const monthly = cars
     .filter((c) => c.active)
@@ -91,14 +192,13 @@ export async function loadCustomerAccount(
     0,
   );
 
-  const today = new Date().toISOString().slice(0, 10);
   const nextDue =
     invoices
       .filter((i) => i.status !== 'PAID' && i.status !== 'WRITTEN_OFF')
       .sort((a, b) => a.dueOn.localeCompare(b.dueOn))[0] ?? null;
 
   const nextVisit =
-    visits
+    effectiveVisits
       .filter((v) => v.status === 'PENDING' && v.scheduledDate >= today)
       .sort(
         (a, b) =>
@@ -106,10 +206,29 @@ export async function loadCustomerAccount(
           a.scheduledTime.localeCompare(b.scheduledTime),
       )[0] ?? null;
 
+  const resolvedVisits = effectiveVisits.map((v) => ({
+    ...v,
+    beforePhotoUrl: resolvePublicPhotoUrl(v.beforePhotoUrl),
+    afterPhotoUrl: resolvePublicPhotoUrl(v.afterPhotoUrl),
+  }));
+
+  const resolvedNextVisit = nextVisit
+    ? {
+        ...nextVisit,
+        beforePhotoUrl: resolvePublicPhotoUrl(nextVisit.beforePhotoUrl),
+        afterPhotoUrl: resolvePublicPhotoUrl(nextVisit.afterPhotoUrl),
+      }
+    : null;
+
+  const totalAccountQuota = cars.reduce(
+    (sum, c) => sum + (packageById.get(c.packageId)?.washesPerMonth ?? 8),
+    0,
+  );
+
   return {
     customer,
     cars: carsWithDetail,
-    visits,
+    visits: resolvedVisits,
     payments,
     invoices,
     monthly,
@@ -119,8 +238,8 @@ export async function loadCustomerAccount(
     balance: totalPaid - (totalBilled - outstanding),
     outstanding,
     nextDue,
-    nextVisit,
-    tally: tallyVisits(cycleVisits),
+    nextVisit: resolvedNextVisit,
+    tally: tallyVisits(effectiveCycleVisits, totalAccountQuota),
   };
 }
 
@@ -186,6 +305,27 @@ export async function recordPayment(
     });
   }
 
+  // Auto-activate service for pending cars and immediately generate wash visits for this cycle
+  const pendingCars = await store.cars.find({
+    where: { customerId: input.customerId, active: true },
+  });
+  for (const car of pendingCars) {
+    if (!car.serviceStarted) {
+      const updatedCar = await store.cars.update(car.id, {
+        serviceStarted: true,
+        serviceStartedAt: new Date().toISOString(),
+        serviceStartedBeforePayment: false,
+        serviceStartedByUserId: input.recordedByUserId || null,
+      });
+      try {
+        await generateVisitsForCar(store, updatedCar, customer, input.cycle);
+      } catch (err) {
+        console.error(`Failed to auto-generate visits for car ${car.id}:`, err);
+      }
+    }
+  }
+
+  invalidateAreaPerformanceCache();
   return payment;
 }
 
@@ -198,7 +338,7 @@ export interface RedAlert {
   lastPaymentOn: string | null;
 }
 
-export async function loadRedAlerts(
+async function _loadRedAlertsInternal(
   store: DataStore,
   areaIds: Id[] | null,
 ): Promise<RedAlert[]> {
@@ -226,20 +366,44 @@ export async function loadRedAlerts(
   }
 
   const alerts: RedAlert[] = [];
-  for (const [customerId, agg] of byCustomer) {
-    const customer = await store.customers.get(customerId);
-    if (!customer || customer.status === 'INACTIVE') continue;
+  const customerIds = [...byCustomer.keys()];
+  if (customerIds.length === 0) return alerts;
 
+  // Single batch parallel query for indebted customers and their latest confirmed payments
+  const [allCustomers, allPayments] = await Promise.all([
+    store.customers.find({ where: { id: { in: customerIds } } as never }),
+    store.payments.find({
+      where: {
+        customerId: { in: customerIds },
+        status: 'CONFIRMED',
+      } as never,
+      orderBy: [{ field: 'createdAt', dir: 'desc' }],
+    }),
+  ]);
+
+  const customerMap = new Map(allCustomers.map((c) => [c.id, c]));
+  const lastPaymentMap = new Map<Id, Payment>();
+  for (const p of allPayments) {
+    if (!lastPaymentMap.has(p.customerId)) {
+      lastPaymentMap.set(p.customerId, p);
+    }
+  }
+
+  for (const customerId of customerIds) {
+    const customer = customerMap.get(customerId);
+    if (!customer) continue;
+    const agg = byCustomer.get(customerId);
+    if (!agg) continue;
+
+    if (customer.status === 'INACTIVE') continue;
+
+    const due = new Date(`${agg.earliestDue}T00:00:00Z`);
     const daysOverdue = Math.floor(
-      (today.getTime() - new Date(`${agg.earliestDue}T00:00:00Z`).getTime()) /
-        86400000,
+      (today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24),
     );
     if (daysOverdue < 0) continue;
 
-    const lastPayment = await store.payments.findOne({
-      where: { customerId, status: 'CONFIRMED' },
-      orderBy: [{ field: 'createdAt', dir: 'desc' }],
-    });
+    // const lastPayment = lastPaymentMap.get(customerId);
 
     alerts.push({
       customer,
@@ -253,11 +417,23 @@ export async function loadRedAlerts(
             : agg.amount > 0 && daysOverdue > 0
               ? 'Payment overdue'
               : 'Month end, no payment',
-      lastPaymentOn: lastPayment?.createdAt ?? null,
+      lastPaymentOn: lastPaymentMap.get(customerId)?.createdAt ?? null,
     });
   }
 
-  return alerts.sort(
-    (a, b) => b.daysOverdue - a.daysOverdue || b.amount - a.amount,
-  );
+  return alerts.sort((a, b) => b.daysOverdue - a.daysOverdue || b.amount - a.amount);
+}
+
+const cachedRedAlertsByScope = cache(
+  async (scopeKey: string, areaIds: Id[] | null, store: DataStore) => {
+    return _loadRedAlertsInternal(store, areaIds);
+  },
+);
+
+export function loadRedAlerts(
+  store: DataStore,
+  areaIds: Id[] | null,
+): Promise<RedAlert[]> {
+  const scopeKey = areaIds ? areaIds.slice().sort().join(',') : 'all';
+  return cachedRedAlertsByScope(scopeKey, areaIds, store);
 }

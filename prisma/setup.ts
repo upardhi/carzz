@@ -19,6 +19,7 @@
 import { spawnSync } from 'node:child_process';
 import { createPrismaClient } from './client';
 import { seedDemoData } from './seed-demo';
+import { seedProdData } from './seed-prod';
 
 const say = (line: string) => process.stdout.write(`[db setup] ${line}\n`);
 
@@ -60,10 +61,20 @@ async function main(): Promise<void> {
       return;
     }
 
-    say('Database is empty. Loading the starter data…');
-    await seedDemoData(prisma);
-    say('Done. Sign in as owner@carzz.app with the password owner123.');
-    say('Change that password before giving anyone else the address.');
+    const isProdMode =
+      process.env.SEED_MODE === 'production' ||
+      process.env.PROD_SEED === 'true' ||
+      (process.env.NODE_ENV === 'production' && process.env.DEMO_SEED !== 'true');
+
+    if (isProdMode) {
+      say('Database is empty. Initializing clean production configuration…');
+      await seedProdData(prisma);
+      say('Production setup complete.');
+    } else {
+      say('Database is empty. Loading the demo starter data…');
+      await seedDemoData(prisma);
+      say('Done. Sign in as owner@carzz.app with the password owner123.');
+    }
   } finally {
     await prisma.$disconnect();
   }

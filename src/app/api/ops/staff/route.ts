@@ -1,3 +1,4 @@
+import { revalidatePath } from 'next/cache';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { HttpError, requireApiSession } from '@/lib/auth/server';
@@ -5,6 +6,18 @@ import { hashPassword } from '@/lib/auth/password';
 import { getStore } from '@/lib/data';
 import { todayISO } from '@/lib/util/format';
 import { assertInScope, opsError } from '../_guard';
+
+function revalidateStaffPages() {
+  try {
+    for (const base of ['/admin', '/manager', '/area']) {
+      revalidatePath(`${base}/users`);
+      revalidatePath(`${base}/areas/[areaId]`, 'page');
+      revalidatePath(`${base}/schedule`);
+    }
+  } catch {
+    // ignore — running outside a request context
+  }
+}
 
 const schema = z.discriminatedUnion('action', [
   z.object({
@@ -14,7 +27,22 @@ const schema = z.discriminatedUnion('action', [
     email: z.string().trim().email(),
     password: z.string().min(6, 'Use at least 6 characters'),
     areaId: z.string().min(1),
+    role: z.enum(['EMPLOYEE', 'MANAGER']).default('EMPLOYEE'),
     referredByStaffId: z.string().optional(),
+    documentUrl: z.string().optional(),
+    documentType: z.string().optional(),
+    aadharNumber: z.string().trim().optional(),
+    aadharCardUrl: z.string().optional(),
+    panNumber: z.string().trim().optional(),
+    panCardUrl: z.string().optional(),
+    address: z.string().trim().optional(),
+    emergencyPhone: z.string().trim().optional(),
+    emergencyContactName: z.string().trim().optional(),
+    bankName: z.string().trim().optional(),
+    bankAccountNumber: z.string().trim().optional(),
+    bankIfsc: z.string().trim().optional(),
+    upiId: z.string().trim().optional(),
+    dob: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   }),
   z.object({
     action: z.literal('setActive'),
@@ -42,10 +70,37 @@ export async function POST(request: Request) {
     const store = await getStore();
 
     if (parsed.data.action === 'create') {
-      assertInScope(session, parsed.data.areaId);
+      const {
+        name,
+        phone,
+        email,
+        password,
+        areaId,
+        role,
+        referredByStaffId,
+        documentUrl,
+        documentType,
+        aadharNumber,
+        aadharCardUrl,
+        panNumber,
+        panCardUrl,
+        address,
+        emergencyPhone,
+        emergencyContactName,
+        bankName,
+        bankAccountNumber,
+        bankIfsc,
+        upiId,
+        dob,
+      } = parsed.data;
+      assertInScope(session, areaId);
+
+      if (role === 'MANAGER' && session.user.role !== 'SUPER_ADMIN' && session.user.role !== 'AREA_ADMIN') {
+        throw new HttpError(403, 'Only administrators can create area managers.');
+      }
 
       const existing = await store.users.findOne({
-        where: { email: parsed.data.email.toLowerCase() },
+        where: { email: email.toLowerCase() },
       });
       if (existing) {
         throw new HttpError(409, 'Someone already uses that email.');
@@ -53,38 +108,68 @@ export async function POST(request: Request) {
 
       const staff = await store.staff.create({
         userId: '',
-        name: parsed.data.name,
-        phone: parsed.data.phone,
-        areaId: parsed.data.areaId,
-        role: 'EMPLOYEE',
+        name,
+        phone,
+        areaId,
+        role,
         joinedOn: todayISO(),
-        referredByStaffId: parsed.data.referredByStaffId || null,
+        referredByStaffId: referredByStaffId || null,
         active: true,
+        documentUrl: documentUrl || aadharCardUrl || panCardUrl || null,
+        documentType: documentType || (aadharCardUrl ? 'aadhaar' : panCardUrl ? 'pan' : null),
+        aadharNumber: aadharNumber || null,
+        aadharCardUrl: aadharCardUrl || null,
+        panNumber: panNumber || null,
+        panCardUrl: panCardUrl || null,
+        address: address || null,
+        emergencyPhone: emergencyPhone || null,
+        emergencyContactName: emergencyContactName || null,
+        bankName: bankName || null,
+        bankAccountNumber: bankAccountNumber || null,
+        bankIfsc: bankIfsc || null,
+        upiId: upiId || null,
+        dob: dob || null,
       });
 
+      const area = await store.areas.get(areaId);
       const user = await store.users.create({
-        name: parsed.data.name,
-        email: parsed.data.email.toLowerCase(),
-        phone: parsed.data.phone,
-        role: 'EMPLOYEE',
-        regionId: null,
-        areaId: parsed.data.areaId,
+        name,
+        email: email.toLowerCase(),
+        phone,
+        role,
+        regionId: area?.regionId ?? session.user.regionId ?? null,
+        areaId,
         customerId: null,
         staffId: staff.id,
-        language: 'mr',
+        language: role === 'EMPLOYEE' ? 'mr' : 'en',
         active: true,
         createdAt: new Date().toISOString(),
+        aadharNumber: aadharNumber || null,
+        aadharCardUrl: aadharCardUrl || null,
+        panNumber: panNumber || null,
+        panCardUrl: panCardUrl || null,
+        address: address || null,
+        emergencyPhone: emergencyPhone || null,
+        emergencyContactName: emergencyContactName || null,
       });
 
       await store.staff.update(staff.id, { userId: user.id });
-      await store.setCredential(user.id, await hashPassword(parsed.data.password));
+      if (role === 'MANAGER') {
+        await store.areas.update(areaId, { managerId: staff.id });
+      }
 
+      await store.setCredential(user.id, await hashPassword(password));
+
+      revalidateStaffPages();
       return NextResponse.json({
         ok: true,
         staff,
-        message: parsed.data.referredByStaffId
-          ? 'Staff added. The referral bonus is queued for the referrer.'
-          : 'Staff added. They can sign in with the email and password you set.',
+        user,
+        message: role === 'MANAGER'
+          ? `Manager ${name} created and assigned to ${area?.name ?? 'the area'}.`
+          : (referredByStaffId
+              ? 'Staff added. The referral bonus is queued for the referrer.'
+              : 'Staff added. They can sign in with the email and password you set.'),
       });
     }
 
@@ -107,8 +192,16 @@ export async function POST(request: Request) {
           } as never,
           { staffId: null },
         );
+        // Also clear any car's standing default assignment to this staff
+        // member — otherwise the next auto-scheduled visit for that car
+        // quietly re-assigns itself right back to him.
+        await store.cars.updateMany(
+          { assignedStaffId: staff.id } as never,
+          { assignedStaffId: null },
+        );
       }
 
+      revalidateStaffPages();
       return NextResponse.json({
         ok: true,
         message: parsed.data.active
@@ -135,6 +228,7 @@ export async function POST(request: Request) {
           note: null,
         });
 
+    revalidateStaffPages();
     return NextResponse.json({ ok: true, attendance, message: 'Attendance updated.' });
   } catch (error) {
     return opsError(error);

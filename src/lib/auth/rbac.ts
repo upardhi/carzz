@@ -49,6 +49,7 @@ export const PERMISSIONS = [
   'visit:complete',        // close a wash with photos
   'visit:assign',          // (re)assign a wash boy to a visit
   'visit:reschedule',
+  'visit:rate',            // a manager (or above) rating how a wash was done
   // Customers
   'customer:view',
   'customer:create',
@@ -60,6 +61,9 @@ export const PERMISSIONS = [
   'staff:discipline',      // warnings, penalties
   'pocket:request',
   'pocket:approve',
+  'leave:request',
+  'leave:manage',
+  'leave:view',
   // Money
   'payment:record',
   'payment:view',
@@ -77,6 +81,9 @@ export const PERMISSIONS = [
   'complaint:view',
   'complaint:resolve',
   'complaint:escalate',
+  // Enquiries & Leads
+  'enquiry:view',
+  'enquiry:manage',
   // Inventory
   'inventory:view',
   'inventory:issue',
@@ -108,12 +115,15 @@ const EMPLOYEE_PERMISSIONS: Permission[] = [
   'visit:view',
   'visit:complete',
   'pocket:request',
+  'leave:request',
+  'leave:view',
 ];
 
 const MANAGER_PERMISSIONS: Permission[] = [
   ...EMPLOYEE_PERMISSIONS.filter((p) => !p.startsWith('self:')),
   'visit:assign',
   'visit:reschedule',
+  'visit:rate',
   'customer:view',
   'customer:create',
   'customer:edit',
@@ -122,6 +132,8 @@ const MANAGER_PERMISSIONS: Permission[] = [
   'staff:create',
   'staff:discipline',
   'pocket:approve',
+  'leave:manage',
+  'leave:view',
   'payment:record',
   'payment:view',
   'invoice:view',
@@ -129,11 +141,14 @@ const MANAGER_PERMISSIONS: Permission[] = [
   'complaint:view',
   'complaint:resolve',
   'complaint:escalate',
+  'enquiry:view',
+  'enquiry:manage',
   'inventory:view',
   'inventory:issue',
   'purchase:request',
   'report:area',
 ];
+
 
 const AREA_ADMIN_PERMISSIONS: Permission[] = [
   ...MANAGER_PERMISSIONS,

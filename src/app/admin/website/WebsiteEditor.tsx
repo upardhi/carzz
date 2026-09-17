@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 import { Button, Card, CardHeading, Note, Tag } from '@/components/ui/primitives';
+import { toast } from '@/components/ui/ToastProvider';
 import { IconCheck } from '@/components/shell/icons';
 import type { ServicePackage, SiteContent } from '@/lib/data/types';
 import { money } from '@/lib/util/format';
@@ -31,14 +32,19 @@ function useSave() {
       });
       const data = (await response.json()) as { message?: string; error?: string };
       if (!response.ok) {
-        setState({ error: data.error ?? 'Could not save.' });
+        const err = data.error ?? 'Could not save.';
+        setState({ error: err });
+        toast.error(err);
         return false;
       }
-      setState({ ok: data.message ?? 'Saved.' });
+      const msg = data.message ?? 'Saved.';
+      setState({ ok: msg });
+      toast.success(msg);
       router.refresh();
       return true;
     } catch {
       setState({ error: 'No connection.' });
+      toast.error('No connection.');
       return false;
     } finally {
       setPending(false);
@@ -49,7 +55,6 @@ function useSave() {
 }
 
 function Feedback({ state }: { state: { ok?: string; error?: string } }) {
-  if (state.ok) return <div className="mt-2"><Note tone="success">{state.ok}</Note></div>;
   if (state.error) return <div className="mt-2"><Note tone="danger">{state.error}</Note></div>;
   return null;
 }
@@ -131,7 +136,7 @@ export function PublishToggle({ content }: { content: SiteContent }) {
     <Card tone={content.published ? 'success' : 'gold'} className="p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-sm font-extrabold">
+          <h2 className="text-sm font-bold">
             {content.published ? 'Your website is live' : 'Your website is hidden'}
           </h2>
           <p className="mt-0.5 text-xs text-ink-mute">
@@ -246,7 +251,7 @@ export function SectionsEditor({ content }: { content: SiteContent }) {
       <Field label="“How it works” heading" value={howTitle} onChange={setHowTitle} max={120} />
       {howSteps.map((step, index) => (
         <div key={index} className="rounded-lg border border-line bg-surface-muted p-3">
-          <span className="text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-ink-soft">
             Step {index + 1}
           </span>
           <input className="field mt-1.5" value={step.title} placeholder="Short title"

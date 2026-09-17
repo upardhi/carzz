@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { HttpError, requireApiSession } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
-import { getPhotoStorage, photoKey } from '@/lib/storage';
+import { uploadMedia, photoKey } from '@/lib/storage';
+import { resolvePublicPhotoUrl } from '@/lib/util/photoUrl';
 
 const MAX_BYTES = 8 * 1024 * 1024;
 const ALLOWED = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'];
@@ -44,21 +45,32 @@ export async function POST(request: Request) {
     }
 
     const key = photoKey(visitId, kind);
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    const storage = getPhotoStorage();
-    await storage.put(key, bytes, file.type || 'image/jpeg');
+    const stored = await uploadMedia(file, {
+      key,
+      folder: 'washes',
+      contentType: file.type || 'image/jpeg',
+      access: 'public',
+    });
 
     // Record it on the visit immediately so a crash between upload and submit
     // does not lose the wash boy's work.
     await store.visits.update(visitId, {
-      [kind === 'before' ? 'beforePhotoUrl' : 'afterPhotoUrl']:
-        storage.urlFor(key),
+      [kind === 'before' ? 'beforePhotoUrl' : 'afterPhotoUrl']: stored.url,
+      [kind === 'before' ? 'beforePhotoBytes' : 'afterPhotoBytes']: stored.bytes,
       ...(kind === 'before' && !visit.startedAt
         ? { startedAt: new Date().toISOString(), status: 'IN_PROGRESS' as const }
         : {}),
     });
 
-    return NextResponse.json({ ok: true, url: storage.urlFor(key) });
+    const publicUrl = resolvePublicPhotoUrl(stored.url) || stored.url;
+
+    return NextResponse.json({
+      ok: true,
+      url: publicUrl,
+      rawUrl: stored.url,
+      key: stored.key,
+      bytes: stored.bytes,
+    });
   } catch (error) {
     if (error instanceof HttpError) {
       return NextResponse.json({ error: error.message }, { status: error.status });
@@ -69,3 +81,4 @@ export async function POST(request: Request) {
     );
   }
 }
+

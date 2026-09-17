@@ -3,7 +3,8 @@ import 'server-only';
 import type { DataStore } from '../data/ports/store';
 import type { Id, MissReason, WashVisit } from '../data/types';
 import { slotInstant } from '../util/time';
-import { nextSlotAfter } from './schedule';
+import { nextSlotAfter, scheduleNextVisitForCar } from './schedule';
+import { invalidateAreaPerformanceCache } from './reports';
 
 export class WashRuleError extends Error {}
 
@@ -51,7 +52,7 @@ export async function completeWash(
   const slot = slotInstant(visit.scheduledDate, visit.scheduledTime);
   const onTime = completedAt.getTime() - slot.getTime() <= 60 * 60 * 1000;
 
-  return store.visits.update(visitId, {
+  const updated = await store.visits.update(visitId, {
     status: 'DONE',
     staffId: input.staffId,
     startedAt: visit.startedAt ?? completedAt.toISOString(),
@@ -61,6 +62,21 @@ export async function completeWash(
     afterPhotoUrl: input.afterPhotoUrl,
     onTime,
   });
+
+  // Automatically schedule the subsequent wash after this 1st wash is done
+  try {
+    const car = await store.cars.get(visit.carId);
+    const customer = await store.customers.get(visit.customerId);
+    if (car && customer && car.active && customer.status === 'ACTIVE') {
+      const nextDate = nextSlotAfter(car, visit.scheduledDate);
+      await scheduleNextVisitForCar(store, car, customer, visit.cycle, nextDate);
+    }
+  } catch (err) {
+    console.error('Failed to schedule next visit after wash completion:', err);
+  }
+
+  invalidateAreaPerformanceCache();
+  return updated;
 }
 
 /**
@@ -92,9 +108,31 @@ export async function missWash(
 
   if (settings.missedWashReturnsToCount) {
     const car = await store.cars.get(visit.carId);
-    const date =
-      input.rescheduleTo ??
-      (car ? nextSlotAfter(car, visit.scheduledDate) : visit.scheduledDate);
+    let date = input.rescheduleTo;
+
+    // If no explicit reschedule date was given, balance workload across available slots
+    if (!date && car) {
+      let candidate = nextSlotAfter(car, visit.scheduledDate);
+      if (visit.staffId) {
+        // Up to 5 slots checked: pick the first slot where staff has under 14 scheduled washes
+        for (let attempt = 0; attempt < 5; attempt++) {
+          const staffLoad = await store.visits.find({
+            where: {
+              staffId: visit.staffId,
+              scheduledDate: candidate,
+              status: { in: ['PENDING', 'IN_PROGRESS'] },
+            } as never,
+          });
+          if (staffLoad.length < 14) {
+            break;
+          }
+          candidate = nextSlotAfter(car, candidate);
+        }
+      }
+      date = candidate;
+    } else if (!date) {
+      date = visit.scheduledDate;
+    }
 
     replacement = await store.visits.create({
       carId: visit.carId,
@@ -112,12 +150,18 @@ export async function missWash(
       servicesDone: [],
       beforePhotoUrl: null,
       afterPhotoUrl: null,
+      beforePhotoBytes: null,
+      afterPhotoBytes: null,
       missReason: null,
       missNote: null,
       rescheduledToVisitId: null,
       rating: null,
       ratingComment: null,
       onTime: false,
+      managerRating: null,
+      managerRatingComment: null,
+      managerRatedAt: null,
+      managerRatedByUserId: null,
     });
   }
 
@@ -129,6 +173,7 @@ export async function missWash(
     rescheduledToVisitId: replacement?.id ?? null,
   });
 
+  invalidateAreaPerformanceCache();
   return { visit: updated, replacement };
 }
 
@@ -175,19 +220,19 @@ export interface VisitTally {
   remaining: number;
 }
 
-export function tallyVisits(visits: WashVisit[]): VisitTally {
+export function tallyVisits(visits: WashVisit[], monthlyQuota?: number): VisitTally {
   const done = visits.filter((v) => v.status === 'DONE').length;
   const missed = visits.filter((v) => v.status === 'MISSED').length;
   const pending = visits.filter(
     (v) => v.status === 'PENDING' || v.status === 'IN_PROGRESS',
   ).length;
+  const quota = monthlyQuota ?? (done + pending || 8);
+  const remaining = Math.max(0, quota - done);
   return {
-    total: visits.length,
+    total: quota,
     done,
     missed,
     pending,
-    // A missed wash is regenerated as a pending one, so "remaining" is simply
-    // what is still open — never a number that quietly loses the customer a wash.
-    remaining: pending,
+    remaining,
   };
 }

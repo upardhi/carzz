@@ -1,9 +1,20 @@
+import { revalidatePath } from 'next/cache';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { HttpError, requireApiSession } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { approvePayout, computePayout, computePayoutRun } from '@/lib/services/payroll';
+import { invalidateAreaPerformanceCache } from '@/lib/services/reports';
 import { money } from '@/lib/util/format';
+
+function revalidatePayoutPages() {
+  try {
+    revalidatePath('/admin/payout');
+    revalidatePath('/admin/accounting');
+  } catch {
+    // ignore — running outside a request context
+  }
+}
 
 const schema = z.discriminatedUnion('action', [
   z.object({
@@ -46,6 +57,8 @@ export async function POST(request: Request) {
       }
       const total = pending.reduce((sum, p) => sum + p.net, 0);
 
+      invalidateAreaPerformanceCache();
+      revalidatePayoutPages();
       return NextResponse.json({
         ok: true,
         approved: pending.length,
@@ -65,6 +78,7 @@ export async function POST(request: Request) {
       const saved = existing
         ? await store.payouts.update(existing.id, held)
         : await store.payouts.create(held);
+      revalidatePayoutPages();
       return NextResponse.json({
         ok: true,
         payout: saved,
@@ -77,6 +91,8 @@ export async function POST(request: Request) {
     }
 
     const saved = await approvePayout(store, payout, session.user.id);
+    invalidateAreaPerformanceCache();
+    revalidatePayoutPages();
     return NextResponse.json({
       ok: true,
       payout: saved,

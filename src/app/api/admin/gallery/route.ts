@@ -2,7 +2,7 @@ import { revalidatePath } from 'next/cache';
 import { NextResponse } from 'next/server';
 import { HttpError, requireApiSession } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
-import { getPhotoStorage } from '@/lib/storage';
+import { uploadMedia } from '@/lib/storage';
 
 const MAX_BYTES = 8 * 1024 * 1024;
 const ALLOWED = ['image/jpeg', 'image/png', 'image/webp'];
@@ -38,19 +38,21 @@ export async function POST(request: Request) {
     }
 
     const store = await getStore();
-    const storage = getPhotoStorage();
     const id = `gal_${Date.now().toString(36)}`;
 
-    await storage.put(
-      `public-${id}-before`,
-      new Uint8Array(await before.arrayBuffer()),
-      before.type || 'image/jpeg',
-    );
-    await storage.put(
-      `public-${id}-after`,
-      new Uint8Array(await after.arrayBuffer()),
-      after.type || 'image/jpeg',
-    );
+    const beforeStored = await uploadMedia(before, {
+      key: `public-${id}-before`,
+      folder: 'gallery',
+      contentType: before.type || 'image/jpeg',
+      access: 'public',
+    });
+
+    const afterStored = await uploadMedia(after, {
+      key: `public-${id}-after`,
+      folder: 'gallery',
+      contentType: after.type || 'image/jpeg',
+      access: 'public',
+    });
 
     const content = await store.getSiteContent();
     const saved = await store.saveSiteContent({
@@ -58,8 +60,8 @@ export async function POST(request: Request) {
         ...content.gallery,
         {
           id,
-          beforeUrl: `/api/gallery/public-${id}-before`,
-          afterUrl: `/api/gallery/public-${id}-after`,
+          beforeUrl: beforeStored.url || `/api/gallery/public-${id}-before`,
+          afterUrl: afterStored.url || `/api/gallery/public-${id}-after`,
           caption,
           detail,
           visible: true,
@@ -85,3 +87,4 @@ export async function POST(request: Request) {
     );
   }
 }
+

@@ -1,6 +1,7 @@
 import clsx from 'clsx';
 import Link from 'next/link';
 import type { ComponentProps, ReactNode } from 'react';
+import { StatCard, StatGrid, type StatTone, type SubtextTone } from './StatCard';
 
 /* -------------------------------------------------------------------------- */
 /* Card                                                                       */
@@ -42,7 +43,7 @@ export function Card({
     <div
       {...rest}
       className={clsx(
-        'rounded-card border shadow-card',
+        'rounded-card border p-4.5 shadow-card',
         CARD_TONES[tone],
         accent && ACCENT[accent],
         className,
@@ -55,9 +56,67 @@ export function Card({
 
 export function CardHeading({ children }: { children: ReactNode }) {
   return (
-    <h3 className="mb-2 text-[11px] font-extrabold uppercase tracking-wider text-ink-soft">
+    <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-ink-soft">
       {children}
     </h3>
+  );
+}
+
+export function AccountCard({
+  monthlyAmount,
+  isPaid = true,
+  statusLabel,
+  className,
+}: {
+  monthlyAmount: number;
+  isPaid?: boolean;
+  statusLabel?: string;
+  className?: string;
+}) {
+  const displayStatus = statusLabel || (isPaid ? 'All paid up' : 'Due soon');
+  return (
+    <div
+      className={clsx(
+        'rounded-2xl border border-[#a7f3d0] bg-[#ecfdf5] p-5 flex items-center justify-between shadow-sm transition-all',
+        className,
+      )}
+    >
+      <div className="flex items-center gap-3.5">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#d1fae5] text-[#059669]">
+          <svg
+            width={22}
+            height={22}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.8}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M3 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v1" />
+            <rect x="3" y="7" width="18" height="12" rx="2" />
+            <circle cx="16.5" cy="13" r="1.2" />
+          </svg>
+        </div>
+        <div>
+          <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[#065f46]">
+            ACCOUNT
+          </div>
+          <div className="text-sm font-semibold text-[#047857] mt-0.5">
+            Monthly package
+          </div>
+        </div>
+      </div>
+
+      <div className="text-right flex flex-col items-end">
+        <span className="inline-flex items-center whitespace-nowrap rounded-full bg-[#d1fae5] px-2.5 py-0.5 text-[11px] font-semibold text-[#047857] mb-1">
+          {displayStatus}
+        </span>
+        <div className="text-xl lg:text-2xl font-bold tracking-tight text-[#064e3b]">
+          ₹{monthlyAmount.toLocaleString('en-IN')}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -80,7 +139,7 @@ export function Stat({
   };
   return (
     <div>
-      <div className={clsx('text-2xl font-extrabold tracking-tight', TONE[tone])}>
+      <div className={clsx('text-2xl font-bold tracking-tight', TONE[tone])}>
         {value}
       </div>
       {sub ? <div className="mt-0.5 text-xs text-ink-mute">{sub}</div> : null}
@@ -107,7 +166,7 @@ export function Row({
   return (
     <div className="flex items-baseline justify-between gap-3 border-b border-dashed border-line-soft py-1.5 text-sm last:border-0">
       <span className="text-ink-mute">{label}</span>
-      <span className={clsx('text-right font-bold', tone && TONE[tone])}>
+      <span className={clsx('text-right font-semibold', tone && TONE[tone])}>
         {value}
       </span>
     </div>
@@ -140,7 +199,7 @@ export function Tag({
   return (
     <span
       className={clsx(
-        'inline-flex items-center whitespace-nowrap rounded-pill px-2 py-0.5 text-[10.5px] font-extrabold',
+        'inline-flex items-center whitespace-nowrap rounded-pill px-2 py-0.5 text-[10.5px] font-semibold tracking-wide',
         TAG_TONES[tone],
         className,
       )}
@@ -154,7 +213,7 @@ export function Tag({
 /* Buttons                                                                    */
 /* -------------------------------------------------------------------------- */
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'gold';
+type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'gold' | 'success';
 type ButtonSize = 'sm' | 'md' | 'lg';
 
 const VARIANTS: Record<ButtonVariant, string> = {
@@ -162,8 +221,9 @@ const VARIANTS: Record<ButtonVariant, string> = {
   secondary:
     'bg-white text-navy-800 border border-line-strong hover:bg-surface-muted disabled:text-ink-faint',
   ghost: 'text-navy-800 hover:bg-navy-50 disabled:text-ink-faint',
-  danger: 'bg-danger-500 text-white hover:bg-danger-600 disabled:bg-line-strong',
-  gold: 'bg-gold-500 text-navy-900 hover:bg-gold-400 disabled:bg-line-strong',
+  danger: 'bg-danger-600 text-white hover:bg-danger-700 disabled:bg-line-strong',
+  gold: 'bg-gold-500 text-white hover:bg-gold-600 disabled:bg-line-strong',
+  success: 'bg-success-600 text-white hover:bg-success-700 disabled:bg-line-strong',
 };
 
 const SIZES: Record<ButtonSize, string> = {
@@ -173,7 +233,7 @@ const SIZES: Record<ButtonSize, string> = {
 };
 
 const BUTTON_BASE =
-  'inline-flex items-center justify-center gap-2 rounded-lg font-bold transition-colors ' +
+  'inline-flex items-center justify-center gap-2 rounded-lg font-semibold transition-colors ' +
   'disabled:cursor-not-allowed active:translate-y-px';
 
 export function Button({
@@ -239,7 +299,7 @@ export function SectionTitle({
 }) {
   return (
     <div className="mb-2 mt-5 flex items-center justify-between gap-3 border-b border-line pb-1.5 first:mt-0">
-      <h2 className="text-[11px] font-extrabold uppercase tracking-wider text-ink-soft">
+      <h2 className="text-[11px] font-semibold uppercase tracking-wider text-ink-soft">
         {children}
       </h2>
       {action}
@@ -278,50 +338,61 @@ export function EmptyState({
 }) {
   return (
     <div className="rounded-card border border-dashed border-line-strong bg-white px-6 py-10 text-center">
-      <p className="font-bold text-ink">{title}</p>
+      <p className="font-semibold text-ink">{title}</p>
       {hint ? <p className="mt-1 text-sm text-ink-mute">{hint}</p> : null}
       {action ? <div className="mt-4">{action}</div> : null}
     </div>
   );
 }
 
-/** KPI tile grid used across every console dashboard. */
-export function KpiGrid({ children }: { children: ReactNode }) {
+/** KPI tile grid used across every console dashboard — renders modern StatGrid */
+export function KpiGrid({
+  children,
+  columns = 6,
+  className,
+}: {
+  children: ReactNode;
+  columns?: 2 | 3 | 4 | 5 | 6;
+  className?: string;
+}) {
   return (
-    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+    <StatGrid columns={columns} className={className}>
       {children}
-    </div>
+    </StatGrid>
   );
 }
 
+/** Modern KPI metric card with icon box, value, and dynamic subtext */
 export function Kpi({
   label,
   value,
   tone = 'default',
   hint,
+  icon,
+  subtext,
+  subtextTone,
+  className,
 }: {
   label: string;
   value: ReactNode;
-  tone?: 'default' | 'brand' | 'success' | 'gold' | 'danger';
-  hint?: string;
+  tone?: 'default' | 'brand' | 'success' | 'gold' | 'danger' | StatTone;
+  hint?: ReactNode;
+  icon?: ReactNode;
+  subtext?: ReactNode;
+  subtextTone?: SubtextTone;
+  className?: string;
 }) {
-  const TONE = {
-    default: 'text-ink',
-    brand: 'text-navy-800',
-    success: 'text-success-600',
-    gold: 'text-gold-600',
-    danger: 'text-danger-500',
-  };
   return (
-    <div className="rounded-card border border-line bg-white px-3 py-2.5 shadow-card">
-      <div className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">
-        {label}
-      </div>
-      <div className={clsx('mt-0.5 text-xl font-extrabold tracking-tight', TONE[tone])}>
-        {value}
-      </div>
-      {hint ? <div className="text-[11px] text-ink-faint">{hint}</div> : null}
-    </div>
+    <StatCard
+      label={label}
+      value={value}
+      tone={tone as StatTone}
+      hint={hint}
+      subtext={subtext}
+      subtextTone={subtextTone}
+      icon={icon}
+      className={className}
+    />
   );
 }
 
@@ -347,7 +418,7 @@ export function Th({ children, className }: ComponentProps<'th'>) {
   return (
     <th
       className={clsx(
-        'whitespace-nowrap bg-surface-raised px-3 py-2 text-left text-[10.5px] font-extrabold uppercase tracking-wide text-navy-500',
+        'whitespace-nowrap bg-surface-raised px-3 py-2 text-left text-[10.5px] font-semibold uppercase tracking-wide text-navy-500',
         className,
       )}
     >
@@ -429,3 +500,8 @@ export function BarChart({
     </div>
   );
 }
+
+export { StatCard, StatGrid } from './StatCard';
+export type { StatCardProps, StatTone, SubtextTone } from './StatCard';
+
+

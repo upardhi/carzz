@@ -47,6 +47,18 @@ export interface User {
   language: Language;
   active: boolean;
   createdAt: Timestamp;
+  aadharNumber?: string | null;
+  aadharCardUrl?: string | null;
+  panNumber?: string | null;
+  panCardUrl?: string | null;
+  address?: string | null;
+  emergencyPhone?: string | null;
+  emergencyContactName?: string | null;
+  dob?: DateOnly | null;
+  bankName?: string | null;
+  accountNumber?: string | null;
+  ifscCode?: string | null;
+  upiId?: string | null;
 }
 
 /** A user plus its bcrypt/scrypt password hash. Never leaves the data layer. */
@@ -64,6 +76,7 @@ export interface Region {
   id: Id;
   name: string;
   areaAdminId: Id | null;
+  active: boolean;
   createdAt: Timestamp;
 }
 
@@ -72,13 +85,25 @@ export interface Area {
   regionId: Id;
   name: string;
   city: string;
+  address?: string | null;
+  lat?: number | null;
+  lng?: number | null;
   managerId: Id | null;
+  active: boolean;
   createdAt: Timestamp;
 }
 
 /* -------------------------------------------------------------------------- */
 /* Staff                                                                      */
 /* -------------------------------------------------------------------------- */
+
+export interface StaffDocument {
+  id: string;
+  name: string;
+  type: string; // 'aadhaar' | 'driving_license' | 'pan' | 'police_verification' | 'other'
+  url: string;
+  uploadedAt: string;
+}
 
 export interface Staff {
   id: Id;
@@ -91,6 +116,21 @@ export interface Staff {
   /** Staff id of whoever referred them, for the referral bonus. */
   referredByStaffId: Id | null;
   active: boolean;
+  documentUrl?: string | null;
+  documentType?: string | null;
+  documents?: StaffDocument[] | null;
+  aadharNumber?: string | null;
+  aadharCardUrl?: string | null;
+  panNumber?: string | null;
+  panCardUrl?: string | null;
+  address?: string | null;
+  emergencyPhone?: string | null;
+  emergencyContactName?: string | null;
+  bankName?: string | null;
+  bankAccountNumber?: string | null;
+  bankIfsc?: string | null;
+  upiId?: string | null;
+  dob?: DateOnly | null;
 }
 
 export interface Attendance {
@@ -116,6 +156,44 @@ export interface PocketMoneyRequest {
   overrodeCap: boolean;
   note: string | null;
 }
+
+export const LEAVE_TYPES = [
+  'PLANNED',
+  'ON_THE_SPOT',
+  'EMERGENCY',
+  'SICK',
+  'CASUAL',
+  'HALF_DAY',
+  'UNINFORMED',
+  'OTHER',
+] as const;
+export type LeaveType = (typeof LEAVE_TYPES)[number];
+
+export const LEAVE_STATUSES = [
+  'PENDING',
+  'APPROVED',
+  'REJECTED',
+  'CANCELLED',
+] as const;
+export type LeaveStatus = (typeof LEAVE_STATUSES)[number];
+
+export interface StaffLeave {
+  id: Id;
+  staffId: Id;
+  startDate: DateOnly;
+  endDate: DateOnly;
+  daysCount: number;
+  type: LeaveType;
+  reason: string;
+  status: LeaveStatus;
+  appliedBy: 'STAFF' | 'MANAGER' | 'ADMIN';
+  appliedAt: Timestamp;
+  decidedByUserId: Id | null;
+  decidedAt: Timestamp | null;
+  rejectionReason: string | null;
+  note: string | null;
+}
+
 
 /* -------------------------------------------------------------------------- */
 /* Customers, cars, packages                                                  */
@@ -155,6 +233,71 @@ export interface Customer {
   joinedOn: DateOnly;
 }
 
+export interface PackageServiceItem {
+  name: string;
+  washesPerMonth: number;
+}
+
+export function parsePackageServices(
+  services: (string | PackageServiceItem | Record<string, unknown> | unknown)[] | null | undefined,
+  defaultWashes = 8,
+): PackageServiceItem[] {
+  if (!services || !Array.isArray(services)) return [];
+  return services.map((s) => {
+    if (!s) {
+      return { name: 'Service', washesPerMonth: defaultWashes };
+    }
+    if (typeof s === 'object') {
+      const obj = s as Record<string, unknown>;
+      const name = String(obj.name || obj.label || obj.title || '').trim();
+      const count = Number(obj.washesPerMonth ?? obj.washes ?? obj.count ?? defaultWashes);
+      return {
+        name: name || 'Service',
+        washesPerMonth: !Number.isNaN(count) && count > 0 ? count : defaultWashes,
+      };
+    }
+    if (typeof s === 'string') {
+      let trimmed = s.trim();
+      if (
+        (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+        (trimmed.startsWith('"{') && trimmed.endsWith('}"'))
+      ) {
+        try {
+          if (trimmed.startsWith('"{')) {
+            trimmed = JSON.parse(trimmed);
+          }
+          const parsed = typeof trimmed === 'string' ? JSON.parse(trimmed) : trimmed;
+          if (parsed && typeof parsed === 'object') {
+            const name = String(parsed.name || parsed.label || parsed.title || '').trim();
+            const count = Number(parsed.washesPerMonth ?? parsed.washes ?? parsed.count ?? defaultWashes);
+            return {
+              name: name || 'Service',
+              washesPerMonth: !Number.isNaN(count) && count > 0 ? count : defaultWashes,
+            };
+          }
+        } catch {
+          // ignore json parse error
+        }
+      }
+
+      const lastColon = trimmed.lastIndexOf(':');
+      if (lastColon !== -1) {
+        const namePart = trimmed.slice(0, lastColon).trim();
+        const countPart = Number(trimmed.slice(lastColon + 1).trim());
+        if (namePart && !Number.isNaN(countPart) && countPart > 0) {
+          return { name: namePart, washesPerMonth: countPart };
+        }
+      }
+      return { name: trimmed, washesPerMonth: defaultWashes };
+    }
+    return { name: String(s), washesPerMonth: defaultWashes };
+  });
+}
+
+export function formatPackageServices(items: PackageServiceItem[]): string[] {
+  return items.map((i) => `${i.name.trim()}:${i.washesPerMonth}`);
+}
+
 export interface ServicePackage {
   id: Id;
   name: string;
@@ -190,6 +333,11 @@ export interface Car {
   scheduleTime: string;
   specialInstructions: string | null;
   active: boolean;
+  serviceStarted?: boolean;
+  serviceStartedAt?: Timestamp | null;
+  serviceStartedBeforePayment?: boolean;
+  serviceStartedByUserId?: Id | null;
+  serviceStartNote?: string | null;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -226,6 +374,8 @@ export interface WashVisit {
   servicesDone: string[];
   beforePhotoUrl: string | null;
   afterPhotoUrl: string | null;
+  beforePhotoBytes: number | null;
+  afterPhotoBytes: number | null;
   missReason: MissReason | null;
   missNote: string | null;
   /** Set when a missed visit is regenerated, pointing at the replacement. */
@@ -234,6 +384,13 @@ export interface WashVisit {
   ratingComment: string | null;
   /** True when the visit was closed within its scheduled slot. */
   onTime: boolean;
+  /** A manager's own rating of how the wash was done, separate from the
+   * customer's — checked against the before/after photos. Feeds the boy's
+   * performance record alongside the customer rating. */
+  managerRating: number | null;
+  managerRatingComment: string | null;
+  managerRatedAt: Timestamp | null;
+  managerRatedByUserId: Id | null;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -447,6 +604,49 @@ export interface StockIssue {
   createdAt: Timestamp;
 }
 
+export interface StockRow {
+  item: InventoryItem;
+  level: StockLevel | null;
+  quantity: number;
+  usagePerDay: number;
+  daysLeft: number | null;
+  status: 'OK' | 'LOW' | 'CRITICAL' | 'OUT';
+  value: Rupees;
+}
+
+export interface AreaPerformance {
+  area: Area;
+  customers: number;
+  activeCars: number;
+  staff: number;
+  washesDone: number;
+  washesMissed: number;
+  billed: Rupees;
+  collected: Rupees;
+  outstanding: Rupees;
+  goodsCost: Rupees;
+  payoutCost: Rupees;
+  profit: Rupees;
+  margin: number;
+  averageRating: number;
+  openComplaints: number;
+}
+
+export interface StaffPerformanceRow {
+  staffId: Id;
+  name: string;
+  areaId: Id;
+  washes: number;
+  onTimeRate: number;
+  averageRating: number;
+  missed: number;
+  complaints: number;
+  /** Washes finished suspiciously fast or taking too long, per the owner's thresholds. */
+  flaggedWashes: number;
+  /** Average of the manager's own wash ratings, separate from customer ratings. */
+  averageManagerRating: number;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Settings                                                                   */
 /* -------------------------------------------------------------------------- */
@@ -462,6 +662,10 @@ export interface AppSettings {
   autoApprovePurchaseUnder: Rupees;
   teaBreakMinutes: number;
   languages: Language[];
+  /** A wash finished faster than this is flagged as possibly rushed/skipped. */
+  minWashMinutes: number;
+  /** A wash taking longer than this is flagged as too slow. */
+  maxWashMinutes: number;
 }
 
 /* -------------------------------------------------------------------------- */

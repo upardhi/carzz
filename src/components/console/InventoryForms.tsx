@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button, Note } from '@/components/ui/primitives';
 
 interface Option { id: string; name: string; unit?: string; areaId?: string }
@@ -40,7 +40,6 @@ function useAction(endpoint: string) {
 }
 
 function Feedback({ state }: { state: { ok?: string; error?: string } }) {
-  if (state.ok) return <div className="mt-2"><Note tone="success">{state.ok}</Note></div>;
   if (state.error) return <div className="mt-2"><Note tone="danger">{state.error}</Note></div>;
   return null;
 }
@@ -54,14 +53,38 @@ export function PurchaseRequestForm({
 }) {
   const { run, pending, state } = useAction('/api/ops/inventory');
   const [areaId, setAreaId] = useState(areas[0]?.id ?? '');
-  const [itemId, setItemId] = useState(items[0]?.id ?? '');
+  const [itemId, setItemId] = useState(items[0]?.id ?? '__custom__');
+  const [isCustom, setIsCustom] = useState(items.length === 0);
+  const [customName, setCustomName] = useState('');
+  const [customUnit, setCustomUnit] = useState('Pieces');
+  const [customCost, setCustomCost] = useState('150');
   const [quantity, setQuantity] = useState('40');
-  const [neededBy, setNeededBy] = useState(
-    new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10),
-  );
+  const [neededBy, setNeededBy] = useState('');
   const [reason, setReason] = useState('');
 
-  const unit = items.find((i) => i.id === itemId)?.unit ?? '';
+  // Default neededBy to 3 days in the future after initial mount
+  useEffect(() => {
+    setNeededBy(new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10));
+  }, []);
+
+  const selectedItem = items.find((i) => i.id === itemId);
+  const unit = isCustom ? customUnit : selectedItem?.unit ?? '';
+  const today = new Date().toISOString().slice(0, 10);
+
+  function handleItemChange(val: string) {
+    if (val === '__custom__') {
+      setIsCustom(true);
+      setItemId('__custom__');
+    } else {
+      setIsCustom(false);
+      setItemId(val);
+    }
+  }
+
+  const isValid =
+    Number(quantity) > 0 &&
+    Boolean(neededBy) &&
+    (!isCustom ? Boolean(itemId && itemId !== '__custom__') : Boolean(customName.trim()));
 
   return (
     <div>
@@ -74,31 +97,100 @@ export function PurchaseRequestForm({
         </>
       ) : null}
 
-      <label className="field-label mt-2" htmlFor="pr-item">Item</label>
-      <select id="pr-item" className="field" value={itemId} onChange={(e) => setItemId(e.target.value)}>
-        {items.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
-      </select>
+      <div className="mt-2 flex items-center justify-between">
+        <label className="field-label mb-0" htmlFor="pr-item">Item</label>
+        <button
+          type="button"
+          onClick={() => {
+            setIsCustom(!isCustom);
+            if (!isCustom) setItemId('__custom__');
+            else setItemId(items[0]?.id ?? '');
+          }}
+          className="text-[11px] font-bold text-blue-600 hover:text-blue-700"
+        >
+          {isCustom ? '← Pick from list' : '+ Custom item'}
+        </button>
+      </div>
 
-      <label className="field-label mt-2" htmlFor="pr-qty">Quantity ({unit})</label>
+      {!isCustom ? (
+        <select id="pr-item" className="field" value={itemId} onChange={(e) => handleItemChange(e.target.value)}>
+          {items.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
+          <option value="__custom__">✨ + Request new / custom item (not in list)...</option>
+        </select>
+      ) : (
+        <div className="mt-1 space-y-2 rounded-xl border border-blue-100 bg-blue-50/50 p-2.5 text-xs">
+          <div>
+            <label className="field-label text-slate-700">Custom item name</label>
+            <input
+              type="text"
+              placeholder="e.g. Foam Lance Spare Nozzle"
+              className="field bg-white"
+              value={customName}
+              onChange={(e) => setCustomName(e.target.value)}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="field-label text-slate-700">Unit</label>
+              <input
+                type="text"
+                placeholder="e.g. Pieces, Litres"
+                className="field bg-white"
+                value={customUnit}
+                onChange={(e) => setCustomUnit(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="field-label text-slate-700">Est. cost / unit (₹)</label>
+              <input
+                type="number"
+                placeholder="₹"
+                className="field bg-white"
+                value={customCost}
+                onChange={(e) => setCustomCost(e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      <label className="field-label mt-2" htmlFor="pr-qty">Quantity ({unit || 'Units'})</label>
       <input id="pr-qty" className="field" type="number" inputMode="decimal" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
 
       <label className="field-label mt-2" htmlFor="pr-by">Needed by</label>
-      <input id="pr-by" className="field" type="date" value={neededBy} onChange={(e) => setNeededBy(e.target.value)} />
+      <input id="pr-by" className="field" type="date" min={today} value={neededBy} onChange={(e) => setNeededBy(e.target.value)} suppressHydrationWarning />
 
       <label className="field-label mt-2" htmlFor="pr-why">Reason</label>
-      <textarea id="pr-why" className="field" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Stock will finish in 1.4 days at current usage." />
+      <textarea id="pr-why" className="field" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Why is this needed..." />
 
       <Button
         block
         className="mt-3"
-        disabled={pending || !(Number(quantity) > 0)}
-        onClick={() =>
-          run({
-            action: 'request', areaId, itemId,
-            quantity: Number(quantity), neededBy,
-            reason: reason || undefined,
-          })
-        }
+        disabled={pending || !isValid}
+        onClick={() => {
+          if (isCustom) {
+            run({
+              action: 'request',
+              areaId,
+              isCustom: true,
+              customItemName: customName,
+              customUnit,
+              customUnitCost: Number(customCost) || 100,
+              quantity: Number(quantity),
+              neededBy,
+              reason: reason || undefined,
+            });
+          } else {
+            run({
+              action: 'request',
+              areaId,
+              itemId,
+              quantity: Number(quantity),
+              neededBy,
+              reason: reason || undefined,
+            });
+          }
+        }}
       >
         {pending ? 'Sending…' : 'Send to owner for approval'}
       </Button>

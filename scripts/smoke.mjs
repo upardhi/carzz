@@ -12,8 +12,19 @@
  * Pass --base=https://... to run the API and page suites against a deployed
  * environment instead (the server is then not started or stopped here).
  */
-import { spawn } from 'node:child_process';
+import { spawn, execSync } from 'node:child_process';
+import { createRequire } from 'node:module';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { setTimeout as sleep } from 'node:timers/promises';
+
+// The server is started as `node <next>/bin/next start` rather than through
+// `npm run start`. On Windows npm is `npm.cmd`, which `spawn` cannot execute
+// without a shell — and a shell would then swallow the kill signal below,
+// leaving the port held and every later suite talking to a stale server.
+const nextBin = createRequire(import.meta.url).resolve('next/dist/bin/next');
+const scriptsDir = fileURLToPath(new URL('.', import.meta.url));
+const webDir = path.resolve(scriptsDir, '..');
 
 const arg = (name, fallback) =>
   process.argv.find((a) => a.startsWith(`--${name}=`))?.split('=')[1] ?? fallback;
@@ -41,10 +52,14 @@ const check = (name, ok, detail = '') => {
 
 async function startServer() {
   if (externalBase) return null;
-  const server = spawn('npm', ['run', 'start', '--', '--port', String(PORT)], {
+  let logs = '';
+  const server = spawn(process.execPath, [nextBin, 'start', '--port', String(PORT)], {
     stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env, PORT: String(PORT) },
+    cwd: webDir,
+    env: { ...process.env, PORT: String(PORT), DATA_PROVIDER: 'memory' },
   });
+  server.stdout?.on('data', (d) => { logs += d.toString(); });
+  server.stderr?.on('data', (d) => { logs += d.toString(); });
   for (let i = 0; i < 60; i += 1) {
     try {
       const r = await fetch(`${BASE}/login`);
@@ -54,13 +69,21 @@ async function startServer() {
     }
     await sleep(500);
   }
-  server.kill('SIGKILL');
-  throw new Error('server did not start');
+  await stopServer(server);
+  throw new Error(`server did not start: ${logs}`);
 }
 
 async function stopServer(server) {
   if (!server) return;
-  server.kill('SIGKILL');
+  if (process.platform === 'win32' && server.pid) {
+    try {
+      execSync(`taskkill /pid ${server.pid} /T /F`, { stdio: 'ignore' });
+    } catch {
+      server.kill('SIGKILL');
+    }
+  } else {
+    server.kill('SIGKILL');
+  }
   await sleep(400);
 }
 
@@ -124,12 +147,12 @@ async function uploadPhoto(visitId, kind, cookie) {
 /* Suite 1 — every route, for every role                                      */
 /* -------------------------------------------------------------------------- */
 
-const ADMIN_ROUTES = ['/admin', '/admin/areas', '/admin/reports', '/admin/sources',
+const ADMIN_ROUTES = ['/admin', '/admin/areas', '/admin/reports', '/admin/reports/staff', '/admin/sources',
   '/admin/payout', '/admin/accounting', '/admin/packages', '/admin/inventory',
   '/admin/complaints', '/admin/users', '/admin/settings'];
 const AREA_ROUTES = ['/area', '/area/schedule', '/area/customers', '/area/customers/new',
   '/area/staff', '/area/alerts', '/area/complaints', '/area/inventory', '/area/areas',
-  '/area/managers', '/area/reports'];
+  '/area/managers', '/area/reports', '/area/reports/staff'];
 const MANAGER_ROUTES = ['/manager', '/manager/schedule', '/manager/customers',
   '/manager/customers/new', '/manager/staff', '/manager/alerts', '/manager/complaints',
   '/manager/inventory'];
@@ -406,10 +429,10 @@ async function suiteOperations() {
     (await post('/api/admin/settings', { scope: 'payout', perWashRate: 1 }, manager)).status === 403);
 
   const payoutBefore = await html('/admin/payout', owner);
-  const totalBefore = payoutBefore.match(/Total payable[\s\S]{0,240}?₹([\d,]+)/)?.[1];
+  const totalBefore = payoutBefore.match(/TOTAL PAYABLE[\s\S]{0,240}?₹([\d,]+)/i)?.[1];
   await post('/api/admin/settings', { scope: 'payout', baseMode: 'DAY_SLAB' }, owner);
   const payoutAfter = await html('/admin/payout', owner);
-  const totalAfter = payoutAfter.match(/Total payable[\s\S]{0,240}?₹([\d,]+)/)?.[1];
+  const totalAfter = payoutAfter.match(/TOTAL PAYABLE[\s\S]{0,240}?₹([\d,]+)/i)?.[1];
   check('changing the base pay rule re-costs every payout',
     Boolean(totalBefore && totalAfter && totalBefore !== totalAfter), `${totalBefore} → ${totalAfter}`);
   await post('/api/admin/settings', { scope: 'payout', baseMode: 'PER_WASH' }, owner);
@@ -470,6 +493,9 @@ async function suiteWebsite() {
   const owner = (await login('owner@carzz.app', 'owner123')).cookie;
   const manager = (await login('manager.wadi@carzz.app', 'manager123')).cookie;
 
+  // Ensure site starts published
+  await post('/api/admin/website', { published: true }, owner);
+
   const home = await fetch(BASE + '/', { redirect: 'manual' });
   check('the website is public — no sign-in needed', home.status === 200);
   const body = await html('/');
@@ -514,13 +540,143 @@ async function suiteWebsite() {
     leak.status === 404);
 
   /* Taking the site offline */
-  await post('/api/admin/website', { published: false }, owner);
-  const offline = await fetch(BASE + '/', { redirect: 'manual' });
-  check('taking the site offline hides it', offline.status === 404, `got ${offline.status}`);
-  const refused = await post('/api/enquiries', { name: 'Too Late', phone: '9800112255' });
-  check('and bookings are refused while it is offline', refused.status === 503);
-  await post('/api/admin/website', { published: true }, owner);
+  try {
+    await post('/api/admin/website', { published: false }, owner);
+    const offline = await fetch(BASE + '/', { redirect: 'manual' });
+    check('taking the site offline hides it', offline.status === 404, `got ${offline.status}`);
+    const refused = await post('/api/enquiries', { name: 'Too Late', phone: '9800112255' });
+    check('and bookings are refused while it is offline', refused.status === 503);
+  } finally {
+    await post('/api/admin/website', { published: true }, owner);
+  }
   check('publishing brings it back', (await fetch(BASE + '/')).status === 200);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Suite 7 — Service activation, manager override & customer flexibility       */
+/* -------------------------------------------------------------------------- */
+
+async function suiteServiceActivationAndCustomerFlexibility() {
+  suiteName = 'service-and-flexibility';
+  const customerAuth = await login('customer@carzz.app', 'customer123');
+  const customer = customerAuth.cookie;
+  const managerAuth = await login('manager.wadi@carzz.app', 'manager123');
+  const manager = managerAuth.cookie;
+
+  /* 1. Customer adds a new car */
+  const addCarRes = await post('/api/customer/cars', {
+    model: 'Creta',
+    make: 'Hyundai',
+    colour: 'Silver',
+    plate: 'MH31 SM 9999',
+    packageId: 'pkg_bucket',
+    schedulePattern: 'MON_THU',
+    scheduleTime: '06:30',
+  }, customer);
+  check('customer adds a new car', addCarRes.ok, addCarRes.body.message);
+  const carId = addCarRes.body.car?.id;
+  check('new car starts with service pending payment', addCarRes.body.car?.serviceStarted === false);
+
+  /* 2. Manager starts service before payment (override with audit reason) */
+  const customerId = customerAuth.body.user?.customerId;
+  if (carId && customerId) {
+    const overrideRes = await post('/api/ops/customers', {
+      action: 'startCarService',
+      customerId,
+      carId,
+      note: 'Trusted smoke test client — grace period approved',
+    }, manager);
+    check('manager starts car service before payment', overrideRes.ok, overrideRes.body.message);
+    check('service is marked as started before payment with audit trail',
+      overrideRes.body.car?.serviceStarted === true &&
+      overrideRes.body.car?.serviceStartedBeforePayment === true &&
+      Boolean(overrideRes.body.car?.serviceStartedByUserId)
+    );
+
+    /* Duplicate start */
+    const dupRes = await post('/api/ops/customers', {
+      action: 'startCarService',
+      customerId,
+      carId,
+    }, manager);
+    check('duplicate service start is safely handled', dupRes.ok && /already active/.test(dupRes.body.message));
+  }
+
+  /* 3. Prepaid auto-activation on payment */
+  const addCar2Res = await post('/api/customer/cars', {
+    model: 'Harrier',
+    make: 'Tata',
+    colour: 'Dark Edition',
+    plate: 'MH31 SM 8888',
+    packageId: 'pkg_bucket',
+    schedulePattern: 'TUE_FRI',
+    scheduleTime: '07:00',
+  }, customer);
+  check('customer adds a second car', addCar2Res.ok);
+  check('second car starts as pending payment', addCar2Res.body.car?.serviceStarted === false);
+
+  const payRes = await post('/api/customer/pay', { amount: 1600, mode: 'GATEWAY' }, customer);
+  check('online pack payment completes', payRes.ok && payRes.body.payment?.status === 'CONFIRMED');
+
+  const accountRes = await (await fetch(`${BASE}/api/customer/account`, { headers: { cookie: customer } })).json();
+  const car2InAccount = accountRes.account?.cars?.find((c) => c.id === addCar2Res.body.car?.id);
+  check('prepaid payment auto-activated the pending car', car2InAccount?.serviceStarted === true && car2InAccount?.serviceStartedBeforePayment === false);
+  const car2Visits = accountRes.account?.visits?.filter((v) => v.carId === addCar2Res.body.car?.id) ?? [];
+  check('wash visits were generated immediately for the prepaid car', car2Visits.length > 0, `${car2Visits.length} visits created`);
+
+  /* 4. Customer Wash Rescheduling & Flexibility */
+  const pendingVisit = accountRes.account?.visits?.find((v) => v.status === 'PENDING');
+  if (pendingVisit) {
+    const slotsRes = await (await fetch(`${BASE}/api/customer/wash?visitId=${pendingVisit.id}`, { headers: { cookie: customer } })).json();
+    check('customer fetches candidate reschedule slots', slotsRes.ok && Array.isArray(slotsRes.candidateSlots), `${slotsRes.candidateSlots?.length} slots returned`);
+
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 2);
+    const targetDate = tomorrow.toISOString().slice(0, 10);
+
+    const rescheduleRes = await post('/api/customer/wash', {
+      action: 'reschedule',
+      visitId: pendingVisit.id,
+      targetDate,
+      reason: 'Out of town on routine day',
+    }, customer);
+    check('customer reschedules wash to custom date', rescheduleRes.ok, rescheduleRes.body.message);
+
+    const badRes = await post('/api/customer/wash', {
+      action: 'reschedule',
+      visitId: pendingVisit.id,
+      targetDate: '2020-01-01',
+    }, customer);
+    check('rescheduling to past date is rejected', badRes.status === 400);
+
+    const nextPending = (await (await fetch(`${BASE}/api/customer/account`, { headers: { cookie: customer } })).json())
+      .account?.visits?.find((v) => v.status === 'PENDING');
+    if (nextPending) {
+      const skipRes = await post('/api/customer/wash', {
+        action: 'skip',
+        visitId: nextPending.id,
+        reason: 'Car in service center',
+      }, customer);
+      check('customer skips a wash and moves it to next routine slot', skipRes.ok, skipRes.body.message);
+    }
+  }
+
+  /* 5. Customer Holiday / Vacation Hold */
+  const futureHoldDate = new Date();
+  futureHoldDate.setDate(futureHoldDate.getDate() + 7);
+  const holdUntil = futureHoldDate.toISOString().slice(0, 10);
+
+  const holdRes = await post('/api/customer/hold', {
+    action: 'pause',
+    holdUntil,
+    note: 'Family vacation to Goa',
+  }, customer);
+  check('customer pauses subscription for vacation', holdRes.ok, holdRes.body.message);
+  check('customer status becomes HOLD', holdRes.body.customer?.status === 'HOLD');
+
+  const resumeRes = await post('/api/customer/hold', { action: 'resume' }, customer);
+  check('customer resumes subscription from vacation hold', resumeRes.ok, resumeRes.body.message);
+  check('customer status returns to ACTIVE', resumeRes.body.customer?.status === 'ACTIVE');
 }
 
 /* -------------------------------------------------------------------------- */
@@ -530,6 +686,7 @@ const SUITES = [
   ['Sign-in', suiteAuth],
   ['The wash', suiteWash],
   ['Money, people and stock', suiteOperations],
+  ['Service activation & customer flexibility', suiteServiceActivationAndCustomerFlexibility],
   ['PWA', suitePwa],
   ['The public website', suiteWebsite],
 ];

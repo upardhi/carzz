@@ -5,6 +5,7 @@ import { getStore } from '@/lib/data';
 import { COMPLAINT_TYPES } from '@/lib/data/types';
 
 const schema = z.object({
+  carId: z.string().optional(),
   type: z.enum(COMPLAINT_TYPES),
   body: z.string().trim().min(5, 'Please tell us what happened.').max(1000),
 });
@@ -27,12 +28,29 @@ export async function POST(request: Request) {
     const customer = await store.customers.get(session.user.customerId);
     if (!customer) throw new HttpError(404, 'Customer record not found.');
 
-    // Attach the most recent completed wash so the manager opens the complaint
-    // with the photos and the wash boy already in front of them.
-    const lastVisit = await store.visits.findOne({
-      where: { customerId: customer.id, status: 'DONE' },
-      orderBy: [{ field: 'scheduledDate', dir: 'desc' }],
-    });
+    // Attach the most recent completed wash for the specific car if specified, or customer generally
+    let lastVisit = parsed.data.carId
+      ? (await store.visits.findOne({
+          where: { customerId: customer.id, carId: parsed.data.carId, status: 'DONE' },
+          orderBy: [{ field: 'scheduledDate', dir: 'desc' }],
+        })) ||
+        (await store.visits.findOne({
+          where: { customerId: customer.id, carId: parsed.data.carId },
+          orderBy: [{ field: 'scheduledDate', dir: 'desc' }],
+        }))
+      : null;
+
+    if (!lastVisit) {
+      lastVisit =
+        (await store.visits.findOne({
+          where: { customerId: customer.id, status: 'DONE' },
+          orderBy: [{ field: 'scheduledDate', dir: 'desc' }],
+        })) ||
+        (await store.visits.findOne({
+          where: { customerId: customer.id },
+          orderBy: [{ field: 'scheduledDate', dir: 'desc' }],
+        }));
+    }
 
     const complaint = await store.complaints.create({
       customerId: customer.id,

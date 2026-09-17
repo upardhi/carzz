@@ -17,7 +17,9 @@ export interface NavCounts {
   unassigned?: number;
   redAlerts?: number;
   openComplaints?: number;
+  newEnquiries?: number;
   pocketRequests?: number;
+  pendingLeaves?: number;
   lowStock?: number;
   pendingPurchases?: number;
 }
@@ -42,6 +44,12 @@ export function operationsNav(base: string, counts: NavCounts): NavGroup[] {
       items: [
         { href: `${base}/customers`, label: 'All customers', icon: <IconUsers width={18} height={18} /> },
         {
+          href: `${base}/enquiries`,
+          label: 'Enquiries',
+          icon: <IconChat width={18} height={18} />,
+          badge: counts.newEnquiries,
+        },
+        {
           href: `${base}/alerts`,
           label: 'Red alerts',
           icon: <IconAlert width={18} height={18} />,
@@ -63,6 +71,12 @@ export function operationsNav(base: string, counts: NavCounts): NavGroup[] {
           label: 'Staff',
           icon: <IconUser width={18} height={18} />,
           badge: counts.pocketRequests,
+        },
+        {
+          href: `${base}/staff/leaves`,
+          label: 'Staff leaves',
+          icon: <IconCalendar width={18} height={18} />,
+          badge: counts.pendingLeaves,
         },
         {
           href: `${base}/inventory`,
@@ -95,43 +109,65 @@ export function adminNav(counts: NavCounts): NavGroup[] {
     {
       heading: 'Business',
       items: [
-        { href: '/admin', label: 'Overview', icon: <IconGrid width={18} height={18} /> },
+        { href: '/admin', label: 'Dashboard', icon: <IconGrid width={18} height={18} /> },
+        { href: '/admin/regions', label: 'Regions', icon: <IconMap width={18} height={18} /> },
         { href: '/admin/areas', label: 'Areas', icon: <IconMap width={18} height={18} /> },
+        { href: '/admin/users', label: 'Company People', icon: <IconUsers width={18} height={18} /> },
+        { href: '/admin/users?role=EMPLOYEE', label: 'Wash Boys', icon: <IconUser width={18} height={18} /> },
+        { href: '/admin/customers', label: 'Customers', icon: <IconUsers width={18} height={18} /> },
+        {
+          href: '/admin/enquiries',
+          label: 'Enquiries',
+          icon: <IconChat width={18} height={18} />,
+          badge: counts.newEnquiries,
+        },
+        { href: '/admin/sources', label: 'Lead Sources', icon: <IconChart width={18} height={18} /> },
         { href: '/admin/reports', label: 'Reports', icon: <IconChart width={18} height={18} /> },
-        { href: '/admin/sources', label: 'Lead sources', icon: <IconChart width={18} height={18} /> },
       ],
     },
     {
       heading: 'Money',
       items: [
-        { href: '/admin/payout', label: 'Staff payout', icon: <IconRupee width={18} height={18} /> },
+        { href: '/admin/payout', label: 'Staff Payments', icon: <IconRupee width={18} height={18} /> },
         { href: '/admin/accounting', label: 'Accounting', icon: <IconRupee width={18} height={18} /> },
-        { href: '/admin/packages', label: 'Packages', icon: <IconBox width={18} height={18} /> },
+        { href: '/admin/packages', label: 'Wash Packages', icon: <IconBox width={18} height={18} /> },
       ],
     },
     {
-      heading: 'Operations',
+      heading: 'Day to Day',
       items: [
         {
+          href: '/admin/staff/leaves',
+          label: 'Staff Leave Requests',
+          icon: <IconCalendar width={18} height={18} />,
+          badge: counts.pendingLeaves,
+        },
+        {
+          href: '/admin/staff/requests',
+          label: 'Pocket Money Requests',
+          icon: <IconRupee width={18} height={18} />,
+          badge: counts.pocketRequests,
+        },
+        {
           href: '/admin/inventory',
-          label: 'Inventory',
+          label: 'Stock / Inventory',
           icon: <IconBox width={18} height={18} />,
           badge: counts.pendingPurchases,
         },
         {
           href: '/admin/complaints',
-          label: 'Complaints',
+          label: 'Customer Complaints',
           icon: <IconChat width={18} height={18} />,
           badge: counts.openComplaints,
         },
       ],
     },
+
     {
       heading: 'Setup',
       items: [
-        { href: '/admin/website', label: 'Website', icon: <IconGrid width={18} height={18} /> },
-        { href: '/admin/users', label: 'People & roles', icon: <IconUsers width={18} height={18} /> },
-        { href: '/admin/settings', label: 'Settings', icon: <IconCog width={18} height={18} /> },
+        { href: '/admin/website', label: 'Website Content', icon: <IconGrid width={18} height={18} /> },
+        { href: '/admin/settings', label: 'App Settings', icon: <IconCog width={18} height={18} /> },
       ],
     },
   ];
