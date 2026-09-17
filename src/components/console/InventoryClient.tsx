@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import clsx from 'clsx';
 import type { Area, InventoryItem, PurchaseRequest, Staff, StockRow } from '@/lib/data/types';
 import { money, todayISO } from '@/lib/util/format';
+import { Tooltip } from '@/components/ui/Tooltip';
 import { useDebounce } from '@/lib/util/debounce';
 
 interface AreaStockData {
@@ -39,6 +40,15 @@ export function InventoryClient({
   const [areaFilter, setAreaFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const debouncedSearch = useDebounce(searchQuery, 250);
+
+  const checkHasActiveRequest = useCallback((areaId: string, itemId: string) => {
+    return _requests.some(
+      (r) =>
+        r.itemId === itemId &&
+        r.areaId === areaId &&
+        (r.status === 'PENDING' || r.status === 'APPROVED')
+    );
+  }, [_requests]);
 
   // Modal / Action States
   const [reorderModal, setReorderModal] = useState<{
@@ -193,8 +203,14 @@ export function InventoryClient({
     return items.filter((i) => i.name.toLowerCase().includes(q) || i.unit.toLowerCase().includes(q));
   }, [items, debouncedSearch]);
 
-  // First urgent item for top alert
-  const primaryUrgent = itemsNeedingAttention[0];
+  const unresolvedAttentionItems = useMemo(() => {
+    return itemsNeedingAttention.filter(
+      (r) => !checkHasActiveRequest(r.areaId, r.item.id)
+    );
+  }, [itemsNeedingAttention, checkHasActiveRequest]);
+
+  // First urgent item for top alert (only from unresolved items)
+  const primaryUrgent = unresolvedAttentionItems[0];
 
   function openNewRequestModal(targetAreaId?: string, targetItemId?: string) {
     const area = targetAreaId || areas[0]?.id || '';
@@ -401,7 +417,7 @@ export function InventoryClient({
       {/* ========================================================================= */}
       {/* 1. TOP ALERT BANNER (if items need attention)                             */}
       {/* ========================================================================= */}
-      {itemsNeedingAttention.length > 0 && primaryUrgent && (
+      {unresolvedAttentionItems.length > 0 && primaryUrgent && (
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl border border-rose-200 bg-rose-50/90 px-5 py-4 shadow-sm" suppressHydrationWarning>
           <div className="flex items-center gap-3.5">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-600 text-white font-bold text-lg shadow-sm">
@@ -409,7 +425,7 @@ export function InventoryClient({
             </div>
             <div>
               <h4 className="text-sm font-bold text-rose-900 leading-snug">
-                {itemsNeedingAttention.length} item{itemsNeedingAttention.length === 1 ? '' : 's'} needs attention
+                {unresolvedAttentionItems.length} item{unresolvedAttentionItems.length === 1 ? '' : 's'} needs attention
               </h4>
               <p className="text-xs font-medium text-rose-700/90 mt-0.5">
                 {primaryUrgent.item.name} at {primaryUrgent.areaName} is {primaryUrgent.status === 'OUT' ? 'out of stock' : 'running low'} and should be reordered.
@@ -645,6 +661,7 @@ export function InventoryClient({
                   <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
                     {itemsNeedingAttention.slice(0, 5).map((row, i) => {
                       const isOut = row.status === 'OUT';
+                      const hasActiveRequest = checkHasActiveRequest(row.areaId, row.item.id);
                       return (
                         <tr key={`${row.areaId}-${row.item.id}-${i}`} className="hover:bg-slate-50/50 transition-colors">
                           <td className="px-6 py-3.5 font-bold text-slate-900">
@@ -677,7 +694,11 @@ export function InventoryClient({
                             </span>
                           </td>
                           <td className="px-6 py-3.5 text-right">
-                            {isOut ? (
+                            {hasActiveRequest ? (
+                              <span className="inline-flex items-center rounded-lg bg-emerald-50 px-3.5 py-1.5 text-xs font-bold text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+                                Ordered
+                              </span>
+                            ) : isOut ? (
                               <button
                                 type="button"
                                 onClick={() => openNewRequestModal(row.areaId, row.item.id)}
@@ -900,6 +921,7 @@ export function InventoryClient({
                       {group.rows.map((row) => {
                         const isOut = row.status === 'OUT';
                         const isLow = row.status === 'LOW' || row.status === 'CRITICAL';
+                        const hasActiveRequest = checkHasActiveRequest(group.area.id, row.item.id);
                         return (
                           <tr key={row.item.id} className="hover:bg-slate-50/60 transition-colors">
                             <td className="px-6 py-3.5 font-bold text-slate-900">
@@ -953,13 +975,19 @@ export function InventoryClient({
                                 >
                                   Issue
                                 </button>
-                                <button
-                                  type="button"
-                                  onClick={() => openNewRequestModal(group.area.id, row.item.id)}
-                                  className="rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-2.5 py-1 text-[11px] font-bold text-blue-600 shadow-sm transition-all"
-                                >
-                                  Order
-                                </button>
+                                {hasActiveRequest ? (
+                                  <span className="inline-flex items-center rounded-lg bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+                                    Ordered
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => openNewRequestModal(group.area.id, row.item.id)}
+                                    className="rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-2.5 py-1 text-[11px] font-bold text-blue-600 shadow-sm transition-all"
+                                  >
+                                    Order
+                                  </button>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -1212,7 +1240,14 @@ export function InventoryClient({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block mb-1 text-slate-600">Reorder Level</label>
+                  <Tooltip
+                    position="top"
+                    content="Minimum stock threshold. System flags 'Low Stock' when quantity falls below this."
+                  >
+                    <label className="block mb-1 text-slate-600 border-b border-dashed border-slate-300 cursor-help w-max pb-0.5">
+                      Reorder Level
+                    </label>
+                  </Tooltip>
                   <input
                     type="number"
                     placeholder="10"
@@ -1222,7 +1257,14 @@ export function InventoryClient({
                   />
                 </div>
                 <div>
-                  <label className="block mb-1 text-slate-600">Usage per Wash ({newItemUnit || 'Units'})</label>
+                  <Tooltip
+                    position="top"
+                    content="Estimated quantity consumed during one car wash."
+                  >
+                    <label className="block mb-1 text-slate-600 border-b border-dashed border-slate-300 cursor-help w-max pb-0.5">
+                      Usage per Wash ({newItemUnit || 'Units'})
+                    </label>
+                  </Tooltip>
                   <input
                     type="number"
                     step="0.01"
@@ -1320,7 +1362,14 @@ export function InventoryClient({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block mb-1 text-slate-600">Reorder Level</label>
+                  <Tooltip
+                    position="top"
+                    content="Minimum stock threshold. System flags 'Low Stock' when quantity falls below this."
+                  >
+                    <label className="block mb-1 text-slate-600 border-b border-dashed border-slate-300 cursor-help w-max pb-0.5">
+                      Reorder Level
+                    </label>
+                  </Tooltip>
                   <input
                     type="number"
                     value={editReorderLevel}
@@ -1329,7 +1378,14 @@ export function InventoryClient({
                   />
                 </div>
                 <div>
-                  <label className="block mb-1 text-slate-600">Usage per Wash ({editUnit})</label>
+                  <Tooltip
+                    position="top"
+                    content="Estimated quantity consumed during one car wash."
+                  >
+                    <label className="block mb-1 text-slate-600 border-b border-dashed border-slate-300 cursor-help w-max pb-0.5">
+                      Usage per Wash ({editUnit})
+                    </label>
+                  </Tooltip>
                   <input
                     type="number"
                     step="0.01"
