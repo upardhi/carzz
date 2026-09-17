@@ -280,7 +280,7 @@ export default async function CarDetail({
                     ) : null}
                   </div>
                 </div>
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 shadow-2xs">
+                <span className="shrink-0 whitespace-nowrap inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 shadow-2xs">
                   ✓ Done
                 </span>
               </div>

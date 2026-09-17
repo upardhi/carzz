@@ -60,7 +60,7 @@ export function ComplaintHistory({ complaints }: { complaints: ComplaintItemData
           <button
             type="button"
             onClick={() => setFilter('ALL')}
-            className={`px-3 py-1 rounded-lg text-[12px] font-semibold transition-all ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
               filter === 'ALL'
                 ? 'bg-white text-slate-900 shadow-xs'
                 : 'text-slate-500 hover:text-slate-800'
@@ -71,7 +71,7 @@ export function ComplaintHistory({ complaints }: { complaints: ComplaintItemData
           <button
             type="button"
             onClick={() => setFilter('OPEN')}
-            className={`px-3 py-1 rounded-lg text-[12px] font-semibold transition-all ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
               filter === 'OPEN'
                 ? 'bg-amber-500 text-white shadow-xs'
                 : 'text-slate-500 hover:text-amber-700'
@@ -82,7 +82,7 @@ export function ComplaintHistory({ complaints }: { complaints: ComplaintItemData
           <button
             type="button"
             onClick={() => setFilter('RESOLVED')}
-            className={`px-3 py-1 rounded-lg text-[12px] font-semibold transition-all ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
               filter === 'RESOLVED'
                 ? 'bg-emerald-600 text-white shadow-xs'
                 : 'text-slate-500 hover:text-emerald-700'

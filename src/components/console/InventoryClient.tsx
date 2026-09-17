@@ -488,7 +488,7 @@ export function InventoryClient({
             <span>Raise Purchase Request</span>
           </button>
 
-          {(canApprovePurchase || true) && (
+          {canApprovePurchase && (
             <button
               type="button"
               onClick={() => {
@@ -596,13 +596,15 @@ export function InventoryClient({
                           >
                             Order
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => openEditItemModal(item)}
-                            className="rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-2.5 py-1 text-[11px] font-bold text-slate-700 shadow-sm transition-all"
-                          >
-                            Edit
-                          </button>
+                          {canApprovePurchase && (
+                            <button
+                              type="button"
+                              onClick={() => openEditItemModal(item)}
+                              className="rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-2.5 py-1 text-[11px] font-bold text-slate-700 shadow-sm transition-all"
+                            >
+                              Edit
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1180,6 +1182,19 @@ export function InventoryClient({
         </div>
       )}
 
+      <datalist id="units-list">
+        <option value="Litres" />
+        <option value="mL" />
+        <option value="Kg" />
+        <option value="Grams" />
+        <option value="Pieces" />
+        <option value="Bottles" />
+        <option value="Packs" />
+        <option value="Cans" />
+        <option value="Rolls" />
+        <option value="Boxes" />
+      </datalist>
+
       {/* ========================================================================= */}
       {/* ADD NEW ITEM TO CATALOG MODAL                                             */}
       {/* ========================================================================= */}
@@ -1220,6 +1235,7 @@ export function InventoryClient({
                   <label className="block mb-1 text-slate-600">Unit of Measurement</label>
                   <input
                     type="text"
+                    list="units-list"
                     placeholder="e.g. Litres, Bottles, Pcs"
                     value={newItemUnit}
                     onChange={(e) => setNewItemUnit(e.target.value)}
@@ -1344,6 +1360,7 @@ export function InventoryClient({
                   <label className="block mb-1 text-slate-600">Unit</label>
                   <input
                     type="text"
+                    list="units-list"
                     value={editUnit}
                     onChange={(e) => setEditUnit(e.target.value)}
                     className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-blue-500"

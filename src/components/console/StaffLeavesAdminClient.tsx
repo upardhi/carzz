@@ -282,7 +282,7 @@ export function StaffLeavesAdminClient({
             className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 cursor-pointer"
           >
             <IconPlus width={15} height={15} />
-            <span>+ Schedule Staff Leave</span>
+            <span>Schedule Staff Leave</span>
           </button>
         </div>
       </div>

@@ -52,18 +52,18 @@ export default async function CustomerCars() {
 
       {/* 2. Registered Cars Section */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="flex items-start sm:items-center justify-between gap-3">
+          <div className="flex items-start sm:items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-blue-100 bg-blue-50 text-blue-600">
               <IconCar width={20} height={20} />
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-900">Your Registered Vehicles</h3>
-              <p className="text-xs text-slate-500">Track monthly wash quota and schedule per vehicle</p>
+              <p className="text-xs text-slate-500 mt-0.5">Track monthly wash quota and schedule per vehicle</p>
             </div>
           </div>
 
-          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700 border border-slate-200/60">
+          <span className="shrink-0 whitespace-nowrap rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700 border border-slate-200/60">
             {account.cars.length} {account.cars.length === 1 ? 'vehicle' : 'vehicles'}
           </span>
         </div>

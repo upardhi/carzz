@@ -375,9 +375,9 @@ export default async function CustomerHome() {
               {recentBookings.map((b) => (
                 <div key={b.id} className="flex items-center justify-between py-2.5 px-1.5 gap-3">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-xl bg-sky-50 border border-sky-100/80 text-sky-900">
+                    <div className="flex min-w-[3.5rem] shrink-0 flex-col items-center justify-center rounded-xl bg-sky-50 border border-sky-100/80 px-1 py-1.5 text-sky-900">
                       <span className="text-xs font-bold leading-tight">{b.day}</span>
-                      <span className="text-[9px] font-bold text-sky-600 uppercase leading-tight">
+                      <span className="text-[9px] font-bold text-sky-600 uppercase leading-tight text-center whitespace-nowrap">
                         {b.yearOrMonth}
                       </span>
                     </div>
