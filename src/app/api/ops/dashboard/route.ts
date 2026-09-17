@@ -1,0 +1,163 @@
+import { NextResponse } from 'next/server';
+import { requireApiSession } from '@/lib/auth/server';
+import { scopeAreaFilter } from '@/lib/auth/rbac';
+import { getStore } from '@/lib/data';
+import { loadRedAlerts } from '@/lib/services/accounts';
+import { areaPerformance } from '@/lib/services/reports';
+import { currentCycle, cycleLabel, formatClock, todayISO } from '@/lib/util/format';
+import { opsError } from '../_guard';
+
+export async function GET() {
+  try {
+    const session = await requireApiSession('report:area');
+    const store = await getStore();
+    const cycle = currentCycle();
+    const today = todayISO();
+    const areaFilter = scopeAreaFilter(session.scope);
+
+    const [
+      visits,
+      alerts,
+      complaintsCount,
+      escalatedComplaintsCount,
+      staff,
+      performance,
+      attendance,
+      allLeaves,
+    ] = await Promise.all([
+      store.visits.find({ where: { scheduledDate: today, ...areaFilter } as never }),
+      loadRedAlerts(store, session.scope.areaIds),
+      store.complaints.count({
+        status: { in: ['OPEN', 'ESCALATED'] },
+        ...areaFilter,
+      } as never),
+      store.complaints.count({
+        status: 'ESCALATED',
+        ...areaFilter,
+      } as never),
+      store.staff.find({ where: { role: 'EMPLOYEE', ...areaFilter } as never }),
+      areaPerformance(store, cycle, session.scope.areaIds, undefined, {
+        skipPayoutsAndGoods: true,
+      }),
+      store.attendance.find({ where: { date: today } }),
+      store.leaves.find({ orderBy: [{ field: 'appliedAt', dir: 'desc' }] }),
+    ]);
+
+    const staffIds = new Set(staff.map((s) => s.id));
+    const staffById = new Map(staff.map((s) => [s.id, s]));
+    const attendanceByStaff = new Map(attendance.map((a) => [a.staffId, a]));
+
+    const pendingLeavesCount = allLeaves.filter(
+      (l) => staffIds.has(l.staffId) && l.status === 'PENDING',
+    ).length;
+
+    const staffOnLeaveToday = allLeaves.filter(
+      (l) =>
+        staffIds.has(l.staffId) &&
+        l.status === 'APPROVED' &&
+        l.startDate <= today &&
+        l.endDate >= today,
+    );
+    const staffOnLeaveNames = staffOnLeaveToday.map(
+      (l) => staffById.get(l.staffId)?.name ?? 'Staff',
+    );
+
+    const unassigned = visits.filter((v) => !v.staffId && v.status === 'PENDING');
+    const assigned = visits.filter((v) => Boolean(v.staffId));
+    const done = visits.filter((v) => v.status === 'DONE').length;
+    const inProgress = visits.filter((v) => v.status === 'IN_PROGRESS').length;
+    const pending = visits.filter((v) => v.status === 'PENDING').length;
+    const missed = visits.filter((v) => v.status === 'MISSED').length;
+    const outstanding = alerts.reduce((sum, a) => sum + a.amount, 0);
+
+    const totals = performance.reduce(
+      (acc, area) => ({
+        customers: acc.customers + area.customers,
+        activeCars: acc.activeCars + area.activeCars,
+        washesDone: acc.washesDone + area.washesDone,
+        washesMissed: acc.washesMissed + area.washesMissed,
+        collected: acc.collected + area.collected,
+      }),
+      { customers: 0, activeCars: 0, washesDone: 0, washesMissed: 0, collected: 0 },
+    );
+
+    const staffTodayFormatted = staff
+      .map((member) => {
+        const own = visits.filter((v) => v.staffId === member.id);
+        const att = attendanceByStaff.get(member.id);
+        const isAbsent =
+          att?.status === 'OFF' ||
+          att?.status === 'ABSENT' ||
+          att?.status === 'OFF_UNINFORMED';
+        return {
+          id: member.id,
+          name: member.name,
+          signedIn: att?.loginAt ? formatClock(att.loginAt) : null,
+          cars: own.length,
+          done: own.filter((v) => v.status === 'DONE').length,
+          status: (isAbsent ? 'Absent' : 'Working') as 'Absent' | 'Working',
+        };
+      })
+      .sort((a, b) => b.cars - a.cars);
+
+    const staffWorkingCount = staffTodayFormatted.filter((s) => s.status === 'Working').length;
+    const staffAbsentCount = staffTodayFormatted.filter((s) => s.status === 'Absent').length;
+    const staffAttendanceRate =
+      staff.length > 0 ? Math.round((staffWorkingCount / staff.length) * 100) : 100;
+
+    const areasCount = session.scope.areaIds?.length ?? performance.length;
+    const resolvedActiveCars = totals.activeCars;
+
+    const storeAreas = await store.areas.find();
+    const scopeLabel =
+      session.scope.areaIds === null
+        ? 'All areas'
+        : storeAreas
+            .filter((a) => session.scope.areaIds!.includes(a.id))
+            .map((a) => a.name)
+            .join(', ') || 'No area assigned';
+
+    return NextResponse.json({
+      ok: true,
+      data: {
+        totals,
+        activeCars: resolvedActiveCars,
+        carsToday: visits.length,
+        completedToday: done,
+        inProgressToday: inProgress,
+        pendingToday: pending,
+        remainingToday: inProgress + pending,
+        assignedToday: assigned.length,
+        notDoneToday: missed,
+        unassignedToday: unassigned.length,
+        staffWorkingCount,
+        staffAbsentCount,
+        staffAttendanceRate,
+        outstanding,
+        alertsCount: alerts.length,
+        oldestAlertDays: alerts[0]?.daysOverdue ?? 0,
+        complaintsCount,
+        escalatedComplaintsCount,
+        staffToday: staffTodayFormatted,
+        scopeLabel,
+        areaPerformance: performance.map((p) => ({
+          areaId: (p as any).area?.id ?? (p as any).areaId,
+          areaName: (p as any).area?.name ?? (p as any).areaName,
+          customers: p.customers,
+          activeCars: p.activeCars,
+          washesDone: p.washesDone,
+          washesMissed: p.washesMissed,
+          collected: p.collected,
+          outstanding: p.outstanding,
+          averageRating: (p as any).averageRating,
+        })),
+        cycleLabel: cycleLabel(cycle),
+        areasCount,
+        pendingLeavesCount,
+        staffOnLeaveNames,
+      },
+    });
+  } catch (error) {
+    return opsError(error);
+  }
+}

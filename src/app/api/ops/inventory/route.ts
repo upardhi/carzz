@@ -2,9 +2,14 @@ import { revalidatePath } from 'next/cache';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { HttpError, requireApiSession } from '@/lib/auth/server';
-import { can } from '@/lib/auth/rbac';
+import { can, scopeAreaFilter } from '@/lib/auth/rbac';
 import { getStore } from '@/lib/data';
-import { issueStock, receivePurchase, invalidateConsumptionCache } from '@/lib/services/inventory';
+import {
+  issueStock,
+  receivePurchase,
+  invalidateConsumptionCache,
+  stockForAreas,
+} from '@/lib/services/inventory';
 import { assertInScope, opsError } from '../_guard';
 
 function revalidateInventoryPages() {
@@ -14,6 +19,114 @@ function revalidateInventoryPages() {
     revalidatePath('/area/inventory');
   } catch {
     // ignore — running outside a request context
+  }
+}
+
+export async function GET() {
+  try {
+    const session = await requireApiSession('inventory:view');
+    const store = await getStore();
+    const areaFilter = scopeAreaFilter(session.scope);
+
+    const areas = (await store.areas.find({ orderBy: [{ field: 'name' }] })).filter(
+      (a) => session.scope.areaIds === null || session.scope.areaIds.includes(a.id),
+    );
+
+    const areaIds = areas.map((a) => a.id);
+    const [stockMap, items, staff, requests] = await Promise.all([
+      stockForAreas(store, areaIds),
+      store.inventoryItems.find({ where: { active: true } }),
+      store.staff.find({ where: { role: 'EMPLOYEE', active: true, ...areaFilter } as never }),
+      store.purchaseRequests.find({
+        where: areaFilter as never,
+        orderBy: [{ field: 'createdAt', dir: 'desc' }],
+      }),
+    ]);
+
+    const itemById = new Map(items.map((i) => [i.id, i]));
+    const areaById = new Map(areas.map((a) => [a.id, a]));
+
+    const stockByArea = areas.map((area) => ({
+      area,
+      rows: stockMap.get(area.id) ?? [],
+    }));
+
+    const allRows = stockByArea.flatMap((s) => s.rows);
+
+    const kpis = {
+      itemsTracked: items.length,
+      outOfStock: allRows.filter((r) => r.status === 'OUT').length,
+      orderNow: allRows.filter((r) => r.status === 'CRITICAL').length,
+      lowStock: allRows.filter((r) => r.status === 'LOW').length,
+      stockValue: allRows.reduce((sum, r) => sum + r.value, 0),
+      openRequests: requests.filter((r) => r.status === 'PENDING').length,
+    };
+
+    const formattedInventory = allRows.map((r) => {
+      const area = areas.find((a) => (stockMap.get(a.id) ?? []).includes(r)) || areas[0];
+      return {
+        id: r.item.id,
+        name: r.item.name,
+        unit: r.item.unit,
+        unitCost: r.item.unitCost,
+        quantity: r.quantity,
+        reorderLevel: r.item.reorderLevel,
+        usagePerWash: r.item.usagePerWash,
+        usagePerDay: r.usagePerDay,
+        daysLeft: r.daysLeft,
+        status: r.status,
+        value: r.value,
+        areaId: area?.id || '',
+        areaName: area?.name || '',
+      };
+    });
+
+    const formattedRequests = requests.map((req) => {
+      const item = itemById.get(req.itemId);
+      const area = areaById.get(req.areaId);
+      return {
+        id: req.id,
+        code: req.code,
+        areaId: req.areaId,
+        areaName: area?.name || 'Assigned Area',
+        itemId: req.itemId,
+        itemName: item?.name || 'Item',
+        itemUnit: item?.unit || 'units',
+        quantity: req.quantity,
+        estimatedCost: req.estimatedCost,
+        neededBy: req.neededBy,
+        reason: req.reason,
+        status: req.status,
+        createdAt: req.createdAt,
+      };
+    });
+
+    return NextResponse.json({
+      ok: true,
+      data: {
+        kpis,
+        inventory: formattedInventory,
+        catalog: items.map((i) => ({
+          id: i.id,
+          name: i.name,
+          unit: i.unit,
+          unitCost: i.unitCost,
+          reorderLevel: i.reorderLevel,
+          usagePerWash: i.usagePerWash,
+          active: i.active,
+        })),
+        requests: formattedRequests,
+        staff: staff.map((s) => ({
+          id: s.id,
+          name: s.name,
+          phone: s.phone,
+          areaId: s.areaId,
+        })),
+        areas: areas.map((a) => ({ id: a.id, name: a.name })),
+      },
+    });
+  } catch (error) {
+    return opsError(error);
   }
 }
 
