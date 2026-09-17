@@ -34,9 +34,16 @@ export async function ConsoleComplaints({
   ]);
 
   const customerIds = [...new Set(complaints.map((c) => c.customerId))];
-  const customers = customerIds.length
-    ? await store.customers.find({ where: { id: { in: customerIds } } as never })
-    : [];
+  const visitIds = [...new Set(complaints.map((c) => c.visitId).filter(Boolean))] as string[];
+  
+  const [customers, visits] = await Promise.all([
+    customerIds.length
+      ? store.customers.find({ where: { id: { in: customerIds } } as never })
+      : [],
+    visitIds.length
+      ? store.visits.find({ where: { id: { in: visitIds } } as never })
+      : [],
+  ]);
 
   const staffById = new Map(staff.map((s) => [s.id, s]));
   const customerById = new Map(customers.map((c) => [c.id, c]));
@@ -72,6 +79,7 @@ export async function ConsoleComplaints({
         regions={regions}
         staff={staff}
         customers={customers}
+        visits={visits}
         canEscalate={canEscalate}
       />
 
