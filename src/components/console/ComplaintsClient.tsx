@@ -18,7 +18,7 @@ import {
 import { useToast } from '@/components/ui/ToastProvider';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { Button } from '@/components/ui/primitives';
-import type { Complaint, Area, Staff, Customer, Region, Visit } from '@/lib/data/types';
+import type { Complaint, Area, Staff, Customer, Region, WashVisit } from '@/lib/data/types';
 import { COMPLAINT_TYPE_LABEL } from '@/lib/util/labels';
 import { formatDateFull, relativeDays } from '@/lib/util/format';
 import Image from 'next/image';
@@ -37,7 +37,7 @@ interface ComplaintsClientProps {
   regions?: Region[];
   staff: Staff[];
   customers: Customer[];
-  visits: Visit[];
+  visits: WashVisit[];
   canEscalate: boolean;
 }
 
@@ -63,7 +63,7 @@ export function ComplaintsClient({
   const [viewMode, setViewMode] = useState<'GRID' | 'LIST'>('GRID');
 
   // Preview Visit state
-  const [previewVisit, setPreviewVisit] = useState<Visit | null>(null);
+  const [previewVisit, setPreviewVisit] = useState<WashVisit | null>(null);
 
   const [page, setPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(6);
@@ -74,7 +74,7 @@ export function ComplaintsClient({
   const [regions, setRegions] = useState<Region[]>(initialRegions || []);
   const [staff, setStaff] = useState<Staff[]>(initialStaff);
   const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
-  const [visits, setVisits] = useState<Visit[]>(initialVisits);
+  const [visits, setVisits] = useState<WashVisit[]>(initialVisits);
 
   const [pagination, setPagination] = useState({
     page: 1,
