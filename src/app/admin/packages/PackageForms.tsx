@@ -415,57 +415,59 @@ export function EditPackageForm({
 
   return (
     <div className="mt-3 border-t border-slate-100 pt-3">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row gap-2">
         <button
           type="button"
           onClick={() => setModalOpen(true)}
           disabled={pending || loadingAction !== null}
-          className="flex-1 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition-all text-center disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex-1 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition-all text-center disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap sm:whitespace-normal"
         >
           Edit package & services
         </button>
 
-        <button
-          type="button"
-          onClick={handleToggleActive}
-          disabled={pending || loadingAction !== null}
-          className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl border shadow-sm transition-all ${
-            pending || loadingAction !== null ? 'opacity-60 cursor-not-allowed' : ''
-          } ${
-            active
-              ? 'border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100'
-              : 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
-          }`}
-          title={active ? 'Disable package (hides from new signups)' : 'Activate package'}
-        >
-          {loadingAction === 'toggle' && (
-            <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
-          )}
-          <span>
-            {loadingAction === 'toggle'
-              ? active
-                ? 'Disabling…'
-                : 'Enabling…'
-              : active
-                ? 'Disable'
-                : 'Enable'}
-          </span>
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleToggleActive}
+            disabled={pending || loadingAction !== null}
+            className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl border shadow-sm transition-all ${
+              pending || loadingAction !== null ? 'opacity-60 cursor-not-allowed' : ''
+            } ${
+              active
+                ? 'border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100'
+                : 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+            }`}
+            title={active ? 'Disable package (hides from new signups)' : 'Activate package'}
+          >
+            {loadingAction === 'toggle' && (
+              <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+            )}
+            <span>
+              {loadingAction === 'toggle'
+                ? active
+                  ? 'Disabling…'
+                  : 'Enabling…'
+                : active
+                  ? 'Disable'
+                  : 'Enable'}
+            </span>
+          </button>
 
-        <button
-          type="button"
-          onClick={handleDeleteClick}
-          disabled={pending || loadingAction !== null}
-          className={`inline-flex items-center justify-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 px-3 py-2 text-xs font-bold text-rose-700 shadow-sm transition-all ${
-            pending || loadingAction !== null ? 'opacity-60 cursor-not-allowed' : ''
-          }`}
-          title="Delete package"
-        >
-          {loadingAction === 'delete' && (
-            <span className="h-3 w-3 animate-spin rounded-full border-2 border-rose-700 border-t-transparent" />
-          )}
-          <span>{loadingAction === 'delete' ? 'Deleting…' : 'Delete'}</span>
-        </button>
+          <button
+            type="button"
+            onClick={handleDeleteClick}
+            disabled={pending || loadingAction !== null}
+            className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 px-3 py-2 text-xs font-bold text-rose-700 shadow-sm transition-all ${
+              pending || loadingAction !== null ? 'opacity-60 cursor-not-allowed' : ''
+            }`}
+            title="Delete package"
+          >
+            {loadingAction === 'delete' && (
+              <span className="h-3 w-3 animate-spin rounded-full border-2 border-rose-700 border-t-transparent" />
+            )}
+            <span>{loadingAction === 'delete' ? 'Deleting…' : 'Delete'}</span>
+          </button>
+        </div>
       </div>
 
       {/* EDIT MODAL */}

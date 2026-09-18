@@ -184,24 +184,26 @@ export function ConsoleShell({
       ) : null}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-40 flex items-center justify-between gap-3 border-b border-navy-700 bg-navy-900 px-4 py-3 pt-safe text-white lg:hidden" suppressHydrationWarning>
-          <div className="flex items-center gap-3" suppressHydrationWarning>
-            <button
-              type="button"
-              onClick={() => setOpen(true)}
-              aria-label="Open menu"
-              className="flex h-9 w-9 items-center justify-center rounded-xl bg-navy-800 text-gold-400 border border-navy-700 hover:bg-navy-750 hover:border-gold-500/50 transition-all shadow-sm active:scale-95"
-            >
-              <IconMenu width={20} height={20} />
-            </button>
-            <BrandLockup subtitle={roleLabel} />
-          </div>
-          <div className="flex items-center gap-2">
-            <div
-              className="flex h-7 w-7 items-center justify-center rounded-full bg-navy-700 text-xs font-bold text-white border border-navy-600"
-              suppressHydrationWarning
-            >
-              {userName.slice(0, 2).toUpperCase()}
+        <header className="sticky top-0 z-40 border-b border-navy-700 bg-navy-900 pt-safe text-white lg:hidden" suppressHydrationWarning>
+          <div className="flex w-full items-center justify-between gap-3 px-4 py-3">
+            <div className="flex items-center gap-3" suppressHydrationWarning>
+              <button
+                type="button"
+                onClick={() => setOpen(true)}
+                aria-label="Open menu"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-gold-400 hover:bg-navy-800 transition-colors active:scale-95 -ml-2"
+              >
+                <IconMenu width={24} height={24} />
+              </button>
+              <BrandLockup subtitle={roleLabel} />
+            </div>
+            <div className="flex items-center gap-2">
+              <div
+                className="flex h-7 w-7 items-center justify-center rounded-full bg-navy-700 text-xs font-bold text-white border border-navy-600"
+                suppressHydrationWarning
+              >
+                {userName.slice(0, 2).toUpperCase()}
+              </div>
             </div>
           </div>
         </header>

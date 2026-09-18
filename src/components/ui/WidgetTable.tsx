@@ -57,7 +57,7 @@ export function WidgetTable<T>({
   return (
     <div
       className={clsx(
-        'flex flex-col justify-between rounded-2xl border border-line-soft bg-white p-5 shadow-sm',
+        'flex flex-col justify-between overflow-hidden min-w-0 rounded-2xl border border-line-soft bg-white p-5 shadow-sm',
         className,
       )}
     >
@@ -72,12 +72,12 @@ export function WidgetTable<T>({
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
-              <tr className="border-b border-line-soft text-[11px] font-semibold uppercase tracking-wider text-ink-mute">
+              <tr className="border-b border-line-soft text-[11px] font-semibold uppercase tracking-wider text-ink-mute whitespace-nowrap">
                 {columns.map((col) => (
                   <th
                     key={col.id}
                     className={clsx(
-                      'pb-2.5 font-semibold',
+                      'pb-2.5 pr-4 font-semibold',
                       alignClass(col.align),
                       col.headerClassName,
                     )}
@@ -97,7 +97,7 @@ export function WidgetTable<T>({
                     <td
                       key={col.id}
                       className={clsx(
-                        'py-2.5 pr-3 text-slate-600',
+                        'py-3 pr-4 text-slate-600 whitespace-nowrap',
                         alignClass(col.align),
                         col.className,
                       )}

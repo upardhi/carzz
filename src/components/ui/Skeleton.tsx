@@ -51,9 +51,18 @@ export function KpiSkeleton() {
 }
 
 /** Matches the full <KpiGrid> / <StatGrid> — six tiles by default. */
-export function KpiGridSkeleton({ count = 6 }: { count?: number }) {
+export function KpiGridSkeleton({ count = 6, columns }: { count?: number, columns?: 2|3|4|5|6 }) {
+  const cols = columns ?? (count === 4 || count === 8 ? 4 : 6);
+  const colClass = {
+    2: 'grid-cols-1 sm:grid-cols-2',
+    3: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
+    4: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4',
+    5: 'grid-cols-1 sm:grid-cols-3 lg:grid-cols-5',
+    6: 'grid-cols-1 sm:grid-cols-3 lg:grid-cols-6',
+  }[cols as 2|3|4|5|6] || 'grid-cols-1 sm:grid-cols-3 lg:grid-cols-6';
+
   return (
-    <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-6">
+    <div className={clsx('grid gap-3.5', colClass)}>
       {Array.from({ length: count }).map((_, i) => (
         <KpiSkeleton key={i} />
       ))}
@@ -76,7 +85,7 @@ export function CardSkeleton({
   return (
     <div
       className={clsx(
-        'rounded-card border border-line bg-white p-4 shadow-card',
+        'rounded-card border border-line bg-white p-4 shadow-card min-w-0 overflow-hidden',
         className,
       )}
     >
@@ -89,7 +98,7 @@ export function CardSkeleton({
 /** Matches a Card that contains a list of <Row> label/value pairs. */
 export function CardRowSkeleton({ rows = 5 }: { rows?: number }) {
   return (
-    <div className="rounded-card border border-line bg-white p-4 shadow-card">
+    <div className="rounded-card border border-line bg-white p-4 shadow-card min-w-0 overflow-hidden">
       <Skeleton className="mb-3 h-3 w-28" />
       {Array.from({ length: rows }).map((_, i) => (
         <div

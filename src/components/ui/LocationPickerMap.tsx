@@ -372,7 +372,7 @@ export function LocationPickerMap({
         </div>
 
         {/* Search / Google Maps URL Box */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <div className="relative flex-1">
             <input
               type="text"
@@ -385,7 +385,7 @@ export function LocationPickerMap({
                   handleSearch();
                 }
               }}
-              className="w-full rounded-lg border border-line bg-white py-1.5 pl-8 pr-3 text-xs placeholder:text-ink-mute focus:border-blue-600 focus:outline-none"
+              className="w-full rounded-lg border border-line bg-white py-1.5 pl-8 pr-3 text-xs placeholder:text-ink-mute focus:border-blue-600 focus:outline-hidden"
             />
             <svg
               className="pointer-events-none absolute left-2.5 top-2 h-3.5 w-3.5 text-ink-mute"
@@ -407,8 +407,9 @@ export function LocationPickerMap({
             size="sm"
             onClick={() => handleSearch()}
             disabled={isSearching || !searchQuery.trim()}
+            className="w-full sm:w-auto justify-center"
           >
-            {isSearching ? 'Locating…' : 'Search / Locate'}
+            {isSearching ? 'Searching…' : 'Search / Locate'}
           </Button>
         </div>
 

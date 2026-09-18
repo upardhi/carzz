@@ -590,9 +590,9 @@ export function AreaManagementClient({
               </p>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap sm:flex-nowrap w-full sm:w-auto items-center gap-3">
               {/* Search Bar */}
-              <div className="relative min-w-[200px] max-w-xs">
+              <div className="relative flex-1 min-w-[140px] sm:max-w-xs">
                 <input
                   type="text"
                   placeholder="Filter regions..."
@@ -624,7 +624,7 @@ export function AreaManagementClient({
                 ) : null}
               </div>
 
-              <Button variant="secondary" size="sm" onClick={openAddRegionModal}>
+              <Button variant="secondary" size="sm" className="shrink-0" onClick={openAddRegionModal}>
                 <IconPlus width={14} height={14} />
                 <span>Add Region</span>
               </Button>
@@ -832,16 +832,16 @@ export function AreaManagementClient({
             return (
               <Card
                 key={area.area.id}
-                className={`p-4 flex flex-col justify-between ${isActive ? '' : 'opacity-60 grayscale'}`}
+                className={`p-4 flex flex-col justify-between min-w-0 ${isActive ? '' : 'opacity-60 grayscale'}`}
               >
-                <div>
-                  <div className="mb-2 flex items-start justify-between gap-2">
-                    <div>
-                      <h3 className="text-sm font-bold text-navy-950 flex items-center gap-1.5">
-                        {area.area.name}
+                <div className="min-w-0">
+                  <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-sm font-bold text-navy-950 flex flex-wrap items-center gap-1.5">
+                        <span className="truncate">{area.area.name}</span>
                         {!isActive && <Tag tone="bad">Disabled</Tag>}
                       </h3>
-                      <p className="text-xs text-ink-mute">
+                      <p className="text-xs text-ink-mute truncate">
                         {admin ? admin.name : 'No area admin assigned'}
                         {' · '}
                         {region ? region.name : ''}
@@ -857,18 +857,18 @@ export function AreaManagementClient({
                               href={`https://www.google.com/maps/search/?api=1&query=${area.area.lat},${area.area.lng}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="hover:text-blue-600 hover:underline inline-flex items-center gap-0.5 leading-snug break-words line-clamp-2"
+                              className="hover:text-blue-600 hover:underline inline-flex items-center gap-0.5 leading-snug break-words line-clamp-2 min-w-0"
                             >
-                              <span>{area.area.address}</span>
+                              <span className="truncate">{area.area.address}</span>
                               <span className="text-[9px] text-blue-600 shrink-0 mt-0.5 self-start">↗</span>
                             </a>
                           ) : (
-                            <span className="leading-snug break-words line-clamp-2">{area.area.address}</span>
+                            <span className="leading-snug break-words line-clamp-2 min-w-0">{area.area.address}</span>
                           )}
                         </div>
                       ) : null}
                     </div>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex flex-wrap items-center gap-1.5 shrink-0">
                       <button
                         type="button"
                         onClick={() => openEditAreaModal(area.area)}

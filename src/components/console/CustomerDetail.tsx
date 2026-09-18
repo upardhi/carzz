@@ -86,8 +86,8 @@ export async function ConsoleCustomerDetail({
       />
 
       <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
-        <Card className="p-4">
-          <div className="flex items-center justify-between mb-2">
+        <Card className="p-4 min-w-0">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
             <CardHeading>Details</CardHeading>
             <EditCustomerModalButton customer={customer} areas={allAreas} />
           </div>
@@ -183,8 +183,8 @@ export async function ConsoleCustomerDetail({
           </div>
         </Card>
 
-        <Card className="p-4">
-          <div className="flex items-center justify-between mb-3">
+        <Card className="p-4 min-w-0">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
             <CardHeading>Cars on this account ({cars.length})</CardHeading>
             <AddCarModalButton
               customerId={customer.id}
@@ -199,11 +199,11 @@ export async function ConsoleCustomerDetail({
                 key={car.id}
                 className="mb-3 rounded-lg border border-line bg-white p-3.5 last:mb-0 shadow-xs"
               >
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line/60 pb-2 mb-2">
-                  <b className="text-sm font-bold text-ink">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b border-line/60 pb-2 mb-2 min-w-0">
+                  <b className="text-sm font-bold text-ink min-w-0 flex-1 break-words">
                     {car.make} {car.model} — {car.plate}
                   </b>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex flex-wrap items-center justify-start sm:justify-end gap-1.5 min-w-0">
                     {isStarted ? (
                       car.serviceStartedBeforePayment ? (
                         <Tag tone="warn">Started Before Payment (Override)</Tag>
@@ -253,12 +253,14 @@ export async function ConsoleCustomerDetail({
                 <Row
                   label="Wash boy"
                   value={
-                    <QuickAssignStaff
-                      customerId={customer.id}
-                      carId={car.id}
-                      currentStaffId={car.assignedStaffId}
-                      staffList={staff}
-                    />
+                    <div className="flex flex-wrap items-center gap-2 justify-end min-w-0">
+                      <QuickAssignStaff
+                        customerId={customer.id}
+                        carId={car.id}
+                        currentStaffId={car.assignedStaffId}
+                        staffList={staff}
+                      />
+                    </div>
                   }
                 />
 
@@ -368,7 +370,7 @@ export async function ConsoleCustomerDetail({
           })}
         </Card>
 
-        <Card className="p-4">
+        <Card className="p-4 min-w-0">
           <CardHeading>Payment — whole account</CardHeading>
           <Row label="Monthly package" value={money(account.monthly)} />
           <Row label="Advance deposited" value={money(account.advanceDeposited)} />
@@ -400,7 +402,7 @@ export async function ConsoleCustomerDetail({
           </div>
         </Card>
 
-        <div className="flex flex-col justify-between lg:col-span-2">
+        <div className="flex flex-col justify-between lg:col-span-2 min-w-0">
           <WidgetTable<(typeof history)[number]>
             title="Recent washes"
             data={history}
@@ -503,7 +505,7 @@ export async function ConsoleCustomerDetail({
           ) : null}
         </div>
 
-        <div className="flex flex-col justify-between">
+        <div className="flex flex-col justify-between min-w-0">
           <WidgetTable<(typeof payments)[number]>
             title="Payment history"
             data={payments.slice(0, 10)}
@@ -572,7 +574,7 @@ export async function ConsoleCustomerDetail({
           ) : null}
         </div>
 
-        <Card className="p-4">
+        <Card className="p-4 min-w-0">
           <CardHeading>Invoices</CardHeading>
           {invoices.slice(0, 6).map((invoice) => (
             <Row

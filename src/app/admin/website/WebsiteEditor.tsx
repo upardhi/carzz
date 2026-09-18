@@ -114,7 +114,7 @@ function Section({
   disabled?: boolean;
 }) {
   return (
-    <Card className="p-5">
+    <Card className="p-5 min-w-0">
       <CardHeading>{title}</CardHeading>
       {description ? (
         <p className="-mt-1 mb-3 text-xs text-ink-mute">{description}</p>
@@ -133,7 +133,7 @@ function Section({
 export function PublishToggle({ content }: { content: SiteContent }) {
   const { save, pending, state } = useSave();
   return (
-    <Card tone={content.published ? 'success' : 'gold'} className="p-5">
+    <Card tone={content.published ? 'success' : 'gold'} className="p-5 min-w-0">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-sm font-bold">

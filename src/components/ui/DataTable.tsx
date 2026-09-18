@@ -98,8 +98,8 @@ export function DataTable<T>({
     : [];
 
   return (
-    <div className={clsx('relative space-y-4', className)}>
-      <div className="relative overflow-hidden rounded-2xl border border-line-soft bg-white shadow-sm">
+    <div className={clsx('relative space-y-4 min-w-0', className)}>
+      <div className="relative overflow-hidden min-w-0 rounded-2xl border border-line-soft bg-white shadow-sm">
         {/* Top Loading Progress Bar */}
         {isLoading && (
           <div className="absolute top-0 left-0 right-0 z-30 h-1 overflow-hidden rounded-t-2xl bg-blue-50">
@@ -139,7 +139,7 @@ export function DataTable<T>({
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left text-sm">
             <thead>
-              <tr className="border-b border-line-soft bg-slate-50/50 text-[11px] font-semibold uppercase tracking-wider text-ink-mute">
+              <tr className="border-b border-line-soft bg-slate-50/50 text-[11px] font-semibold uppercase tracking-wider text-ink-mute whitespace-nowrap">
                 {columns.map((col) => {
                   const isCurrentSort = (col.sortKey ?? col.id) === sortColumn;
                   const canSort = col.sortable && onSort;
@@ -192,7 +192,7 @@ export function DataTable<T>({
                         <td
                           key={col.id}
                           className={clsx(
-                            'px-4 py-3 text-slate-700',
+                            'px-4 py-3 text-slate-700 whitespace-nowrap',
                             alignClass(col.align),
                             col.className,
                           )}

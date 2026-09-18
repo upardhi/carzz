@@ -99,8 +99,8 @@ export function ConfirmDialog({
         if (e.target === e.currentTarget && !loading) onCancel();
       }}
     >
-      <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-line bg-white p-6 shadow-float transition-all">
-        <div className="flex items-start gap-4">
+      <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-line bg-white p-5 sm:p-6 shadow-float transition-all">
+        <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4">
           <div
             className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border ${toneConfig.bg} ${toneConfig.text} ${toneConfig.border}`}
           >
@@ -120,11 +120,12 @@ export function ConfirmDialog({
           </div>
         </div>
 
-        <div className="mt-6 flex items-center justify-end gap-2.5 border-t border-line/70 pt-4">
+        <div className="mt-6 flex flex-col-reverse sm:flex-row sm:justify-end gap-2.5 border-t border-line/70 pt-4">
           <Button
             type="button"
             variant="secondary"
             size="md"
+            className="w-full sm:w-auto"
             disabled={loading}
             onClick={onCancel}
           >
@@ -136,6 +137,7 @@ export function ConfirmDialog({
             type="button"
             variant={tone === 'danger' ? 'danger' : tone === 'warning' || tone === 'gold' ? 'gold' : 'primary'}
             size="md"
+            className="w-full sm:w-auto"
             disabled={loading}
             onClick={() => onConfirm()}
           >
