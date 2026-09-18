@@ -214,46 +214,43 @@ export default async function HomePage() {
             {/* Dotted connector line — desktop only */}
             <div className="hidden md:block absolute top-12 left-[calc(33.33%+12px)] right-[calc(33.33%+12px)] border-t-2 border-dashed border-blue-200 z-0" />
 
-            {[
-              {
-                num: '1',
-                icon: (
+            {site.howSteps?.map((step, i) => {
+              const num = String(i + 1);
+              let icon;
+              let accent;
+              
+              if (i === 0) {
+                icon = (
                   <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                     <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" />
                   </svg>
-                ),
-                title: site.howSteps?.[0]?.title || 'Tell us where you park',
-                desc: site.howSteps?.[0]?.body || 'Your building, your slot, your time. We fit the service entirely around your schedule.',
-                accent: 'border-t-blue-500',
-              },
-              {
-                num: '2',
-                icon: <IconCar className="w-5 h-5" />,
-                title: site.howSteps?.[1]?.title || 'We come to you',
-                desc: site.howSteps?.[1]?.body || 'Our trained wash boy arrives right on time. No calls, no chasing, no waiting around.',
-                accent: 'border-t-amber-500',
-              },
-              {
-                num: '3',
-                icon: <IconCamera width={22} height={22} strokeWidth={2} />,
-                title: site.howSteps?.[2]?.title || 'You see the proof',
-                desc: site.howSteps?.[2]?.body || 'Receive before & after photos of every wash so you always know what you paid for.',
-                accent: 'border-t-green-500',
-              },
-            ].map(({ num, icon, title, desc, accent }) => (
-              <div key={num} className={`relative z-10 flex flex-col rounded-2xl border-t-4 border border-slate-200 bg-white p-7 shadow-sm hover:shadow-md transition-shadow ${accent}`}>
-                <div className="flex items-start justify-between mb-5">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#071739] text-sm font-bold text-white shadow-sm">
-                    {num}
-                  </span>
-                  <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
-                    {icon}
-                  </span>
+                );
+                accent = 'border-t-blue-500';
+              } else if (i === 1) {
+                icon = <IconCar className="w-5 h-5" />;
+                accent = 'border-t-amber-500';
+              } else {
+                icon = <IconCamera width={22} height={22} strokeWidth={2} />;
+                accent = 'border-t-green-500';
+              }
+              
+              return (
+                <div key={num} className={`relative z-10 flex flex-col rounded-2xl border-t-4 border border-slate-200 bg-white p-7 shadow-sm hover:shadow-md transition-shadow ${accent}`}>
+                  <div className="flex items-start justify-between mb-5">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#071739] text-sm font-bold text-white shadow-sm">
+                      {num}
+                    </span>
+                    <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+                      {icon}
+                    </span>
+                  </div>
+                  <h3 className="text-[17px] font-bold text-slate-900">{step.title}</h3>
+                  <p className="mt-2 text-[13px] text-slate-500 leading-relaxed font-medium">
+                    {step.body}
+                  </p>
                 </div>
-                <h3 className="text-base font-bold text-slate-900">{title}</h3>
-                <p className="mt-2 text-sm text-slate-500 leading-relaxed">{desc}</p>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Bottom CTA */}
@@ -456,8 +453,7 @@ export default async function HomePage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {site.features && site.features.length > 0 ? (
-              site.features.map((feature, i) => {
+            {site.features?.map((feature, i) => {
                 const accent = [
                   'bg-blue-600/15 text-blue-300',
                   'bg-amber-500/15 text-amber-300',
@@ -479,43 +475,7 @@ export default async function HomePage() {
                     <p className="mt-2 text-sm text-slate-400 leading-relaxed">{feature.body}</p>
                   </div>
                 );
-              })
-            ) : (
-              [
-                {
-                  icon: '📷',
-                  title: 'Photo Proof',
-                  desc: 'Before & after photos sent for every single wash. No photos? The wash is free.',
-                  accent: 'bg-blue-600/15 text-blue-300',
-                },
-                {
-                  icon: '🗓️',
-                  title: 'Flexible Schedule',
-                  desc: 'Pick your days and time. We adjust around your parking and work hours.',
-                  accent: 'bg-amber-500/15 text-amber-300',
-                },
-                {
-                  icon: '🛡️',
-                  title: 'Verified Staff',
-                  desc: 'Background-checked, trained wash boys. The same person shows up every week.',
-                  accent: 'bg-green-600/15 text-green-300',
-                },
-                {
-                  icon: '💳',
-                  title: 'Easy Payment',
-                  desc: 'Pay monthly by UPI, cash, or card. No advance, no hidden charges.',
-                  accent: 'bg-purple-600/15 text-purple-300',
-                },
-              ].map(({ icon, title, desc, accent }) => (
-                <div key={title} className="group rounded-2xl border border-white/8 bg-white/5 p-6 hover:bg-white/8 hover:border-white/15 transition-all">
-                  <div className={`inline-flex h-12 w-12 items-center justify-center rounded-2xl text-2xl mb-4 ${accent}`}>
-                    {icon}
-                  </div>
-                  <h3 className="text-base font-semibold text-white">{title}</h3>
-                  <p className="mt-2 text-sm text-slate-400 leading-relaxed">{desc}</p>
-                </div>
-              ))
-            )}
+              })}
           </div>
         </div>
       </section>

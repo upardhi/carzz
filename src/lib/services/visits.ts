@@ -205,6 +205,9 @@ export async function rateVisit(
   if (visit.status !== 'DONE') {
     throw new WashRuleError('Only a completed wash can be rated.');
   }
+  if (visit.rating !== null) {
+    throw new WashRuleError('This wash has already been rated. Thank you!');
+  }
   return store.visits.update(visitId, {
     rating,
     ratingComment: comment ?? null,
