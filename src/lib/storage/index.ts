@@ -143,7 +143,7 @@ class VercelBlobStorage implements PhotoStorage {
       const isPrivate = url.includes('.private.blob.vercel-storage.com');
       const delToken = isPrivate ? this.privateToken : this.publicToken;
       await vercelBlobDel(url, { token: delToken });
-    } catch (err) {
+    } catch {
       // Ignore if already deleted
     }
     this.urlCache.delete(keyOrUrl);
