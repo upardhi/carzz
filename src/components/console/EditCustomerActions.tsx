@@ -532,6 +532,8 @@ export function AddCarModalButton({
   const [schedulePattern, setSchedulePattern] = useState<WeekdayPattern>('MON_THU');
   const [scheduleTime, setScheduleTime] = useState('09:00');
   const [specialInstructions, setSpecialInstructions] = useState('');
+  const [autoStartService, setAutoStartService] = useState(true);
+  const [startDate, setStartDate] = useState(() => new Date().toISOString().slice(0, 10));
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -557,7 +559,8 @@ export function AddCarModalButton({
           schedulePattern,
           scheduleTime,
           specialInstructions: specialInstructions.trim() || null,
-          autoStartService: true,
+          autoStartService,
+          startDate: startDate || undefined,
         }),
       });
 
@@ -727,6 +730,33 @@ export function AddCarModalButton({
                   placeholder="e.g. B2, Slot 14"
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold focus:border-blue-500 focus:outline-none"
                 />
+              </div>
+
+              <div className="flex flex-col gap-2 pt-2 pb-1 border-t border-slate-100">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="auto-start"
+                    checked={autoStartService}
+                    onChange={(e) => setAutoStartService(e.target.checked)}
+                    className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <label htmlFor="auto-start" className="font-bold text-slate-700 cursor-pointer">
+                    Auto-start service (Payment Collected)
+                  </label>
+                </div>
+                {autoStartService && (
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Service Start Date</label>
+                    <input
+                      type="date"
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold focus:border-blue-500 focus:outline-none"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      required
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">

@@ -87,20 +87,16 @@ export default async function AdminAccounting({
         <Card accent="brand" className="p-4">
           <CardHeading>Result</CardHeading>
           <Stat
-            value={money(summary.profit)}
-            tone={summary.profit > 0 ? 'success' : 'danger'}
-            sub={`Net profit · ${cycleLabel(cycle)}`}
+            value={money(summary.revenuePerCar)}
+            tone="brand"
+            sub={`Revenue per car · ${cycleLabel(cycle)}`}
           />
-          <div className="mt-3">
-            <Row label="Cost per wash" value={money(summary.costPerWash)} />
-            <Row label="Revenue per car" value={money(summary.revenuePerCar)} />
-          </div>
 
           {summary.outstanding > 0 ? (
             <div className="mt-3">
               <Note>
                 If the {money(summary.outstanding)} outstanding were collected,
-                that adds {money(summary.outstanding)} straight to profit.
+                that adds {money(summary.outstanding)} straight to collections.
                 Collection is the biggest single lever you have.
               </Note>
             </div>

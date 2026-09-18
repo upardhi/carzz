@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { Note } from '@/components/ui/primitives';
 import { useToast } from '@/components/ui/ToastProvider';
 import { DocumentUploadPreview } from '@/components/ui/DocumentUploadPreview';
+import { LocationPickerMap } from '@/components/ui/LocationPickerMap';
 import type { Role, Area, Region, User, Staff } from '@/lib/data/types';
 import { ROLE_LABEL } from '@/lib/util/labels';
 
@@ -84,6 +85,8 @@ export function EditPersonClient({
 
   // 3. Address & Personal
   const [address, setAddress] = useState(user.address || staff?.address || '');
+  const [lat, setLat] = useState<number | null>(null);
+  const [lng, setLng] = useState<number | null>(null);
   const [emergencyContactName, setEmergencyContactName] = useState(user.emergencyContactName || staff?.emergencyContactName || '');
   const [emergencyPhone, setEmergencyPhone] = useState(user.emergencyPhone || staff?.emergencyPhone || '');
   const [dob, setDob] = useState(user.dob || staff?.dob || '');
@@ -596,59 +599,83 @@ export function EditPersonClient({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-bold text-slate-900 mb-1" htmlFor="edit-address">
-                  🏠 Residential Address
-                </label>
-                <input
-                  id="edit-address"
-                  type="text"
-                  placeholder="Flat/House No, Building, Street, City, Pincode"
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs text-slate-800 focus:border-blue-600 focus:outline-none"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-900 mb-1" htmlFor="edit-address">
+                    🏠 Residential Address
+                  </label>
+                  <input
+                    id="edit-address"
+                    type="text"
+                    placeholder="Flat/House No, Building, Street, City, Pincode"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs text-slate-800 focus:border-blue-600 focus:outline-none"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                  />
+                </div>
+
+                <hr className="border-slate-100" />
+
+                <div className="pt-1">
+                  <h3 className="text-sm font-bold text-slate-900">Emergency Contact Details</h3>
+                  <p className="text-[11px] text-slate-500 mb-3">Person to be contacted in case of emergency</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-900 mb-1" htmlFor="edit-emg-name">
+                        👤 Emergency Contact Name
+                      </label>
+                      <input
+                        id="edit-emg-name"
+                        type="text"
+                        placeholder="Relative / Parent / Spouse"
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs text-slate-800 focus:border-blue-600 focus:outline-none"
+                        value={emergencyContactName}
+                        onChange={(e) => setEmergencyContactName(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-900 mb-1" htmlFor="edit-emg-phone">
+                        📞 Emergency Mobile Phone
+                      </label>
+                      <input
+                        id="edit-emg-phone"
+                        type="tel"
+                        placeholder="10-digit emergency phone"
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs text-slate-800 focus:border-blue-600 focus:outline-none"
+                        value={emergencyPhone}
+                        onChange={(e) => setEmergencyPhone(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <label className="block text-xs font-bold text-slate-900 mb-1" htmlFor="edit-dob">
+                    📅 Date of Birth
+                  </label>
+                  <input
+                    id="edit-dob"
+                    type="date"
+                    className="w-full sm:w-1/2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs text-slate-800 focus:border-blue-600 focus:outline-none"
+                    value={dob}
+                    onChange={(e) => setDob(e.target.value)}
+                  />
+                </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-900 mb-1" htmlFor="edit-emg-name">
-                  👤 Emergency Contact Name
-                </label>
-                <input
-                  id="edit-emg-name"
-                  type="text"
-                  placeholder="Relative / Parent / Spouse"
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs text-slate-800 focus:border-blue-600 focus:outline-none"
-                  value={emergencyContactName}
-                  onChange={(e) => setEmergencyContactName(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-900 mb-1" htmlFor="edit-emg-phone">
-                  📞 Emergency Mobile Phone
-                </label>
-                <input
-                  id="edit-emg-phone"
-                  type="tel"
-                  placeholder="10-digit emergency phone"
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs text-slate-800 focus:border-blue-600 focus:outline-none"
-                  value={emergencyPhone}
-                  onChange={(e) => setEmergencyPhone(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-900 mb-1" htmlFor="edit-dob">
-                  📅 Date of Birth
-                </label>
-                <input
-                  id="edit-dob"
-                  type="date"
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs text-slate-800 focus:border-blue-600 focus:outline-none"
-                  value={dob}
-                  onChange={(e) => setDob(e.target.value)}
+                <LocationPickerMap
+                  address={address}
+                  lat={lat}
+                  lng={lng}
+                  city={areas.find(a => a.id === areaId)?.city || 'Nagpur'}
+                  hideAddressInput
+                  onAddressChange={(newAddress) => setAddress(newAddress)}
+                  onCoordinatesChange={(newLat, newLng) => {
+                    setLat(newLat);
+                    setLng(newLng);
+                  }}
                 />
               </div>
             </div>

@@ -113,7 +113,7 @@ export function adminNav(counts: NavCounts): NavGroup[] {
         { href: '/admin/regions', label: 'Regions', icon: <IconMap width={18} height={18} /> },
         { href: '/admin/areas', label: 'Areas', icon: <IconMap width={18} height={18} /> },
         { href: '/admin/users', label: 'Company People', icon: <IconUsers width={18} height={18} /> },
-        { href: '/admin/users?role=EMPLOYEE', label: 'Boys', icon: <IconUser width={18} height={18} /> },
+        { href: '/admin/users?role=EMPLOYEE', label: 'Wash Boys', icon: <IconUser width={18} height={18} /> },
         { href: '/admin/customers', label: 'Customers', icon: <IconUsers width={18} height={18} /> },
         {
           href: '/admin/enquiries',

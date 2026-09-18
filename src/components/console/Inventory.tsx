@@ -7,7 +7,7 @@ import {
   Note,
   Tag,
 } from '@/components/ui/primitives';
-import { scopeAreaFilter } from '@/lib/auth/rbac';
+import { scopeAreaFilter, can } from '@/lib/auth/rbac';
 import type { Session } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { stockForAreas } from '@/lib/services/inventory';
@@ -101,7 +101,7 @@ export async function ConsoleInventory({ session }: { session: Session }) {
           areas={areas}
           staff={staff}
           requests={requests}
-          canApprovePurchase={session.user.role === 'SUPER_ADMIN'}
+          canApprovePurchase={can(session.user.role, 'purchase:approve')}
         />
       </div>
 

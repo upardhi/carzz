@@ -8,6 +8,8 @@ import { safeOfflineFetch } from '@/lib/util/offlineQueue';
 interface Option {
   id: string;
   label: string;
+  washesPerMonth?: number;
+  services?: string[];
 }
 
 /**
@@ -42,6 +44,7 @@ export function EnquiryForm({
     phone: string;
     areaLabel: string;
     carCount: string;
+    packageId: string;
     packageLabel: string;
     message: string;
   } | null>(null);
@@ -97,6 +100,7 @@ export function EnquiryForm({
         phone: phone.trim(),
         areaLabel: selectedArea ? selectedArea.label : (locality ? locality : 'Nagpur (General)'),
         carCount: carCount,
+        packageId: packageId,
         packageLabel: selectedPackage ? selectedPackage.label.split('—')[0].trim() : 'Not selected yet',
         message: confirmationMsg,
       });
@@ -242,7 +246,27 @@ export function EnquiryForm({
                 </svg>
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 truncate">Preferred Package</span>
               </div>
-              <p className="text-xs sm:text-sm font-bold text-slate-900 break-words leading-tight">{submittedData.packageLabel}</p>
+              <div className="mt-1">
+                <p className="text-xs sm:text-sm font-bold text-slate-900 break-words leading-tight">{submittedData.packageLabel}</p>
+                {(() => {
+                  const pkg = packages.find(p => p.id === submittedData.packageId);
+                  if (!pkg?.services || pkg.services.length === 0) return null;
+                  return (
+                    <div className="mt-1.5 space-y-1">
+                      {pkg.services.map((s, i) => {
+                        const [name, count] = s.split(':');
+                        const frequency = count || pkg.washesPerMonth;
+                        return (
+                          <div key={i} className="flex items-center gap-1.5 text-[11px] font-medium text-slate-600">
+                            <span className="flex h-3 w-3 items-center justify-center rounded-full bg-emerald-100 text-[7px] text-emerald-600">✓</span>
+                            <span>{name} ({frequency}/mo)</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
             </div>
           </div>
         </div>
@@ -401,6 +425,25 @@ export function EnquiryForm({
             <option key={p.id} value={p.id}>{p.label}</option>
           ))}
         </select>
+        {selectedPackage?.services && selectedPackage.services.length > 0 && (
+          <div className="mt-2 space-y-1.5 rounded-xl border border-blue-100 bg-blue-50/50 p-2.5">
+            {selectedPackage.services.map((s, i) => {
+              const [name, count] = s.split(':');
+              const frequency = count || selectedPackage.washesPerMonth;
+              return (
+                <div key={i} className="flex items-center justify-between text-xs font-medium text-blue-900">
+                  <div className="flex items-center gap-1.5">
+                    <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-blue-200 text-[8px] text-blue-700">
+                      ✓
+                    </span>
+                    {name}
+                  </div>
+                  <span className="text-[10px] text-blue-600/80">{frequency} / mo</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="sm:col-span-2">

@@ -102,11 +102,6 @@ export function RateWashForm({
         {pending ? 'Sending…' : 'Submit rating'}
       </button>
 
-      <div className="mt-2.5">
-        <Note tone="success">
-          A good rating pays your wash boy ₹10 extra.
-        </Note>
-      </div>
 
       {state.ok ? (
         <div className="mt-2.5">

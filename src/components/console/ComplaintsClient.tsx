@@ -18,9 +18,10 @@ import {
 import { useToast } from '@/components/ui/ToastProvider';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { Button } from '@/components/ui/primitives';
-import type { Complaint, Area, Staff, Customer, Region } from '@/lib/data/types';
+import type { Complaint, Area, Staff, Customer, Region, Visit } from '@/lib/data/types';
 import { COMPLAINT_TYPE_LABEL } from '@/lib/util/labels';
 import { formatDateFull, relativeDays } from '@/lib/util/format';
+import Image from 'next/image';
 
 const QUICK_SUGGESTIONS = [
   'Free re-wash scheduled',
@@ -36,6 +37,7 @@ interface ComplaintsClientProps {
   regions?: Region[];
   staff: Staff[];
   customers: Customer[];
+  visits: Visit[];
   canEscalate: boolean;
 }
 
@@ -45,6 +47,7 @@ export function ComplaintsClient({
   regions: initialRegions,
   staff: initialStaff,
   customers: initialCustomers,
+  visits: initialVisits,
   canEscalate,
 }: ComplaintsClientProps) {
   const router = useRouter();
@@ -58,6 +61,10 @@ export function ComplaintsClient({
   const [selectedAreaId, setSelectedAreaId] = useState<string>('');
   const [sortBy, setSortBy] = useState<'LATEST' | 'OLDEST'>('LATEST');
   const [viewMode, setViewMode] = useState<'GRID' | 'LIST'>('GRID');
+
+  // Preview Visit state
+  const [previewVisit, setPreviewVisit] = useState<Visit | null>(null);
+
   const [page, setPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(6);
 
@@ -67,6 +74,7 @@ export function ComplaintsClient({
   const [regions, setRegions] = useState<Region[]>(initialRegions || []);
   const [staff, setStaff] = useState<Staff[]>(initialStaff);
   const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
+  const [visits, setVisits] = useState<Visit[]>(initialVisits);
 
   const [pagination, setPagination] = useState({
     page: 1,
@@ -132,6 +140,7 @@ export function ComplaintsClient({
           if (data.staff) setStaff(data.staff);
           if (data.areas) setAreas(data.areas);
           if (data.regions) setRegions(data.regions);
+          if (data.visits) setVisits(data.visits);
           if (data.pagination) setPagination(data.pagination);
           if (data.counts) setCounts(data.counts);
           if (data.kpis) setKpis(data.kpis);
@@ -666,6 +675,16 @@ export function ComplaintsClient({
                     &ldquo;{complaint.body}&rdquo;
                   </div>
 
+                  {complaint.visitId && visits.find(v => v.id === complaint.visitId) && (
+                    <button
+                      type="button"
+                      onClick={() => setPreviewVisit(visits.find(v => v.id === complaint.visitId)!)}
+                      className="mb-3 inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100 hover:border-blue-300 transition-colors shadow-2xs cursor-pointer w-full justify-center"
+                    >
+                      <span>View Wash Details & Photos</span>
+                    </button>
+                  )}
+
                   {/* Manager Escalation Info Banner */}
                   {isManagerLocked ? (
                     <div className="mb-3 flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-xs text-amber-900">
@@ -915,11 +934,136 @@ export function ComplaintsClient({
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none transition-all duration-300">
           <div className="flex items-center gap-3 rounded-full border border-navy-800 bg-navy-950/95 px-5 py-2.5 text-xs font-semibold text-white shadow-2xl backdrop-blur-md ring-1 ring-white/10">
             <div className="relative flex h-4 w-4 items-center justify-center">
-              <span className="absolute h-full w-full animate-ping rounded-full bg-sky-400 opacity-40" />
+                      <span className="absolute h-full w-full animate-ping rounded-full bg-sky-400 opacity-40" />
               <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
             </div>
             <span className="tracking-wide">Updating complaints from database…</span>
             <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          </div>
+        </div>
+      )}
+
+      {/* REUSABLE PHOTO PREVIEW MODAL */}
+      {previewVisit && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-sm animate-in fade-in duration-150"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setPreviewVisit(null);
+          }}
+        >
+          <div className="relative w-full max-w-2xl overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <IconMapPin width={18} height={18} className="text-blue-600" />
+                  <span>Wash Inspection</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {formatDateFull(previewVisit.scheduledDate)}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewVisit(null)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-800 font-semibold transition-colors cursor-pointer"
+                aria-label="Close modal"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Before Photo Card */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3.5 flex flex-col items-center">
+                <div className="flex items-center justify-between w-full mb-2.5">
+                  <span className="text-xs font-semibold text-slate-900 uppercase tracking-wider">
+                    📷 Before Wash
+                  </span>
+                  {previewVisit.beforePhotoBytes ? (
+                    <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-0.5 text-[10.5px] font-semibold text-blue-700 border border-blue-200">
+                      {(previewVisit.beforePhotoBytes / 1024).toFixed(1)} KB
+                    </span>
+                  ) : null}
+                </div>
+                {previewVisit.beforePhotoUrl ? (
+                  <div className="relative aspect-4/3 w-full overflow-hidden rounded-lg border border-slate-200 bg-slate-900">
+                    <Image
+                      src={previewVisit.beforePhotoUrl}
+                      alt="Before Wash"
+                      fill
+                      unoptimized
+                      className="object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="flex aspect-4/3 w-full items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white text-xs font-medium text-slate-400">
+                    No before photo recorded
+                  </div>
+                )}
+              </div>
+
+              {/* After Photo Card */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3.5 flex flex-col items-center">
+                <div className="flex items-center justify-between w-full mb-2.5">
+                  <span className="text-xs font-semibold text-slate-900 uppercase tracking-wider">
+                    ✨ After Wash
+                  </span>
+                  {previewVisit.afterPhotoBytes ? (
+                    <span className="inline-flex items-center rounded-md bg-emerald-50 px-2 py-0.5 text-[10.5px] font-semibold text-emerald-700 border border-emerald-200">
+                      {(previewVisit.afterPhotoBytes / 1024).toFixed(1)} KB
+                    </span>
+                  ) : null}
+                </div>
+                {previewVisit.afterPhotoUrl ? (
+                  <div className="relative aspect-4/3 w-full overflow-hidden rounded-lg border border-slate-200 bg-slate-900">
+                    <Image
+                      src={previewVisit.afterPhotoUrl}
+                      alt="After Wash"
+                      fill
+                      unoptimized
+                      className="object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="flex aspect-4/3 w-full items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white text-xs font-medium text-slate-400">
+                    No after photo recorded
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-1.5">
+              <span className="text-xs font-bold uppercase text-slate-500 mr-2 self-center">Services Done:</span>
+              {Array.isArray(previewVisit.servicesDone) && previewVisit.servicesDone.length > 0 ? (
+                previewVisit.servicesDone.map((s) => (
+                  <span key={s} className="inline-flex items-center rounded-md bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 border border-blue-200">
+                    ✓ {s}
+                  </span>
+                ))
+              ) : (
+                <span className="text-xs text-slate-500 italic self-center">No checklist recorded</span>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-3 text-xs text-slate-500">
+              <div>
+                Status:{' '}
+                <span className="font-bold text-slate-800">
+                  {previewVisit.status.replace(/_/g, ' ')}
+                </span>
+                {previewVisit.rating ? ` · Customer rated: ${previewVisit.rating} ★` : ''}
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewVisit(null)}
+                className="rounded-lg bg-[#0F2347] px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#163363] transition-colors cursor-pointer"
+              >
+                Close Preview
+              </button>
+            </div>
           </div>
         </div>
       )}

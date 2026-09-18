@@ -165,12 +165,22 @@ export async function GET(request: Request) {
       ]),
     ) as string[];
 
-    const [pageCustomers, pageStaff] = await Promise.all([
+    const visitIds = Array.from(
+      new Set([
+        ...paginatedComplaints.map((c) => c.visitId).filter(Boolean),
+        ...recentResolvedSample.map((c) => c.visitId).filter(Boolean),
+      ]),
+    ) as string[];
+
+    const [pageCustomers, pageStaff, pageVisits] = await Promise.all([
       customerIds.length
         ? store.customers.find({ where: { id: { in: customerIds } } as never })
         : [],
       staffIds.length
         ? store.staff.find({ where: { id: { in: staffIds } } as never })
+        : [],
+      visitIds.length
+        ? store.visits.find({ where: { id: { in: visitIds } } as never })
         : [],
     ]);
 
@@ -199,6 +209,7 @@ export async function GET(request: Request) {
       staff: pageStaff,
       areas: areasList,
       regions: regionsList,
+      visits: pageVisits,
       pagination: {
         page,
         pageSize,

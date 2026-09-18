@@ -220,19 +220,24 @@ export default async function CustomerHelp() {
       </div>
 
       {/* 5. My Complaints & Resolutions */}
-      <div className="space-y-2 pt-1">
-        <div className="flex items-center justify-between">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600">
-            My Complaints & Resolutions
-          </h3>
-          <span className="text-xs text-slate-400 font-medium">
+      <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs space-y-3">
+        <div className="flex items-start sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900">
+              My Complaints & Resolutions
+            </h3>
+            <p className="text-[11.5px] text-slate-500 font-medium mt-0.5">
+              Track the status, manager investigation notes, and reschedule/re-wash actions.
+            </p>
+          </div>
+          <span className="shrink-0 whitespace-nowrap rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 border border-slate-200/60">
             {displayComplaints.length} Total
           </span>
         </div>
-        <p className="text-[12.5px] text-slate-500 font-medium">
-          Track the status, manager investigation notes, and reschedule/re-wash actions.
-        </p>
-        <ComplaintHistory complaints={displayComplaints} />
+        
+        <div className="pt-2">
+          <ComplaintHistory complaints={displayComplaints} />
+        </div>
       </div>
     </div>
   );

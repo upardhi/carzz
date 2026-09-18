@@ -74,7 +74,7 @@ export default async function AdminUsers({
     SUPER_ADMIN: 'Super Admins',
     AREA_ADMIN: 'Area Admins',
     MANAGER: 'Area Managers',
-    EMPLOYEE: 'Boys',
+    EMPLOYEE: 'Wash Boys',
     CUSTOMER: 'Customers',
   };
 

@@ -164,8 +164,8 @@ export default async function StaffToday() {
 
       {/* 3. Today's Route List Card */}
       <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-2xs">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+          <div className="flex items-start sm:items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-blue-100 bg-blue-50 text-blue-600">
               <IconCalendar width={20} height={20} />
             </div>
@@ -265,7 +265,7 @@ export default async function StaffToday() {
                   href={`/staff/wash/${visit.id}`}
                   className="group block rounded-xl border border-slate-200 bg-white p-4 shadow-2xs transition-all hover:border-blue-400 hover:shadow-sm"
                 >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
@@ -279,30 +279,30 @@ export default async function StaffToday() {
                         </span>
                       </div>
 
-                      <div className="mt-1.5 flex items-center gap-1.5 text-xs text-slate-500">
-                        <IconMap width={14} height={14} className="shrink-0 text-slate-400" />
-                        <span className="truncate">
+                      <div className="mt-2 flex items-start gap-1.5 text-xs text-slate-500">
+                        <IconMap width={14} height={14} className="shrink-0 text-slate-400 mt-0.5" />
+                        <span className="line-clamp-2">
                           {customer?.address}
                           {customer?.landmark ? ` (${customer.landmark})` : ''}
                         </span>
                       </div>
 
                       {customer?.note && (
-                        <div className="mt-1.5 rounded-lg bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 border border-amber-100 inline-block">
+                        <div className="mt-2.5 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-800 border border-amber-100 inline-block">
                           Note: {customer.note}
                         </div>
                       )}
                     </div>
 
-                    <div className="flex items-center gap-3 shrink-0">
-                      <div className="text-right hidden sm:block">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 shrink-0">
+                      <div className="text-left sm:text-right hidden sm:block">
                         <div className="text-xs font-bold text-slate-900">
                           {formatTime(visit.scheduledTime)}
                         </div>
                         <div className="text-[10.5px] text-slate-400 font-medium">Scheduled</div>
                       </div>
 
-                      <div className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-xs group-hover:bg-blue-700 transition-colors">
+                      <div className="flex items-center justify-center gap-2 w-full sm:w-auto rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-xs group-hover:bg-blue-700 transition-colors">
                         <span>{visit.status === 'IN_PROGRESS' ? 'Continue wash' : 'Start wash'}</span>
                         <IconChevron width={14} height={14} />
                       </div>

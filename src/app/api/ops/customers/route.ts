@@ -11,9 +11,10 @@ import {
   type Customer,
   type Car,
 } from '@/lib/data/types';
-import { recordPayment } from '@/lib/services/accounts';
+import { loadCustomerAccount, recordPayment } from '@/lib/services/accounts';
 import { generateVisitsForCar } from '@/lib/services/schedule';
 import { currentCycle, todayISO } from '@/lib/util/format';
+import { scopeAreaFilter } from '@/lib/auth/rbac';
 import { assertInScope, opsError } from '../_guard';
 
 /** A number plate identifies one real vehicle — two cars must never share one. */
@@ -53,8 +54,6 @@ const carSchema = z.object({
 
 const createSchema = z.object({
   action: z.literal('create'),
-  // Step 1 of the wizard: the lead source is compulsory, because it is the
-  // only way the owner ever learns which marketing actually works.
   source: z.enum(LEAD_SOURCES),
   referredById: z.string().optional(),
   name: z.string().trim().min(2),
@@ -75,6 +74,7 @@ const createSchema = z.object({
   loginEmail: z.string().trim().email().optional(),
   loginPassword: z.string().min(6).optional(),
   enquiryId: z.string().optional(),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
 });
 
 const statusSchema = z.object({
@@ -97,6 +97,7 @@ const startCarServiceSchema = z.object({
   carId: z.string().min(1),
   assignedStaffId: z.string().optional().nullable(),
   note: z.string().max(300).optional().nullable(),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
 });
 
 const updateCustomerSchema = z.object({
@@ -142,12 +143,21 @@ const addCarSchema = z.object({
   assignedStaffId: z.string().optional().nullable(),
   specialInstructions: z.string().max(300).optional().nullable(),
   autoStartService: z.boolean().optional(),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
 });
 
 const deleteCarSchema = z.object({
   action: z.literal('deleteCar'),
   customerId: z.string().min(1),
   carId: z.string().min(1),
+});
+
+const adhocWashSchema = z.object({
+  action: z.literal('adhocWash'),
+  customerId: z.string().min(1),
+  carId: z.string().min(1),
+  assignedStaffId: z.string().min(1),
+  note: z.string().max(300).optional().nullable(),
 });
 
 const schema = z.discriminatedUnion('action', [
@@ -159,6 +169,7 @@ const schema = z.discriminatedUnion('action', [
   updateCarSchema,
   addCarSchema,
   deleteCarSchema,
+  adhocWashSchema,
 ]);
 
 export async function POST(request: Request) {
@@ -280,7 +291,7 @@ export async function POST(request: Request) {
       const updatedCar = await store.cars.update(car.id, patch);
 
       const cycle = currentCycle();
-      await generateVisitsForCar(store, updatedCar, customer, cycle);
+      await generateVisitsForCar(store, updatedCar, customer, cycle, parsed.data.startDate ?? undefined);
 
       if (updatedCar.assignedStaffId) {
         await store.visits.updateMany(
@@ -294,6 +305,71 @@ export async function POST(request: Request) {
         ok: true,
         car: updatedCar,
         message: `Service started for ${car.make} ${car.model}. Washes scheduled immediately.`,
+      });
+    }
+
+    if (parsed.data.action === 'adhocWash') {
+      const customer = await store.customers.get(parsed.data.customerId);
+      if (!customer) throw new HttpError(404, 'Customer not found.');
+      assertInScope(session, customer.areaId);
+
+      const car = await store.cars.get(parsed.data.carId);
+      if (!car || car.customerId !== customer.id) {
+        throw new HttpError(404, 'Car not found for this customer.');
+      }
+      if (!car.serviceStarted) {
+        throw new HttpError(400, 'Service is not active for this car. Start service first.');
+      }
+      
+      const staff = await store.staff.get(parsed.data.assignedStaffId);
+      if (!staff || staff.areaId !== customer.areaId) {
+        throw new HttpError(400, 'Invalid staff selected.');
+      }
+
+      const cycle = currentCycle();
+      const today = todayISO();
+      
+      // Delete any existing PENDING visit for today to avoid duplicate washes on the same day
+      const existingToday = await store.visits.find({
+        where: { carId: car.id, scheduledDate: today, status: 'PENDING' } as never,
+      });
+      for (const v of existingToday) {
+        await store.visits.delete(v.id);
+      }
+
+      const visit = await store.visits.create({
+        carId: car.id,
+        customerId: customer.id,
+        areaId: customer.areaId,
+        staffId: staff.id,
+        cycle,
+        scheduledDate: today,
+        scheduledTime: car.scheduleTime || '09:00',
+        status: 'PENDING',
+        startedAt: null,
+        completedAt: null,
+        servicesDone: [],
+        beforePhotoUrl: null,
+        afterPhotoUrl: null,
+        beforePhotoBytes: null,
+        afterPhotoBytes: null,
+        missReason: null,
+        missNote: null,
+        rescheduledToVisitId: null,
+        rating: null,
+        ratingComment: null,
+        onTime: false,
+        managerRating: null,
+        managerRatingComment: null,
+        managerRatedAt: null,
+        managerRatedByUserId: null,
+      });
+
+      revalidateCustomerPages();
+      return NextResponse.json({
+        ok: true,
+        visit,
+        message: `Ad-hoc wash scheduled for today and assigned to ${staff.name}.`,
       });
     }
 
@@ -415,7 +491,7 @@ export async function POST(request: Request) {
 
       const cycle = currentCycle();
       if (car.serviceStarted) {
-        await generateVisitsForCar(store, car, customer, cycle);
+        await generateVisitsForCar(store, car, customer, cycle, parsed.data.startDate ?? undefined);
       }
 
       revalidateCustomerPages();
@@ -547,7 +623,7 @@ export async function POST(request: Request) {
       });
 
       if (isPrepaidPaid) {
-        await generateVisitsForCar(store, car, customer, cycle);
+        await generateVisitsForCar(store, car, customer, cycle, data.startDate ?? undefined);
       }
     }
 
@@ -593,6 +669,180 @@ export async function POST(request: Request) {
       ok: true,
       customer,
       message: `Saved. ${visits} wash ${visits === 1 ? 'visit' : 'visits'} generated for this month.`,
+    });
+  } catch (error) {
+    return opsError(error);
+  }
+}
+
+export async function GET(request: Request) {
+  try {
+    const session = await requireApiSession('customer:view');
+    const store = await getStore();
+    const cycle = currentCycle();
+    const { searchParams } = new URL(request.url);
+    const customerId = searchParams.get('customerId');
+
+    if (customerId) {
+      const account = await loadCustomerAccount(store, customerId, cycle);
+      if (!account) {
+        return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
+      }
+      const [area, staff, user, allAreas, allPackages] = await Promise.all([
+        store.areas.get(account.customer.areaId),
+        store.staff.find({ where: { areaId: account.customer.areaId, role: 'EMPLOYEE' } }),
+        account.customer.userId ? store.users.get(account.customer.userId) : Promise.resolve(null),
+        store.areas.find(),
+        store.packages.find(),
+      ]);
+
+      return NextResponse.json({
+        ok: true,
+        data: {
+          account,
+          area: area ? { id: area.id, name: area.name, city: area.city } : null,
+          staff: staff.map((s) => ({ id: s.id, name: s.name, phone: s.phone })),
+          user: user ? { id: user.id, email: user.email, name: user.name, phone: user.phone, role: user.role } : null,
+          allAreas: allAreas.map((a) => ({ id: a.id, name: a.name })),
+          allPackages: allPackages.map((p) => ({ id: p.id, name: p.name, price: p.price, washesPerMonth: p.washesPerMonth, services: p.services })),
+        },
+      });
+    }
+
+    const areaFilter = scopeAreaFilter(session.scope);
+    const [all, areas, staff, packages, invoices, users] = await Promise.all([
+      store.customers.find({
+        where: areaFilter as never,
+        orderBy: [{ field: 'name' }],
+      }),
+      store.areas.find(),
+      store.staff.find({ where: { role: 'EMPLOYEE', ...areaFilter } as never }),
+      store.packages.find(),
+      store.invoices.find({ where: { cycle, ...areaFilter } as never }),
+      store.users.find(),
+    ]);
+
+    const userByUserId = new Map(users.map((u) => [u.id, u]));
+    const userByCustomerId = new Map(
+      users.filter((u) => u.customerId).map((u) => [u.customerId!, u]),
+    );
+
+    const customerIds = all.map((c) => c.id);
+    const scopedCars = customerIds.length
+      ? await store.cars.find({ where: { customerId: { in: customerIds } } as never })
+      : [];
+
+    const carsByCustomer = new Map<string, Car[]>();
+    for (const car of scopedCars) {
+      const list = carsByCustomer.get(car.customerId) ?? [];
+      list.push(car);
+      carsByCustomer.set(car.customerId, list);
+    }
+
+    const invoiceByCustomer = new Map(invoices.map((i) => [i.customerId, i]));
+    const staffById = new Map(staff.map((s) => [s.id, s]));
+    const areaById = new Map(areas.map((a) => [a.id, a]));
+    const packageById = new Map(packages.map((p) => [p.id, p]));
+
+    const totalCustomers = all.length;
+    const activeCustomers = all.filter((c) => c.status === 'ACTIVE').length;
+    const holdCustomers = all.filter((c) => c.status === 'HOLD').length;
+    const inactiveCustomers = all.filter((c) => c.status === 'INACTIVE').length;
+
+    const activePercent = totalCustomers > 0 ? ((activeCustomers / totalCustomers) * 100).toFixed(1) : '0.0';
+    const holdPercent = totalCustomers > 0 ? ((holdCustomers / totalCustomers) * 100).toFixed(1) : '0.0';
+    const inactivePercent = totalCustomers > 0 ? ((inactiveCustomers / totalCustomers) * 100).toFixed(1) : '0.0';
+    const totalCarsCount = scopedCars.length;
+
+    const unpaidInvoices = invoices.filter((i) => i.status !== 'PAID' && i.amount - i.paidAmount > 0);
+    const unpaidCount = unpaidInvoices.length;
+    const unpaidAmount = unpaidInvoices.reduce((sum, i) => sum + (i.amount - i.paidAmount), 0);
+
+    const customers = all.map((customer) => {
+      const own = carsByCustomer.get(customer.id) ?? [];
+      const user = (customer.userId ? userByUserId.get(customer.userId) : null) ?? userByCustomerId.get(customer.id);
+      const invoice = invoiceByCustomer.get(customer.id);
+      const owed = invoice ? Math.max(0, invoice.amount - invoice.paidAmount) : 0;
+      const paymentStatus = !invoice
+        ? 'NONE'
+        : owed <= 0
+        ? 'PAID'
+        : invoice.paidAmount > 0
+        ? 'PARTIAL'
+        : 'PENDING';
+
+      const monthlyAmount = own.reduce(
+        (sum, car) => sum + (packageById.get(car.packageId)?.price ?? 0),
+        0,
+      );
+
+      const firstCar = own[0];
+      const assignedStaff = firstCar?.assignedStaffId ? staffById.get(firstCar.assignedStaffId) : null;
+
+      return {
+        id: customer.id,
+        name: customer.name,
+        phone: customer.phone,
+        altPhone: customer.altPhone,
+        address: customer.address,
+        landmark: customer.landmark,
+        lat: customer.lat,
+        lng: customer.lng,
+        joinedOn: customer.joinedOn,
+        areaId: customer.areaId,
+        areaName: areaById.get(customer.areaId)?.name || 'Area',
+        status: customer.status,
+        source: customer.source,
+        note: customer.note,
+        email: user?.email || '',
+        userId: customer.userId,
+        carsCount: own.length,
+        cars: own.map((car) => ({
+          id: car.id,
+          make: car.make,
+          model: car.model,
+          plate: car.plate,
+          colour: car.colour,
+          packageId: car.packageId,
+          packageName: packageById.get(car.packageId)?.name,
+          packagePrice: packageById.get(car.packageId)?.price,
+          schedulePattern: car.schedulePattern,
+          scheduleTime: car.scheduleTime,
+          assignedStaffId: car.assignedStaffId,
+          assignedStaffName: car.assignedStaffId ? staffById.get(car.assignedStaffId)?.name : undefined,
+          serviceStarted: car.serviceStarted,
+          serviceStartedBeforePayment: car.serviceStartedBeforePayment,
+        })),
+        monthlyAmount,
+        paymentStatus,
+        outstandingAmount: owed,
+        schedulePattern: firstCar?.schedulePattern,
+        scheduleTime: firstCar?.scheduleTime,
+        assignedStaffId: firstCar?.assignedStaffId,
+        assignedStaffName: assignedStaff?.name,
+      };
+    });
+
+    return NextResponse.json({
+      ok: true,
+      data: {
+        customers,
+        stats: {
+          totalCustomers,
+          activeCustomers,
+          holdCustomers,
+          inactiveCustomers,
+          activePercent,
+          holdPercent,
+          inactivePercent,
+          totalCarsCount,
+          unpaidCount,
+          unpaidAmount,
+        },
+        staff: staff.map((s) => ({ id: s.id, name: s.name })),
+        packages: packages.map((p) => ({ id: p.id, name: p.name, price: p.price })),
+        areas: areas.map((a) => ({ id: a.id, name: a.name })),
+      },
     });
   } catch (error) {
     return opsError(error);

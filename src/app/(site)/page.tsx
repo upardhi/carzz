@@ -659,6 +659,8 @@ export default async function HomePage() {
                   packages={packages.map((p) => ({
                     id: p.id,
                     label: `${p.name} — ${p.washesPerMonth} washes — ${money(p.price)}`,
+                    washesPerMonth: p.washesPerMonth,
+                    services: p.services,
                   }))}
                 />
               </div>

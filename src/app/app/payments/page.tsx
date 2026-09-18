@@ -196,18 +196,18 @@ export default async function CustomerPayments() {
 
       {/* 5. Available Service Packages */}
       <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-2xs">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-          <div className="flex items-center gap-3">
+        <div className="flex items-start sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+          <div className="flex items-start sm:items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-blue-100 bg-blue-50 text-blue-600">
               <IconBox width={20} height={20} />
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-900">Available Packages</h3>
-              <p className="text-xs text-slate-500">Standard and premium car wash tiers available in your area</p>
+              <p className="text-xs text-slate-500 mt-0.5">Standard and premium car wash tiers available in your area</p>
             </div>
           </div>
 
-          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 border border-slate-200/60">
+          <span className="shrink-0 whitespace-nowrap rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 border border-slate-200/60">
             {packages.length} plans
           </span>
         </div>
@@ -254,7 +254,7 @@ export default async function CustomerPayments() {
 
       {/* 6. Payment History List */}
       <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-2xs">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+        <div className="flex items-start sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-blue-100 bg-blue-50 text-blue-600">
               <IconCalendar width={20} height={20} />
@@ -262,7 +262,7 @@ export default async function CustomerPayments() {
             <h3 className="text-base font-bold text-slate-900">Payment History</h3>
           </div>
 
-          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 border border-slate-200/60">
+          <span className="shrink-0 whitespace-nowrap rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 border border-slate-200/60">
             {account.payments.length} transactions
           </span>
         </div>
@@ -281,9 +281,9 @@ export default async function CustomerPayments() {
                   className="flex items-center justify-between gap-4 py-3.5 first:pt-4 last:pb-0"
                 >
                   <div className="flex items-center gap-3.5 min-w-0">
-                    <div className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-xl border border-blue-100/80 bg-blue-50 text-blue-600">
+                    <div className="flex min-w-[3.5rem] shrink-0 flex-col items-center justify-center rounded-xl border border-blue-100/80 bg-blue-50 py-1.5 px-1 text-blue-600">
                       <span className="text-sm font-extrabold leading-none">{badge.day}</span>
-                      <span className="text-[10px] font-bold uppercase leading-tight mt-0.5">{badge.month}</span>
+                      <span className="text-[10px] font-bold uppercase leading-tight mt-0.5 text-center whitespace-nowrap">{badge.month}</span>
                     </div>
 
                     <div className="min-w-0">

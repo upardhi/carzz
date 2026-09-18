@@ -47,12 +47,6 @@ export function LoginForm({ next }: { next?: string }) {
     }
   }
 
-  /** Called by DemoAccounts to fill the form directly via React state. */
-  function fillAccount(a: { email: string; password: string }) {
-    setEmail(a.email);
-    setPassword(a.password);
-  }
-
   return (
     <>
       <form onSubmit={onSubmit} className="space-y-3">
@@ -114,46 +108,7 @@ export function LoginForm({ next }: { next?: string }) {
           {pending ? 'Signing in…' : 'Sign in'}
         </Button>
       </form>
-
-      <DemoAccounts onFill={fillAccount} />
     </>
   );
 }
 
-const DEMO_ACCOUNTS = [
-  { role: 'Super Admin', email: 'owner@carzz.app', password: 'owner123' },
-  { role: 'Area Admin', email: 'areaadmin@carzz.app', password: 'area123' },
-  { role: 'Manager', email: 'manager.wadi@carzz.app', password: 'manager123' },
-  { role: 'Wash Staff', email: 'rahul1@carzz.app', password: 'staff123' },
-  { role: 'Customer', email: 'customer@carzz.app', password: 'customer123' },
-];
-
-/** One-tap fill for the demo accounts — calls React state setters directly. */
-function DemoAccounts({
-  onFill,
-}: {
-  onFill: (a: { email: string; password: string }) => void;
-}) {
-  return (
-    <div className="mt-6 rounded-card border border-navy-600 bg-navy-850 p-3">
-      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-navy-300">
-        Demo sign-ins
-      </p>
-      <div className="space-y-1">
-        {DEMO_ACCOUNTS.map((a) => (
-          <button
-            key={a.email}
-            type="button"
-            onClick={() => onFill(a)}
-            className="flex w-full items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left text-xs text-slate-300 hover:bg-navy-700"
-          >
-            <span className="font-bold text-white">{a.role}</span>
-            <span className="truncate font-mono text-[11px] text-navy-300">
-              {a.email}
-            </span>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
