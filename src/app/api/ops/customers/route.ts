@@ -11,9 +11,10 @@ import {
   type Customer,
   type Car,
 } from '@/lib/data/types';
-import { recordPayment } from '@/lib/services/accounts';
+import { loadCustomerAccount, recordPayment } from '@/lib/services/accounts';
 import { generateVisitsForCar } from '@/lib/services/schedule';
 import { currentCycle, todayISO } from '@/lib/util/format';
+import { scopeAreaFilter } from '@/lib/auth/rbac';
 import { assertInScope, opsError } from '../_guard';
 
 /** A number plate identifies one real vehicle — two cars must never share one. */
@@ -668,6 +669,180 @@ export async function POST(request: Request) {
       ok: true,
       customer,
       message: `Saved. ${visits} wash ${visits === 1 ? 'visit' : 'visits'} generated for this month.`,
+    });
+  } catch (error) {
+    return opsError(error);
+  }
+}
+
+export async function GET(request: Request) {
+  try {
+    const session = await requireApiSession('customer:view');
+    const store = await getStore();
+    const cycle = currentCycle();
+    const { searchParams } = new URL(request.url);
+    const customerId = searchParams.get('customerId');
+
+    if (customerId) {
+      const account = await loadCustomerAccount(store, customerId, cycle);
+      if (!account) {
+        return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
+      }
+      const [area, staff, user, allAreas, allPackages] = await Promise.all([
+        store.areas.get(account.customer.areaId),
+        store.staff.find({ where: { areaId: account.customer.areaId, role: 'EMPLOYEE' } }),
+        account.customer.userId ? store.users.get(account.customer.userId) : Promise.resolve(null),
+        store.areas.find(),
+        store.packages.find(),
+      ]);
+
+      return NextResponse.json({
+        ok: true,
+        data: {
+          account,
+          area: area ? { id: area.id, name: area.name, city: area.city } : null,
+          staff: staff.map((s) => ({ id: s.id, name: s.name, phone: s.phone })),
+          user: user ? { id: user.id, email: user.email, name: user.name, phone: user.phone, role: user.role } : null,
+          allAreas: allAreas.map((a) => ({ id: a.id, name: a.name })),
+          allPackages: allPackages.map((p) => ({ id: p.id, name: p.name, price: p.price, washesPerMonth: p.washesPerMonth, services: p.services })),
+        },
+      });
+    }
+
+    const areaFilter = scopeAreaFilter(session.scope);
+    const [all, areas, staff, packages, invoices, users] = await Promise.all([
+      store.customers.find({
+        where: areaFilter as never,
+        orderBy: [{ field: 'name' }],
+      }),
+      store.areas.find(),
+      store.staff.find({ where: { role: 'EMPLOYEE', ...areaFilter } as never }),
+      store.packages.find(),
+      store.invoices.find({ where: { cycle, ...areaFilter } as never }),
+      store.users.find(),
+    ]);
+
+    const userByUserId = new Map(users.map((u) => [u.id, u]));
+    const userByCustomerId = new Map(
+      users.filter((u) => u.customerId).map((u) => [u.customerId!, u]),
+    );
+
+    const customerIds = all.map((c) => c.id);
+    const scopedCars = customerIds.length
+      ? await store.cars.find({ where: { customerId: { in: customerIds } } as never })
+      : [];
+
+    const carsByCustomer = new Map<string, Car[]>();
+    for (const car of scopedCars) {
+      const list = carsByCustomer.get(car.customerId) ?? [];
+      list.push(car);
+      carsByCustomer.set(car.customerId, list);
+    }
+
+    const invoiceByCustomer = new Map(invoices.map((i) => [i.customerId, i]));
+    const staffById = new Map(staff.map((s) => [s.id, s]));
+    const areaById = new Map(areas.map((a) => [a.id, a]));
+    const packageById = new Map(packages.map((p) => [p.id, p]));
+
+    const totalCustomers = all.length;
+    const activeCustomers = all.filter((c) => c.status === 'ACTIVE').length;
+    const holdCustomers = all.filter((c) => c.status === 'HOLD').length;
+    const inactiveCustomers = all.filter((c) => c.status === 'INACTIVE').length;
+
+    const activePercent = totalCustomers > 0 ? ((activeCustomers / totalCustomers) * 100).toFixed(1) : '0.0';
+    const holdPercent = totalCustomers > 0 ? ((holdCustomers / totalCustomers) * 100).toFixed(1) : '0.0';
+    const inactivePercent = totalCustomers > 0 ? ((inactiveCustomers / totalCustomers) * 100).toFixed(1) : '0.0';
+    const totalCarsCount = scopedCars.length;
+
+    const unpaidInvoices = invoices.filter((i) => i.status !== 'PAID' && i.amount - i.paidAmount > 0);
+    const unpaidCount = unpaidInvoices.length;
+    const unpaidAmount = unpaidInvoices.reduce((sum, i) => sum + (i.amount - i.paidAmount), 0);
+
+    const customers = all.map((customer) => {
+      const own = carsByCustomer.get(customer.id) ?? [];
+      const user = (customer.userId ? userByUserId.get(customer.userId) : null) ?? userByCustomerId.get(customer.id);
+      const invoice = invoiceByCustomer.get(customer.id);
+      const owed = invoice ? Math.max(0, invoice.amount - invoice.paidAmount) : 0;
+      const paymentStatus = !invoice
+        ? 'NONE'
+        : owed <= 0
+        ? 'PAID'
+        : invoice.paidAmount > 0
+        ? 'PARTIAL'
+        : 'PENDING';
+
+      const monthlyAmount = own.reduce(
+        (sum, car) => sum + (packageById.get(car.packageId)?.price ?? 0),
+        0,
+      );
+
+      const firstCar = own[0];
+      const assignedStaff = firstCar?.assignedStaffId ? staffById.get(firstCar.assignedStaffId) : null;
+
+      return {
+        id: customer.id,
+        name: customer.name,
+        phone: customer.phone,
+        altPhone: customer.altPhone,
+        address: customer.address,
+        landmark: customer.landmark,
+        lat: customer.lat,
+        lng: customer.lng,
+        joinedOn: customer.joinedOn,
+        areaId: customer.areaId,
+        areaName: areaById.get(customer.areaId)?.name || 'Area',
+        status: customer.status,
+        source: customer.source,
+        note: customer.note,
+        email: user?.email || '',
+        userId: customer.userId,
+        carsCount: own.length,
+        cars: own.map((car) => ({
+          id: car.id,
+          make: car.make,
+          model: car.model,
+          plate: car.plate,
+          colour: car.colour,
+          packageId: car.packageId,
+          packageName: packageById.get(car.packageId)?.name,
+          packagePrice: packageById.get(car.packageId)?.price,
+          schedulePattern: car.schedulePattern,
+          scheduleTime: car.scheduleTime,
+          assignedStaffId: car.assignedStaffId,
+          assignedStaffName: car.assignedStaffId ? staffById.get(car.assignedStaffId)?.name : undefined,
+          serviceStarted: car.serviceStarted,
+          serviceStartedBeforePayment: car.serviceStartedBeforePayment,
+        })),
+        monthlyAmount,
+        paymentStatus,
+        outstandingAmount: owed,
+        schedulePattern: firstCar?.schedulePattern,
+        scheduleTime: firstCar?.scheduleTime,
+        assignedStaffId: firstCar?.assignedStaffId,
+        assignedStaffName: assignedStaff?.name,
+      };
+    });
+
+    return NextResponse.json({
+      ok: true,
+      data: {
+        customers,
+        stats: {
+          totalCustomers,
+          activeCustomers,
+          holdCustomers,
+          inactiveCustomers,
+          activePercent,
+          holdPercent,
+          inactivePercent,
+          totalCarsCount,
+          unpaidCount,
+          unpaidAmount,
+        },
+        staff: staff.map((s) => ({ id: s.id, name: s.name })),
+        packages: packages.map((p) => ({ id: p.id, name: p.name, price: p.price })),
+        areas: areas.map((a) => ({ id: a.id, name: a.name })),
+      },
     });
   } catch (error) {
     return opsError(error);
