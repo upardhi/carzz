@@ -728,22 +728,22 @@ export default async function HomePage() {
                   <h3 className="text-sm font-bold text-slate-900">Service Areas</h3>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2.5 mb-5">
+                <div className="flex flex-col gap-2.5 mb-5">
                   {areasList.map((area, i) => (
-                    <div key={area.id} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+                    <div key={area.id} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
                       <span className={`h-2.5 w-2.5 rounded-full flex-shrink-0 ${i === 0 ? 'bg-blue-500' : i === 1 ? 'bg-purple-500' : 'bg-emerald-500'}`} />
-                      <div className="min-w-0">
-                        <p className="text-xs font-semibold text-slate-900 truncate">{area.name}</p>
-                        <p className="text-[9px] text-slate-500">{area.city}</p>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-slate-900 truncate">{area.name}</p>
+                        <p className="text-[10px] text-slate-500">{area.city}</p>
                       </div>
                     </div>
                   ))}
                 </div>
 
                 {/* Map + don't see your area */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-2xl overflow-hidden border border-slate-200 bg-[#e8f0f8]">
-                    <svg viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+                <div className="flex flex-col gap-3">
+                  <div className="rounded-2xl overflow-hidden border border-slate-200 bg-[#e8f0f8] aspect-[2/1]">
+                    <svg viewBox="0 0 200 120" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
                       <rect width="200" height="120" fill="#e8f0f8" />
                       <line x1="0" y1="60" x2="200" y2="60" stroke="#c8d8e8" strokeWidth="4" />
                       <line x1="100" y1="0" x2="100" y2="120" stroke="#c8d8e8" strokeWidth="4" />
@@ -766,14 +766,14 @@ export default async function HomePage() {
                     </svg>
                   </div>
 
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3.5 flex flex-col justify-between">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 flex flex-row items-center justify-between gap-3">
                     <div>
                       <p className="text-xs font-bold text-slate-900">Don&apos;t see your area?</p>
                       <p className="text-[10px] text-slate-500 mt-0.5">We&apos;re expanding fast!</p>
                     </div>
                     <a
                       href="#book"
-                      className="mt-3 block w-full rounded-lg border border-slate-300 bg-white py-2 text-center text-[10px] font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
+                      className="flex-shrink-0 rounded-lg border border-slate-300 bg-white px-4 py-2 text-center text-[10px] font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
                     >
                       Request area →
                     </a>
