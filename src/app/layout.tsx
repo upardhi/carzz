@@ -66,7 +66,7 @@ export default function RootLayout({
   return (
     <html
       lang="en-IN"
-      className={`${geistSans.variable} ${geistMono.variable}`}
+      className={`${geistSans.variable} ${geistMono.variable} scroll-smooth`}
     >
       <body>
         <ConfirmProvider>

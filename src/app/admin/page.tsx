@@ -382,11 +382,7 @@ async function AdminDashboardContent() {
             />
             <Row label="Staff Payout Cost" value={money(summary.payoutCost)} />
             <Row label="Consumables & Operating Expenses" value={money(summary.expenses)} />
-            <Row
-              label="Net Profit"
-              value={money(summary.profit)}
-              tone={summary.profit > 0 ? 'success' : 'danger'}
-            />
+
           </div>
         </Card>
       </div>

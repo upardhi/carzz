@@ -722,7 +722,7 @@ export default async function HomePage() {
               </div>
 
               {/* Service Areas card */}
-              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-md">
+              <div id="areas" className="scroll-mt-24 rounded-3xl border border-slate-200 bg-white p-6 shadow-md">
                 <div className="flex items-center gap-2 mb-4">
                   <span className="text-blue-600 text-base">📍</span>
                   <h3 className="text-sm font-bold text-slate-900">Service Areas</h3>
