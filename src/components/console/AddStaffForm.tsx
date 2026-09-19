@@ -67,72 +67,45 @@ export function AddStaffForm({
   const [pending, setPending] = useState(false);
   const [state, setState] = useState<{ ok?: string; error?: string }>({});
 
-  async function uploadPrivateDoc(file: File, docType: string): Promise<string> {
-    const docFormData = new FormData();
-    docFormData.append('file', file);
-    docFormData.append('docType', docType);
 
-    const docRes = await fetch('/api/ops/staff/doc', {
-      method: 'POST',
-      body: docFormData,
-    });
-
-    const docJson = await docRes.json();
-    if (!docRes.ok || !docJson.url) {
-      throw new Error(docJson.error ?? `Failed to upload ${docType} document.`);
-    }
-    return docJson.url;
-  }
 
   async function submit() {
     setPending(true);
     setState({});
     try {
-      let uploadedAadharUrl: string | undefined = undefined;
-      let uploadedPanUrl: string | undefined = undefined;
-      let uploadedOtherDocUrl: string | undefined = undefined;
-
-      if (aadharFile || panFile || otherDocFile) {
-        setUploadingDocs(true);
-        if (aadharFile) {
-          uploadedAadharUrl = await uploadPrivateDoc(aadharFile, 'aadhaar');
-        }
-        if (panFile) {
-          uploadedPanUrl = await uploadPrivateDoc(panFile, 'pan');
-        }
-        if (otherDocFile) {
-          uploadedOtherDocUrl = await uploadPrivateDoc(otherDocFile, otherDocType);
-        }
-        setUploadingDocs(false);
-      }
-
       // Create staff record with all profile and KYC details
+      const formData = new FormData();
+      
+      const payload = {
+        action: 'create',
+        name,
+        phone,
+        email,
+        password,
+        areaId,
+        referredByStaffId: referredByStaffId || undefined,
+        aadharNumber: aadharNumber.trim() || undefined,
+        panNumber: panNumber.trim().toUpperCase() || undefined,
+        address: address.trim() || undefined,
+        emergencyPhone: emergencyPhone.trim() || undefined,
+        emergencyContactName: emergencyContactName.trim() || undefined,
+        bankName: bankName.trim() || undefined,
+        bankAccountNumber: bankAccountNumber.trim() || undefined,
+        bankIfsc: bankIfsc.trim().toUpperCase() || undefined,
+        upiId: upiId.trim() || undefined,
+        dob: dob || undefined,
+      };
+
+      formData.append('data', JSON.stringify(payload));
+      if (aadharFile) formData.append('aadharFile', aadharFile);
+      if (panFile) formData.append('panFile', panFile);
+      if (otherDocFile) formData.append('otherDocFile', otherDocFile);
+
+      toast.info('Creating staff and uploading documents...');
+
       const response = await fetch('/api/ops/staff', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'create',
-          name,
-          phone,
-          email,
-          password,
-          areaId,
-          referredByStaffId: referredByStaffId || undefined,
-          aadharNumber: aadharNumber.trim() || undefined,
-          aadharCardUrl: uploadedAadharUrl,
-          panNumber: panNumber.trim().toUpperCase() || undefined,
-          panCardUrl: uploadedPanUrl,
-          documentUrl: uploadedOtherDocUrl || uploadedAadharUrl || uploadedPanUrl,
-          documentType: otherDocFile ? otherDocType : aadharFile ? 'aadhaar' : panFile ? 'pan' : undefined,
-          address: address.trim() || undefined,
-          emergencyPhone: emergencyPhone.trim() || undefined,
-          emergencyContactName: emergencyContactName.trim() || undefined,
-          bankName: bankName.trim() || undefined,
-          bankAccountNumber: bankAccountNumber.trim() || undefined,
-          bankIfsc: bankIfsc.trim().toUpperCase() || undefined,
-          upiId: upiId.trim() || undefined,
-          dob: dob || undefined,
-        }),
+        body: formData,
       });
 
       const data = (await response.json()) as { message?: string; error?: string };

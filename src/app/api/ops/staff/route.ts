@@ -57,10 +57,26 @@ const schema = z.discriminatedUnion('action', [
   }),
 ]);
 
+import { uploadMedia } from '@/lib/storage';
+
 export async function POST(request: Request) {
   try {
     const session = await requireApiSession('staff:create');
-    const parsed = schema.safeParse(await request.json().catch(() => null));
+    const contentType = request.headers.get('content-type') || '';
+    let raw: unknown = null;
+    let formData: FormData | null = null;
+
+    if (contentType.includes('multipart/form-data')) {
+      formData = await request.formData();
+      const dataStr = formData.get('data');
+      if (typeof dataStr === 'string') {
+        raw = JSON.parse(dataStr);
+      }
+    } else {
+      raw = await request.json().catch(() => null);
+    }
+
+    const parsed = schema.safeParse(raw);
     if (!parsed.success) {
       return NextResponse.json(
         { error: parsed.error.issues[0]?.message ?? 'Check the form.' },
@@ -68,6 +84,21 @@ export async function POST(request: Request) {
       );
     }
     const store = await getStore();
+
+    async function handleUpload(file: unknown, docType: string) {
+      if (!(file instanceof File)) return undefined;
+      const MAX_BYTES = 10 * 1024 * 1024;
+      if (file.size > MAX_BYTES) throw new HttpError(413, 'Document file must be under 10MB.');
+      const ext = file.name.split('.').pop() || 'pdf';
+      const key = `doc_${docType}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.${ext}`;
+      const stored = await uploadMedia(file, {
+        key,
+        folder: 'staff-docs',
+        contentType: file.type || 'application/octet-stream',
+        access: 'public',
+      });
+      return stored.url;
+    }
 
     if (parsed.data.action === 'create') {
       const {
@@ -106,6 +137,27 @@ export async function POST(request: Request) {
         throw new HttpError(409, 'Someone already uses that email.');
       }
 
+      let finalAadharUrl = aadharCardUrl;
+      let finalPanUrl = panCardUrl;
+      let finalOtherDocUrl = documentUrl;
+      let finalDocType = documentType;
+
+      if (formData) {
+         const aadharUrl = await handleUpload(formData.get('aadharFile'), 'aadhar');
+         if (aadharUrl) finalAadharUrl = aadharUrl;
+         const panUrl = await handleUpload(formData.get('panFile'), 'pan');
+         if (panUrl) finalPanUrl = panUrl;
+         const otherUrl = await handleUpload(formData.get('otherDocFile'), 'other');
+         if (otherUrl) {
+           finalOtherDocUrl = otherUrl;
+           finalDocType = 'other';
+         } else if (aadharUrl) {
+           finalDocType = 'aadhaar';
+         } else if (panUrl) {
+           finalDocType = 'pan';
+         }
+      }
+
       const staff = await store.staff.create({
         userId: '',
         name,
@@ -115,12 +167,12 @@ export async function POST(request: Request) {
         joinedOn: todayISO(),
         referredByStaffId: referredByStaffId || null,
         active: true,
-        documentUrl: documentUrl || aadharCardUrl || panCardUrl || null,
-        documentType: documentType || (aadharCardUrl ? 'aadhaar' : panCardUrl ? 'pan' : null),
+        documentUrl: finalOtherDocUrl || finalAadharUrl || finalPanUrl || null,
+        documentType: finalDocType || (finalAadharUrl ? 'aadhaar' : finalPanUrl ? 'pan' : null),
         aadharNumber: aadharNumber || null,
-        aadharCardUrl: aadharCardUrl || null,
+        aadharCardUrl: finalAadharUrl || null,
         panNumber: panNumber || null,
-        panCardUrl: panCardUrl || null,
+        panCardUrl: finalPanUrl || null,
         address: address || null,
         emergencyPhone: emergencyPhone || null,
         emergencyContactName: emergencyContactName || null,
