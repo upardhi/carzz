@@ -17,6 +17,7 @@ export const PATTERN_DAYS: Record<WeekdayPattern, number[]> = {
   TUE_FRI: [2, 5],
   WED_SAT: [3, 6],
   THU_SUN: [4, 0],
+  CUSTOM: [],
 };
 
 const toDate = (d: DateOnly) => new Date(`${d}T00:00:00.000Z`);
@@ -74,7 +75,7 @@ export async function scheduleNextVisitForCar(
   car: Car,
   customer: Customer,
   cycle: string,
-  fromDate?: DateOnly,
+  fromDate?: DateOnly | null,
 ): Promise<WashVisit | null> {
   const pkg = await store.packages.get(car.packageId);
   const quota = pkg?.washesPerMonth ?? 8;
@@ -117,6 +118,10 @@ export async function scheduleNextVisitForCar(
       }
     }
     return firstOpen;
+  }
+
+  if (fromDate === null) {
+    return null;
   }
 
   const baseDate = fromDate && fromDate >= today ? fromDate : today;

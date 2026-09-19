@@ -144,6 +144,7 @@ const PATTERN_DAYS: Record<WeekdayPattern, number[]> = {
   TUE_FRI: [2, 5],
   WED_SAT: [3, 6],
   THU_SUN: [4, 0],
+  CUSTOM: [],
 };
 
 const FIRST_NAMES = [
