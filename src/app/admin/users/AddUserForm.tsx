@@ -49,57 +49,37 @@ export function AddUserForm({
     (!needsArea || areaId) &&
     (!needsRegion || regionId);
 
-  async function uploadDoc(file: File, type: string): Promise<string> {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('docType', type);
-    const res = await fetch('/api/ops/staff/doc', {
-      method: 'POST',
-      body: formData,
-    });
-    const data = await res.json();
-    if (!res.ok || !data.url) {
-      throw new Error(data.error || `Failed to upload ${type}`);
-    }
-    return data.url;
-  }
-
   async function submit() {
     setPending(true);
     setState({});
     try {
-      let aadharCardUrl: string | undefined;
-      let panCardUrl: string | undefined;
+      const formData = new FormData();
+      const payload = {
+        action: 'create',
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        password: password.trim(),
+        role,
+        areaId: needsArea ? areaId : undefined,
+        regionId: needsRegion ? regionId : undefined,
+        aadharNumber: aadharNumber.trim() || undefined,
+        panNumber: panNumber.trim().toUpperCase() || undefined,
+        address: address.trim() || undefined,
+        emergencyContactName: emergencyContactName.trim() || undefined,
+        emergencyPhone: emergencyPhone.trim() || undefined,
+        dob: dob || undefined,
+      };
 
-      if (aadharFile) {
-        aadharCardUrl = await uploadDoc(aadharFile, 'AADHAR');
-      }
-      if (panFile) {
-        panCardUrl = await uploadDoc(panFile, 'PAN');
-      }
+      formData.append('data', JSON.stringify(payload));
+      if (aadharFile) formData.append('aadharFile', aadharFile);
+      if (panFile) formData.append('panFile', panFile);
 
       const response = await fetch('/api/admin/users', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'create',
-          name: name.trim(),
-          email: email.trim(),
-          phone: phone.trim(),
-          password: password.trim(),
-          role,
-          areaId: needsArea ? areaId : undefined,
-          regionId: needsRegion ? regionId : undefined,
-          aadharNumber: aadharNumber.trim() || undefined,
-          aadharCardUrl,
-          panNumber: panNumber.trim().toUpperCase() || undefined,
-          panCardUrl,
-          address: address.trim() || undefined,
-          emergencyContactName: emergencyContactName.trim() || undefined,
-          emergencyPhone: emergencyPhone.trim() || undefined,
-          dob: dob || undefined,
-        }),
+        body: formData,
       });
+
       const data = (await response.json()) as { message?: string; error?: string };
       if (!response.ok) {
         setState({ error: data.error ?? 'Could not add that person.' });

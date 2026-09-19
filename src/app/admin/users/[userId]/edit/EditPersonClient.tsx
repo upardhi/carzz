@@ -111,23 +111,6 @@ export function EditPersonClient({
     (!needsArea || areaId) &&
     (!needsRegion || regionId);
 
-  async function uploadDoc(file: File, type: string): Promise<string> {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('docType', type);
-
-    const res = await fetch('/api/ops/staff/doc', {
-      method: 'POST',
-      body: formData,
-    });
-
-    const data = await res.json();
-    if (!res.ok || !data.ok) {
-      throw new Error(data.error || 'Failed to upload document');
-    }
-    return data.url;
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!valid) return;
@@ -136,43 +119,41 @@ export function EditPersonClient({
     setError(null);
 
     try {
-      let finalAadharUrl = aadharCardUrl;
-      let finalPanUrl = panCardUrl;
+      const formData = new FormData();
+      
+      const payload = {
+        action: 'update',
+        userId: user.id,
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        phone: phone.trim(),
+        role,
+        regionId: role === 'AREA_ADMIN' ? regionId : null,
+        areaId: role === 'MANAGER' || role === 'EMPLOYEE' ? areaId : null,
+        password: password ? password : undefined,
+        aadharNumber: aadharNumber.trim() || undefined,
+        aadharCardUrl: aadharFile ? undefined : aadharCardUrl,
+        panNumber: panNumber.trim().toUpperCase() || undefined,
+        panCardUrl: panFile ? undefined : panCardUrl,
+        address: address.trim() || undefined,
+        emergencyContactName: emergencyContactName.trim() || undefined,
+        emergencyPhone: emergencyPhone.trim() || undefined,
+        dob: dob || undefined,
+        bankName: bankName.trim() || undefined,
+        accountNumber: accountNumber.trim() || undefined,
+        ifscCode: ifscCode.trim().toUpperCase() || undefined,
+        upiId: upiId.trim() || undefined,
+      };
 
-      // If new files were selected, upload them
-      if (aadharFile) {
-        finalAadharUrl = await uploadDoc(aadharFile, 'AADHAAR');
-      }
-      if (panFile) {
-        finalPanUrl = await uploadDoc(panFile, 'PAN');
-      }
+      formData.append('data', JSON.stringify(payload));
+      if (aadharFile) formData.append('aadharFile', aadharFile);
+      if (panFile) formData.append('panFile', panFile);
+
+      toast.info('Updating account and uploading documents...');
 
       const res = await fetch('/api/admin/users', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'update',
-          userId: user.id,
-          name: name.trim(),
-          email: email.trim().toLowerCase(),
-          phone: phone.trim(),
-          role,
-          regionId: role === 'AREA_ADMIN' ? regionId : null,
-          areaId: role === 'MANAGER' || role === 'EMPLOYEE' ? areaId : null,
-          password: password ? password : undefined,
-          aadharNumber: aadharNumber.trim() || undefined,
-          aadharCardUrl: finalAadharUrl || undefined,
-          panNumber: panNumber.trim().toUpperCase() || undefined,
-          panCardUrl: finalPanUrl || undefined,
-          address: address.trim() || undefined,
-          emergencyContactName: emergencyContactName.trim() || undefined,
-          emergencyPhone: emergencyPhone.trim() || undefined,
-          dob: dob || undefined,
-          bankName: bankName.trim() || undefined,
-          accountNumber: accountNumber.trim() || undefined,
-          ifscCode: ifscCode.trim().toUpperCase() || undefined,
-          upiId: upiId.trim() || undefined,
-        }),
+        body: formData,
       });
 
       const body = await res.json();

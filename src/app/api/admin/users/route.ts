@@ -6,6 +6,7 @@ import { hashPassword } from '@/lib/auth/password';
 import { ROLES } from '@/lib/data/types';
 import { getStore } from '@/lib/data';
 import { todayISO } from '@/lib/util/format';
+import { uploadMedia } from '@/lib/storage';
 
 function revalidateUserPages() {
   try {
@@ -212,7 +213,20 @@ const schema = z.discriminatedUnion('action', [
 /** The owner owns the org chart: who exists, and what they can reach. */
 export async function POST(request: Request) {
   try {
-    const raw = await request.json().catch(() => null);
+    const contentType = request.headers.get('content-type') || '';
+    let raw: unknown = null;
+    let formData: FormData | null = null;
+
+    if (contentType.includes('multipart/form-data')) {
+      formData = await request.formData();
+      const dataStr = formData.get('data');
+      if (typeof dataStr === 'string') {
+        raw = JSON.parse(dataStr);
+      }
+    } else {
+      raw = await request.json().catch(() => null);
+    }
+
     const parsed = schema.safeParse(raw);
     if (!parsed.success) {
       return NextResponse.json(
@@ -227,6 +241,21 @@ export async function POST(request: Request) {
         : 'user:manage'
     );
     const store = await getStore();
+
+    async function handleUpload(file: unknown, docType: string) {
+      if (!(file instanceof File)) return undefined;
+      const MAX_BYTES = 10 * 1024 * 1024;
+      if (file.size > MAX_BYTES) throw new HttpError(413, 'Document file must be under 10MB.');
+      const ext = file.name.split('.').pop() || 'pdf';
+      const key = `doc_${docType}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.${ext}`;
+      const stored = await uploadMedia(file, {
+        key,
+        folder: 'staff-docs',
+        contentType: file.type || 'application/octet-stream',
+        access: 'public',
+      });
+      return stored.url;
+    }
 
     if (parsed.data.action === 'setActive') {
       if (parsed.data.userId === session.user.id && !parsed.data.active) {
@@ -287,6 +316,13 @@ export async function POST(request: Request) {
       const nextRole = data.role ?? user.role;
       const nextRegionId = data.regionId !== undefined ? data.regionId : user.regionId;
       const nextAreaId = data.areaId !== undefined ? data.areaId : user.areaId;
+
+      if (formData) {
+         const aadharUrl = await handleUpload(formData.get('aadharFile'), 'aadhar');
+         if (aadharUrl) data.aadharCardUrl = aadharUrl;
+         const panUrl = await handleUpload(formData.get('panFile'), 'pan');
+         if (panUrl) data.panCardUrl = panUrl;
+      }
 
       const userUpdates: Partial<typeof user> = {};
       if (data.name) userUpdates.name = data.name;
@@ -367,6 +403,13 @@ export async function POST(request: Request) {
       where: { email: data.email.toLowerCase() },
     });
     if (existing) throw new HttpError(409, 'Someone already uses that email.');
+
+    if (formData) {
+       const aadharUrl = await handleUpload(formData.get('aadharFile'), 'aadhar');
+       if (aadharUrl) data.aadharCardUrl = aadharUrl;
+       const panUrl = await handleUpload(formData.get('panFile'), 'pan');
+       if (panUrl) data.panCardUrl = panUrl;
+    }
 
     if ((data.role === 'MANAGER' || data.role === 'EMPLOYEE') && !data.areaId) {
       throw new HttpError(400, 'A manager or wash boy must be given an area.');

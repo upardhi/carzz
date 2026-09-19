@@ -119,25 +119,6 @@ export function AddPersonClient({
     (!needsRegion || regionId) &&
     hasKyc;
 
-  async function uploadDoc(file: File, type: string): Promise<string> {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('type', type);
-
-    const res = await fetch('/api/ops/staff/doc', {
-      method: 'POST',
-      body: formData,
-    });
-
-    if (!res.ok) {
-      const errData = await res.json().catch(() => ({}));
-      throw new Error(errData.error || `Failed to upload ${type} document`);
-    }
-
-    const data = await res.json();
-    return data.url;
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!valid) return;
@@ -146,44 +127,38 @@ export function AddPersonClient({
     setError(null);
 
     try {
-      let aadharCardUrl: string | undefined;
-      let panCardUrl: string | undefined;
+      const formData = new FormData();
+      
+      const payload = {
+        action: 'create',
+        role,
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        password: password.trim(),
+        regionId: needsRegion ? regionId : undefined,
+        areaId: needsArea ? areaId : undefined,
+        aadharNumber: aadharNumber.trim() || undefined,
+        panNumber: panNumber.trim().toUpperCase() || undefined,
+        address: address.trim() || undefined,
+        emergencyContactName: emergencyContactName.trim() || undefined,
+        emergencyPhone: emergencyPhone.trim() || undefined,
+        dob: dob || undefined,
+        bankName: bankName.trim() || undefined,
+        accountNumber: bankAccountNumber.trim() || undefined,
+        ifscCode: bankIfsc.trim().toUpperCase() || undefined,
+        upiId: upiId.trim() || undefined,
+      };
 
-      if (aadharFile) {
-        toast.info('Uploading Aadhaar card document...');
-        aadharCardUrl = await uploadDoc(aadharFile, 'aadhar');
-      }
+      formData.append('data', JSON.stringify(payload));
+      if (aadharFile) formData.append('aadharFile', aadharFile);
+      if (panFile) formData.append('panFile', panFile);
 
-      if (panFile) {
-        toast.info('Uploading PAN card document...');
-        panCardUrl = await uploadDoc(panFile, 'pan');
-      }
+      toast.info('Creating account and uploading documents...');
 
       const response = await fetch('/api/admin/users', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'create',
-          role,
-          name: name.trim(),
-          email: email.trim(),
-          phone: phone.trim(),
-          password: password.trim(),
-          regionId: needsRegion ? regionId : undefined,
-          areaId: needsArea ? areaId : undefined,
-          aadharNumber: aadharNumber.trim() || undefined,
-          aadharCardUrl,
-          panNumber: panNumber.trim().toUpperCase() || undefined,
-          panCardUrl,
-          address: address.trim() || undefined,
-          emergencyContactName: emergencyContactName.trim() || undefined,
-          emergencyPhone: emergencyPhone.trim() || undefined,
-          dob: dob || undefined,
-          bankName: bankName.trim() || undefined,
-          accountNumber: bankAccountNumber.trim() || undefined,
-          ifscCode: bankIfsc.trim().toUpperCase() || undefined,
-          upiId: upiId.trim() || undefined,
-        }),
+        body: formData,
       });
 
       const data = await response.json();
