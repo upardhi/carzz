@@ -371,7 +371,7 @@ export default async function HomePage() {
                     </div>
                     <h3 className="text-lg font-bold text-slate-900 mb-2">Custom Wash Plans</h3>
                     <p className="text-sm text-slate-600 max-w-md mx-auto mb-6">
-                      We tailor our service exactly to your car's needs. Request a callback and we'll offer you our best available pricing based on your location and vehicle.
+                      We tailor our service exactly to your car&apos;s needs. Request a callback and we&apos;ll offer you our best available pricing based on your location and vehicle.
                     </p>
                     <a
                       href="#book"

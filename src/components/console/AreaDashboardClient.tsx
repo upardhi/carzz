@@ -501,11 +501,11 @@ export function AreaDashboardClient({
                 );
               },
             },
-            {
-              id: 'signedIn',
-              header: 'SIGNED IN',
-              render: (staff) => staff.signedIn || '—',
-            },
+            // {
+            //   id: 'signedIn',
+            //   header: 'SIGNED IN',
+            //   render: (staff) => staff.signedIn || '—',
+            // },
             {
               id: 'cars',
               header: 'CARS',
@@ -530,9 +530,8 @@ export function AreaDashboardClient({
                   <div className="flex items-center gap-2">
                     <div className="h-1.5 w-14 overflow-hidden rounded-full bg-slate-100">
                       <div
-                        className={`h-full rounded-full transition-all ${
-                          pct === 100 ? 'bg-emerald-500' : pct > 0 ? 'bg-blue-500' : 'bg-slate-300'
-                        }`}
+                        className={`h-full rounded-full transition-all ${pct === 100 ? 'bg-emerald-500' : pct > 0 ? 'bg-blue-500' : 'bg-slate-300'
+                          }`}
                         style={{ width: `${pct}%` }}
                       />
                     </div>
@@ -547,11 +546,10 @@ export function AreaDashboardClient({
               align: 'center',
               render: (staff) => (
                 <span
-                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
-                    staff.status === 'Working'
+                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${staff.status === 'Working'
                       ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
                       : 'bg-rose-50 text-rose-700 border border-rose-100'
-                  }`}
+                    }`}
                 >
                   {staff.status}
                 </span>

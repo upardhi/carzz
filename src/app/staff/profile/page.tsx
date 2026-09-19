@@ -91,7 +91,7 @@ export default async function StaffProfile() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          {/* <div className="flex items-center gap-2">
             <span
               className={`rounded-full px-3 py-1 text-xs font-bold ${
                 todayAttendance?.loginAt
@@ -103,7 +103,7 @@ export default async function StaffProfile() {
                 ? `Active Today (${formatClock(todayAttendance.loginAt)})`
                 : 'Not Signed In Today'}
             </span>
-          </div>
+          </div> */}
         </div>
 
         <div className="mt-4 space-y-1">
@@ -146,8 +146,8 @@ export default async function StaffProfile() {
             value={
               rated.length > 0
                 ? `${(rated.reduce((s, v) => s + (v.rating ?? 0), 0) / rated.length).toFixed(1)} ★ (${Math.round(
-                    (rated.reduce((s, v) => s + (v.rating ?? 0), 0) / (rated.length * 5)) * 100,
-                  )}% satisfaction · ${rated.length} ${rated.length === 1 ? 'review' : 'reviews'})`
+                  (rated.reduce((s, v) => s + (v.rating ?? 0), 0) / (rated.length * 5)) * 100,
+                )}% satisfaction · ${rated.length} ${rated.length === 1 ? 'review' : 'reviews'})`
                 : 'No customer reviews yet'
             }
             tone={rated.length > 0 ? 'gold' : undefined}
