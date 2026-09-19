@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Note } from '@/components/ui/primitives';
 import { toast } from '@/components/ui/ToastProvider';
 import { money } from '@/lib/util/format';
+import { IconIdCard, IconCreditCard } from '@/components/shell/icons';
 
 import { DocumentUploadPreview } from '@/components/ui/DocumentUploadPreview';
 import { LocationPickerMap } from '@/components/ui/LocationPickerMap';
@@ -332,8 +333,8 @@ export function AddStaffForm({
               }`}
             >
               <div className="flex items-center gap-2">
-                <span className="flex h-7 w-7 items-center justify-center rounded-md bg-purple-100 text-xs">
-                  🪪
+                <span className="flex h-7 w-7 items-center justify-center rounded-md bg-purple-100 text-purple-600">
+                  <IconIdCard width={16} height={16} />
                 </span>
                 <div>
                   <div className="text-xs font-bold">Aadhaar Card Verification</div>
@@ -359,8 +360,8 @@ export function AddStaffForm({
               }`}
             >
               <div className="flex items-center gap-2">
-                <span className="flex h-7 w-7 items-center justify-center rounded-md bg-blue-100 text-xs">
-                  💳
+                <span className="flex h-7 w-7 items-center justify-center rounded-md bg-blue-100 text-blue-600">
+                  <IconCreditCard width={16} height={16} />
                 </span>
                 <div>
                   <div className="text-xs font-bold">PAN Card Verification</div>
@@ -383,7 +384,7 @@ export function AddStaffForm({
           <div className="w-full rounded-lg border border-line bg-surface p-3 space-y-3">
             <div className="flex items-center justify-between border-b border-line-soft pb-2">
               <span className="text-xs font-bold text-navy-950 flex items-center gap-1.5">
-                <span>🪪</span> Aadhaar Card Verification
+                <span className="text-purple-600"><IconIdCard width={16} height={16} /></span> Aadhaar Card Verification
               </span>
               <span className="text-[10px] font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
                 Primary Identity Document
@@ -416,7 +417,7 @@ export function AddStaffForm({
           <div className="w-full rounded-lg border border-line bg-surface p-3 space-y-3">
             <div className="flex items-center justify-between border-b border-line-soft pb-2">
               <span className="text-xs font-bold text-navy-950 flex items-center gap-1.5">
-                <span>💳</span> PAN Card Verification
+                <span className="text-blue-600"><IconCreditCard width={16} height={16} /></span> PAN Card Verification
               </span>
               <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
                 Primary Identity Document

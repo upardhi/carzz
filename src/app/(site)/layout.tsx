@@ -88,7 +88,7 @@ export default async function SiteLayout({
       </header>
 
       {/* ----------------- Main Content ----------------- */}
-      <main className="flex-1 pb-16 md:pb-0">{children}</main>
+      <main className="flex-1">{children}</main>
 
       {/* ----------------- Mobile Bottom Navigation Bar ----------------- */}
       <nav
@@ -156,7 +156,7 @@ export default async function SiteLayout({
       </nav>
 
       {/* ----------------- Footer ----------------- */}
-      <footer className="border-t border-[#1e3a6a]/40 bg-[#061021] px-5 py-12 text-slate-400">
+      <footer className="border-t border-[#1e3a6a]/40 bg-[#061021] px-5 pt-12 pb-24 md:pb-12 text-slate-400">
         <div className="mx-auto grid w-full max-w-7xl gap-8 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <div className="flex items-center gap-2">

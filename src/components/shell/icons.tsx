@@ -139,9 +139,20 @@ export const IconCheck = (p: SVGProps<SVGSVGElement>) => (
 
 export const IconBack = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p)}>
-    <path d="M15 5l-7 7 7 7" />
+    <path d="m15 18-6-6 6-6" />
   </svg>
 );
+
+export const IconIdCard = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <path d="M16 10h2" />
+    <path d="M16 14h2" />
+    <path d="M6.17 15a3 3 0 0 1 5.66 0" />
+    <circle cx="9" cy="11" r="2" />
+    <rect x="2" y="5" width="20" height="14" rx="2" />
+  </svg>
+);
+
 
 export const IconChevron = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p)}>

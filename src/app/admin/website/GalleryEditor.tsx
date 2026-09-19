@@ -123,7 +123,7 @@ export function GalleryEditor({ content }: { content: SiteContent }) {
   }
 
   return (
-    <Card className="p-5">
+    <Card className="p-5 min-w-0">
       <CardHeading>Our work — before and after</CardHeading>
       <p className="-mt-1 mb-3 text-xs text-ink-mute">
         Pictures you upload here are <b>public</b>. Customers&rsquo; own wash
@@ -324,7 +324,7 @@ export function ReviewsAndMapEditor({ content }: { content: SiteContent }) {
   }
 
   return (
-    <Card className="p-5">
+    <Card className="p-5 min-w-0">
       <CardHeading>Customer ratings and the map</CardHeading>
 
       <button

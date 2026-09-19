@@ -140,17 +140,31 @@ export async function GET() {
         escalatedComplaintsCount,
         staffToday: staffTodayFormatted,
         scopeLabel,
-        areaPerformance: performance.map((p) => ({
-          areaId: (p as any).area?.id ?? (p as any).areaId,
-          areaName: (p as any).area?.name ?? (p as any).areaName,
-          customers: p.customers,
-          activeCars: p.activeCars,
-          washesDone: p.washesDone,
-          washesMissed: p.washesMissed,
-          collected: p.collected,
-          outstanding: p.outstanding,
-          averageRating: (p as any).averageRating,
-        })),
+        areaPerformance: performance.map((p: unknown) => {
+          const perf = p as {
+            area?: { id: string; name: string };
+            areaId?: string;
+            areaName?: string;
+            customers: number;
+            activeCars: number;
+            washesDone: number;
+            washesMissed: number;
+            collected: number;
+            outstanding: number;
+            averageRating?: number;
+          };
+          return {
+            areaId: perf.area?.id ?? perf.areaId,
+            areaName: perf.area?.name ?? perf.areaName,
+            customers: perf.customers,
+            activeCars: perf.activeCars,
+            washesDone: perf.washesDone,
+            washesMissed: perf.washesMissed,
+            collected: perf.collected,
+            outstanding: perf.outstanding,
+            averageRating: perf.averageRating,
+          };
+        }),
         cycleLabel: cycleLabel(cycle),
         areasCount,
         pendingLeavesCount,

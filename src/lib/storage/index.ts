@@ -47,6 +47,9 @@ export interface PhotoStorage {
 class VercelBlobStorage implements PhotoStorage {
   private readonly token?: string;
   private readonly urlCache = new Map<string, string>();
+  
+  private publicToken: string | undefined;
+  private privateToken: string | undefined;
 
   constructor(token?: string) {
     this.token =
@@ -54,6 +57,9 @@ class VercelBlobStorage implements PhotoStorage {
       process.env.PUBLIC_BLOB_READ_WRITE_TOKEN ||
       process.env.BLOB_READ_WRITE_TOKEN ||
       process.env.VERCEL_BLOB_READ_WRITE_TOKEN;
+
+    this.publicToken = this.token;
+    this.privateToken = process.env.PRIVATE_BLOB_READ_WRITE_TOKEN || this.token;
   }
 
   async put(
@@ -71,7 +77,7 @@ class VercelBlobStorage implements PhotoStorage {
       blob = await vercelBlobPut(pathname, Buffer.from(data), {
         access: requestedAccess,
         contentType,
-        token: this.token,
+        token: requestedAccess === 'private' ? this.privateToken : this.publicToken,
         addRandomSuffix: false, // Deterministic keys so replacements overwrite cleanly
       });
     } catch (err) {
@@ -81,14 +87,14 @@ class VercelBlobStorage implements PhotoStorage {
         blob = await vercelBlobPut(pathname, Buffer.from(data), {
           access: 'private',
           contentType,
-          token: this.token,
+          token: this.privateToken,
           addRandomSuffix: false,
         });
       } else if (msg.includes('public store') || msg.includes('Cannot use private access')) {
         blob = await vercelBlobPut(pathname, Buffer.from(data), {
           access: 'public',
           contentType,
-          token: this.token,
+          token: this.publicToken,
           addRandomSuffix: false,
         });
       } else {
@@ -134,7 +140,9 @@ class VercelBlobStorage implements PhotoStorage {
   async delete(keyOrUrl: string): Promise<void> {
     const url = this.urlCache.get(keyOrUrl) || keyOrUrl;
     try {
-      await vercelBlobDel(url, { token: this.token });
+      const isPrivate = url.includes('.private.blob.vercel-storage.com');
+      const delToken = isPrivate ? this.privateToken : this.publicToken;
+      await vercelBlobDel(url, { token: delToken });
     } catch {
       // Ignore if already deleted
     }

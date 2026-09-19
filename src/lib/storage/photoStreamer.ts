@@ -23,7 +23,9 @@ export async function servePhoto(target: string) {
     decoded = target.trim();
   }
 
+  // Support an explicitly dedicated private token, otherwise fall back to the generic public/default token
   const token =
+    process.env.PRIVATE_BLOB_READ_WRITE_TOKEN ||
     process.env.PUBLIC_BLOB_READ_WRITE_TOKEN ||
     process.env.BLOB_READ_WRITE_TOKEN ||
     process.env.VERCEL_BLOB_READ_WRITE_TOKEN;

@@ -9,6 +9,7 @@ import { DocumentUploadPreview } from '@/components/ui/DocumentUploadPreview';
 import { LocationPickerMap } from '@/components/ui/LocationPickerMap';
 import type { Role, Area, Region } from '@/lib/data/types';
 import { ROLE_LABEL } from '@/lib/util/labels';
+import { IconIdCard, IconCreditCard } from '@/components/shell/icons';
 
 const ASSIGNABLE_ROLES: { role: Role; label: string; blurb: string; icon: string }[] = [
   {
@@ -497,8 +498,8 @@ export function AddPersonClient({
                   }`}
                 >
                   <div className="flex items-center gap-2.5">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-100 text-sm">
-                      🪪
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-100 text-purple-600">
+                      <IconIdCard width={18} height={18} />
                     </span>
                     <div>
                       <div className="text-xs font-bold">Aadhaar Card Verification</div>
@@ -524,8 +525,8 @@ export function AddPersonClient({
                   }`}
                 >
                   <div className="flex items-center gap-2.5">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 text-sm">
-                      💳
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
+                      <IconCreditCard width={18} height={18} />
                     </span>
                     <div>
                       <div className="text-xs font-bold">PAN Card Verification</div>
@@ -548,8 +549,8 @@ export function AddPersonClient({
               <div className="w-full rounded-xl border border-slate-200 bg-slate-50/40 p-4 space-y-3.5">
                 <div className="flex items-center justify-between border-b border-slate-200/80 pb-2.5">
                   <div className="flex items-center gap-2">
-                    <span className="flex h-6 w-6 items-center justify-center rounded-md bg-purple-100 text-xs">
-                      🪪
+                    <span className="flex h-6 w-6 items-center justify-center rounded-md bg-purple-100 text-purple-600">
+                      <IconIdCard width={14} height={14} />
                     </span>
                     <h3 className="text-xs font-bold uppercase tracking-wider text-navy-950">
                       Aadhaar Card Verification
@@ -589,8 +590,8 @@ export function AddPersonClient({
               <div className="w-full rounded-xl border border-slate-200 bg-slate-50/40 p-4 space-y-3.5">
                 <div className="flex items-center justify-between border-b border-slate-200/80 pb-2.5">
                   <div className="flex items-center gap-2">
-                    <span className="flex h-6 w-6 items-center justify-center rounded-md bg-blue-100 text-xs">
-                      💳
+                    <span className="flex h-6 w-6 items-center justify-center rounded-md bg-blue-100 text-blue-600">
+                      <IconCreditCard width={14} height={14} />
                     </span>
                     <h3 className="text-xs font-bold uppercase tracking-wider text-navy-950">
                       PAN Card Verification
@@ -919,7 +920,7 @@ export function AddPersonClient({
               <div className="space-y-2 text-xs">
                 <div className="flex items-center justify-between">
                   <span className="text-slate-600 flex items-center gap-1.5 font-medium">
-                    <span>🪪</span> Aadhaar or PAN
+                    <span className="text-slate-400"><IconIdCard width={14} height={14} /></span> Aadhaar or PAN
                   </span>
                   <span className={hasKyc ? 'text-emerald-600 font-bold' : 'text-amber-600 font-bold'}>
                     {hasKyc ? `✓ ${hasAadhaar && hasPan ? 'Both' : hasAadhaar ? 'Aadhaar' : 'PAN'}` : 'Required (1 of 2)'}

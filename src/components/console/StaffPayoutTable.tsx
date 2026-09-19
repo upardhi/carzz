@@ -20,6 +20,7 @@ export function StaffPayoutTable({ payouts, staff, areas, cycle }: Props) {
   const debouncedSearch = useDebounce(search, 250);
   const [selectedArea, setSelectedArea] = useState('ALL');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
+  const [viewingPayout, setViewingPayout] = useState<StaffPayout | null>(null);
   const [sortColumn, setSortColumn] = useState<string>('net');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(1);
@@ -221,30 +222,37 @@ export function StaffPayoutTable({ payouts, staff, areas, cycle }: Props) {
     {
       id: 'action',
       header: 'ACTION',
-      render: (payout) =>
-        payout.status === 'DRAFT' ? (
-          <div className="flex gap-1.5">
-            <ActionButton
-              endpoint="/api/admin/payout"
-              payload={{
-                action: 'approveOne',
-                staffId: payout.staffId,
-                cycle,
-              }}
-            >
-              Approve
-            </ActionButton>
-            <ActionButton
-              endpoint="/api/admin/payout"
-              variant="secondary"
-              payload={{ action: 'hold', staffId: payout.staffId, cycle }}
-            >
-              Hold
-            </ActionButton>
-          </div>
-        ) : (
-          <span className="text-ink-faint">—</span>
-        ),
+      render: (payout) => (
+        <div className="flex gap-1.5 items-center">
+          {payout.status === 'DRAFT' && (
+            <>
+              <ActionButton
+                endpoint="/api/admin/payout"
+                payload={{
+                  action: 'approveOne',
+                  staffId: payout.staffId,
+                  cycle,
+                }}
+              >
+                Approve
+              </ActionButton>
+              <ActionButton
+                endpoint="/api/admin/payout"
+                variant="secondary"
+                payload={{ action: 'hold', staffId: payout.staffId, cycle }}
+              >
+                Hold
+              </ActionButton>
+            </>
+          )}
+          <button
+            onClick={() => setViewingPayout(payout)}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition-colors"
+          >
+            Breakdown
+          </button>
+        </div>
+      ),
     },
   ];
 
@@ -322,6 +330,52 @@ export function StaffPayoutTable({ payouts, staff, areas, cycle }: Props) {
         }}
         pageSizeOptions={[10, 20, 50, 100]}
       />
+
+      {/* Payout Breakdown Modal */}
+      {viewingPayout && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/70 backdrop-blur-sm" onClick={() => setViewingPayout(null)}>
+          <div className="relative w-full max-w-lg rounded-2xl bg-white shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-6 py-4">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Payslip Breakdown</h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {staffById.get(viewingPayout.staffId)?.name} · {cycle}
+                </p>
+              </div>
+              <button
+                onClick={() => setViewingPayout(null)}
+                className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-200 hover:text-slate-600 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6 space-y-5">
+              {viewingPayout.lines.map((line, i) => (
+                <div key={i} className="flex justify-between items-start gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">{line.label}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {line.qty} × {line.rate ? money(line.rate) : 'Variable'}
+                    </p>
+                    {line.detail && (
+                      <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">{line.detail}</p>
+                    )}
+                  </div>
+                  <div className={`text-sm font-bold whitespace-nowrap ${line.kind === 'EARNING' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                    {line.kind === 'EARNING' ? '+' : '−'}{money(line.amount)}
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            <div className="border-t border-slate-100 bg-slate-50 px-6 py-4 flex items-center justify-between">
+              <span className="text-sm font-bold text-slate-700">Net Payable</span>
+              <span className="text-lg font-bold text-slate-900">{money(viewingPayout.net)}</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

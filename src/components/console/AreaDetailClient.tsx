@@ -959,12 +959,12 @@ export function AreaDetailClient({
       </div>
 
       {/* Main Tab Navigation Bar (At Top) */}
-      <div className="flex items-center border-b border-slate-200 space-x-2 pt-1">
+      <div className="flex items-center border-b border-slate-200 space-x-2 pt-1 overflow-x-auto no-scrollbar">
         <button
           type="button"
           onClick={() => setActiveTab('today')}
           className={clsx(
-            'flex items-center gap-2 px-4 py-3 text-xs font-bold transition-all border-b-2 -mb-px cursor-pointer',
+            'flex items-center gap-2 px-4 py-3 text-xs font-bold transition-all border-b-2 -mb-px cursor-pointer shrink-0 whitespace-nowrap',
             activeTab === 'today'
               ? 'border-blue-600 text-blue-600 bg-blue-50/50 rounded-t-lg'
               : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300',
@@ -987,7 +987,7 @@ export function AreaDetailClient({
           type="button"
           onClick={() => setActiveTab('washes')}
           className={clsx(
-            'flex items-center gap-2 px-4 py-3 text-xs font-bold transition-all border-b-2 -mb-px cursor-pointer',
+            'flex items-center gap-2 px-4 py-3 text-xs font-bold transition-all border-b-2 -mb-px cursor-pointer shrink-0 whitespace-nowrap',
             activeTab === 'washes'
               ? 'border-blue-600 text-blue-600 bg-blue-50/50 rounded-t-lg'
               : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300',
@@ -1010,7 +1010,7 @@ export function AreaDetailClient({
           type="button"
           onClick={() => setActiveTab('customers')}
           className={clsx(
-            'flex items-center gap-2 px-4 py-3 text-xs font-bold transition-all border-b-2 -mb-px cursor-pointer',
+            'flex items-center gap-2 px-4 py-3 text-xs font-bold transition-all border-b-2 -mb-px cursor-pointer shrink-0 whitespace-nowrap',
             activeTab === 'customers'
               ? 'border-blue-600 text-blue-600 bg-blue-50/50 rounded-t-lg'
               : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300',
@@ -1255,7 +1255,7 @@ export function AreaDetailClient({
               ))}
             </div>
 
-            <div className="relative min-w-[240px]">
+            <div className="relative flex-1 w-full sm:w-auto min-w-0 sm:max-w-xs">
               <IconSearch
                 width={14}
                 height={14}
@@ -1312,7 +1312,7 @@ export function AreaDetailClient({
               ))}
             </div>
 
-            <div className="relative min-w-[260px]">
+            <div className="relative flex-1 w-full sm:w-auto min-w-0 sm:max-w-xs">
               <IconSearch
                 width={14}
                 height={14}

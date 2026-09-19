@@ -17,7 +17,7 @@ export function BrandMark({
       aria-hidden="true"
       suppressHydrationWarning
     >
-      <rect width="100" height="100" rx="22" fill="#0e2748" />
+      <rect width="100" height="100" rx="22" fill="transparent" />
       <path
         d="M13 40 Q50 8 87 40"
         fill="none"

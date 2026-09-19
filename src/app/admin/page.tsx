@@ -162,7 +162,7 @@ async function AdminDashboardContent() {
 
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
         {/* Left Column: Area Performance Table */}
-        <div className="flex flex-col justify-between">
+        <div className="flex flex-col justify-between min-w-0">
           <WidgetTable<(typeof areas)[number]>
             title="Area Profitability"
             data={areas}
@@ -214,10 +214,10 @@ async function AdminDashboardContent() {
         </div>
 
         {/* Right Column: Owner Action Center */}
-        <Card className="p-5">
-          <div className="mb-3.5 flex items-center justify-between">
+        <Card className="p-5 min-w-0">
+          <div className="mb-3.5 flex flex-wrap items-center justify-between gap-2">
             <CardHeading>Owner Action Required</CardHeading>
-            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-700">
+            <span className="whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-700">
               Needs your decision
             </span>
           </div>
@@ -233,20 +233,20 @@ async function AdminDashboardContent() {
                 {unapproved.length > 0 ? (
                   <Link href="/admin/payout" className="block group">
                     <div className="flex items-center justify-between rounded-xl border border-line-soft border-l-4 border-l-rose-500 bg-white p-3.5 shadow-xs transition-all hover:bg-slate-50/70 hover:shadow-sm">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-rose-50 text-rose-600">
                           <IconRupee width={18} height={18} strokeWidth={2.2} />
                         </div>
-                        <div>
-                          <b className="text-sm font-semibold text-navy-950 group-hover:text-blue-600 transition-colors">
+                        <div className="min-w-0 flex-1 pr-2">
+                          <b className="block truncate text-sm font-semibold text-navy-950 group-hover:text-blue-600 transition-colors">
                             Staff payout pending approval
                           </b>
-                          <p className="mt-0.5 text-xs text-ink-mute">
+                          <p className="truncate mt-0.5 text-xs text-ink-mute">
                             {unapproved.length} staff members · {money(unapproved.reduce((s, p) => s + p.net, 0))} total · Click to approve.
                           </p>
                         </div>
                       </div>
-                      <IconChevronRight width={16} height={16} className="text-slate-400 group-hover:text-blue-600 transition-colors" />
+                      <IconChevronRight width={16} height={16} className="shrink-0 text-slate-400 group-hover:text-blue-600 transition-colors" />
                     </div>
                   </Link>
                 ) : null}
@@ -254,20 +254,20 @@ async function AdminDashboardContent() {
                 {purchases > 0 ? (
                   <Link href="/admin/inventory" className="block group">
                     <div className="flex items-center justify-between rounded-xl border border-line-soft border-l-4 border-l-amber-500 bg-white p-3.5 shadow-xs transition-all hover:bg-slate-50/70 hover:shadow-sm">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
                           <IconClock width={18} height={18} strokeWidth={2.2} />
                         </div>
-                        <div>
-                          <b className="text-sm font-semibold text-navy-950 group-hover:text-blue-600 transition-colors">
+                        <div className="min-w-0 flex-1 pr-2">
+                          <b className="block truncate text-sm font-semibold text-navy-950 group-hover:text-blue-600 transition-colors">
                             {purchases} inventory purchase {purchases === 1 ? 'request' : 'requests'} waiting
                           </b>
-                          <p className="mt-0.5 text-xs text-ink-mute">
+                          <p className="truncate mt-0.5 text-xs text-ink-mute">
                             Stock replenishment awaiting owner sign-off.
                           </p>
                         </div>
                       </div>
-                      <IconChevronRight width={16} height={16} className="text-slate-400 group-hover:text-blue-600 transition-colors" />
+                      <IconChevronRight width={16} height={16} className="shrink-0 text-slate-400 group-hover:text-blue-600 transition-colors" />
                     </div>
                   </Link>
                 ) : null}
@@ -275,20 +275,20 @@ async function AdminDashboardContent() {
                 {escalatedComplaints > 0 ? (
                   <Link href="/admin/complaints" className="block group">
                     <div className="flex items-center justify-between rounded-xl border border-line-soft border-l-4 border-l-rose-500 bg-white p-3.5 shadow-xs transition-all hover:bg-slate-50/70 hover:shadow-sm">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-rose-50 text-rose-600">
                           <IconAlert width={18} height={18} strokeWidth={2.2} />
                         </div>
-                        <div>
-                          <b className="text-sm font-semibold text-rose-950 group-hover:text-rose-700 transition-colors">
+                        <div className="min-w-0 flex-1 pr-2">
+                          <b className="block truncate text-sm font-semibold text-rose-950 group-hover:text-rose-700 transition-colors">
                             {escalatedComplaints} escalated customer {escalatedComplaints === 1 ? 'complaint' : 'complaints'}
                           </b>
-                          <p className="mt-0.5 text-xs text-ink-mute">
+                          <p className="truncate mt-0.5 text-xs text-ink-mute">
                             Urgent issue flagged to the business owner.
                           </p>
                         </div>
                       </div>
-                      <IconChevronRight width={16} height={16} className="text-slate-400 group-hover:text-blue-600 transition-colors" />
+                      <IconChevronRight width={16} height={16} className="shrink-0 text-slate-400 group-hover:text-blue-600 transition-colors" />
                     </div>
                   </Link>
                 ) : null}
@@ -296,20 +296,20 @@ async function AdminDashboardContent() {
                 {summary.outstanding > 0 ? (
                   <Link href="/admin/reports" className="block group">
                     <div className="flex items-center justify-between rounded-xl border border-line-soft border-l-4 border-l-amber-500 bg-white p-3.5 shadow-xs transition-all hover:bg-slate-50/70 hover:shadow-sm">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
                           <IconClock width={18} height={18} strokeWidth={2.2} />
                         </div>
-                        <div>
-                          <b className="text-sm font-semibold text-navy-950 group-hover:text-blue-600 transition-colors">
+                        <div className="min-w-0 flex-1 pr-2">
+                          <b className="block truncate text-sm font-semibold text-navy-950 group-hover:text-blue-600 transition-colors">
                             {money(summary.outstanding)} outstanding receivables
                           </b>
-                          <p className="mt-0.5 text-xs text-ink-mute">
+                          <p className="truncate mt-0.5 text-xs text-ink-mute">
                             Collecting this would add {money(summary.outstanding)} straight to profit.
                           </p>
                         </div>
                       </div>
-                      <IconChevronRight width={16} height={16} className="text-slate-400 group-hover:text-blue-600 transition-colors" />
+                      <IconChevronRight width={16} height={16} className="shrink-0 text-slate-400 group-hover:text-blue-600 transition-colors" />
                     </div>
                   </Link>
                 ) : null}
@@ -317,21 +317,21 @@ async function AdminDashboardContent() {
                 {worstSource && worstSource.costPerActiveCar > 1000 ? (
                   <Link href="/admin/sources" className="block group">
                     <div className="flex items-center justify-between rounded-xl border border-line-soft border-l-4 border-l-navy-800 bg-white p-3.5 shadow-xs transition-all hover:bg-slate-50/70 hover:shadow-sm">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
                           <IconUsers width={18} height={18} strokeWidth={2.2} />
                         </div>
-                        <div>
-                          <b className="text-sm font-semibold text-navy-950 group-hover:text-blue-600 transition-colors">
+                        <div className="min-w-0 flex-1 pr-2">
+                          <b className="block truncate text-sm font-semibold text-navy-950 group-hover:text-blue-600 transition-colors">
                             {LEAD_SOURCE_LABEL[worstSource.source]} marketing high CAC
                           </b>
-                          <p className="mt-0.5 text-xs text-ink-mute">
+                          <p className="truncate mt-0.5 text-xs text-ink-mute">
                             {money(worstSource.cost)} spent, {worstSource.joined} joined —{' '}
                             {money(worstSource.costPerActiveCar)} per active subscriber.
                           </p>
                         </div>
                       </div>
-                      <IconChevronRight width={16} height={16} className="text-slate-400 group-hover:text-blue-600 transition-colors" />
+                      <IconChevronRight width={16} height={16} className="shrink-0 text-slate-400 group-hover:text-blue-600 transition-colors" />
                     </div>
                   </Link>
                 ) : null}
@@ -341,7 +341,7 @@ async function AdminDashboardContent() {
         </Card>
 
         {/* Operational Performance Summary Card */}
-        <Card className="p-5">
+        <Card className="p-5 min-w-0">
           <CardHeading>Operations & Service Execution</CardHeading>
           <div className="mt-2 space-y-1">
             <Row label="Washes completed" value={summary.washesDone} />
@@ -371,7 +371,7 @@ async function AdminDashboardContent() {
         </Card>
 
         {/* Monthly P&L Financial Summary Card */}
-        <Card className="p-5">
+        <Card className="p-5 min-w-0">
           <CardHeading>Monthly Financial P&L Breakdown</CardHeading>
           <div className="mt-2 space-y-1">
             <Row label="Total Billed" value={money(summary.billed)} />
@@ -382,11 +382,7 @@ async function AdminDashboardContent() {
             />
             <Row label="Staff Payout Cost" value={money(summary.payoutCost)} />
             <Row label="Consumables & Operating Expenses" value={money(summary.expenses)} />
-            <Row
-              label="Net Profit"
-              value={money(summary.profit)}
-              tone={summary.profit > 0 ? 'success' : 'danger'}
-            />
+
           </div>
         </Card>
       </div>

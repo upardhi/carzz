@@ -4,6 +4,8 @@ import {
   IconCar,
   IconCheck,
   IconStar,
+  IconRupee,
+  IconShield,
 } from '@/components/shell/icons';
 import { getStore } from '@/lib/data';
 import { EnquiryForm } from './EnquiryForm';
@@ -22,42 +24,16 @@ export default async function HomePage() {
     store.areas.find({ orderBy: [{ field: 'name' }] }),
   ]);
 
-  const packagesList = allPackages.length > 0 ? allPackages : [
-    {
-      id: 'p-bucket',
-      name: 'Bucket Wash',
-      price: 1600,
-      washesPerMonth: 8,
-      services: ['Exterior wash', 'Interior vacuum', 'Tyre dressing'],
-    },
-    {
-      id: 'p-detail',
-      name: 'Detailing',
-      price: 3200,
-      washesPerMonth: 4,
-      services: ['Pressure wash', 'Interior vacuum', 'Polish / wax', 'Tyre dressing'],
-    },
-    {
-      id: 'p-pressure',
-      name: 'Pressure Wash',
-      price: 2000,
-      washesPerMonth: 8,
-      services: ['Pressure wash', 'Interior vacuum', 'Tyre dressing'],
-    },
-  ];
+  const packagesList = allPackages;
 
   const packages = [...packagesList].sort((a, b) => {
     const order: Record<string, number> = { 'bucket wash': 1, 'detailing': 2, 'pressure wash': 3 };
-    const aOrder = order[a.name.toLowerCase()] ?? 2;
-    const bOrder = order[b.name.toLowerCase()] ?? 2;
+    const aOrder = order[a.name.toLowerCase()] ?? 99;
+    const bOrder = order[b.name.toLowerCase()] ?? 99;
     return aOrder - bOrder;
   });
 
-  const areasList = areas.length > 0 ? areas : [
-    { id: 'a1', name: 'Bajaj Nagar', city: 'Nagpur' },
-    { id: 'a2', name: 'Civil Lines', city: 'Nagpur' },
-    { id: 'a3', name: 'Wadi', city: 'Nagpur' },
-  ];
+  const areasList = areas;
 
   return (
     <div className="flex flex-col bg-white text-slate-900 selection:bg-amber-400 selection:text-[#081429]">
@@ -126,19 +102,18 @@ export default async function HomePage() {
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-60" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-400" />
               </span>
-              DOORSTEP CAR WASH · NAGPUR
+              {site.heroEyebrow || 'DOORSTEP CAR WASH · NAGPUR'}
             </div>
 
             {/* Headline */}
             <h1 className="mt-5 text-[44px] sm:text-5xl lg:text-[62px] font-bold leading-[1.06] tracking-tight text-white">
               {site.heroTitle || 'Clean Car.'}<br />
-              <span className="text-[#f59e0b]">{site.heroTitleAccent || 'Happier Days.'}</span>
+              {site.heroTitleAccent ? <span className="text-[#f59e0b]">{site.heroTitleAccent}</span> : null}
             </h1>
 
             {/* Subheading */}
-            <p className="mt-5 max-w-md text-sm sm:text-base leading-relaxed text-slate-300/90">
-              We come to your location, clean your car, and share before &amp; after photos.
-              No calls, no chasing, no hassle.
+            <p className="mt-5 max-w-md text-sm sm:text-base leading-relaxed text-slate-300/90 whitespace-pre-wrap">
+              {site.heroBody || 'We come to your location, clean your car, and share before & after photos.\nNo calls, no chasing, no hassle.'}
             </p>
 
             {/* Feature chips */}
@@ -158,40 +133,48 @@ export default async function HomePage() {
 
             {/* CTAs */}
             <div className="mt-9 flex flex-wrap items-center gap-4">
-              <a
-                href="#book"
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#f59e0b] hover:bg-[#e08900] px-7 py-4 text-sm sm:text-base font-semibold text-[#071739] shadow-lg shadow-amber-500/30 hover:scale-[1.03] active:scale-[0.97] transition-all"
-              >
-                <span>Book a Wash</span>
-                <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
-                  <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
-                </svg>
-              </a>
-              <a
-                href="#packages"
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/8 hover:bg-white/15 px-7 py-4 text-sm sm:text-base font-bold text-white backdrop-blur-sm transition-all"
-              >
-                View Packages
-              </a>
+              {site.heroPrimaryCta ? (
+                <a
+                  href="#book"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#f59e0b] hover:bg-[#e08900] px-7 py-4 text-sm sm:text-base font-semibold text-[#071739] shadow-lg shadow-amber-500/30 hover:scale-[1.03] active:scale-[0.97] transition-all"
+                >
+                  <span>{site.heroPrimaryCta}</span>
+                  <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
+                    <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
+                  </svg>
+                </a>
+              ) : null}
+              
+              {site.heroSecondaryCta ? (
+                <a
+                  href="#packages"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/8 hover:bg-white/15 px-7 py-4 text-sm sm:text-base font-bold text-white backdrop-blur-sm transition-all"
+                >
+                  {site.heroSecondaryCta}
+                </a>
+              ) : null}
             </div>
 
             {/* Stats */}
-            <div className="mt-11 grid grid-cols-3 gap-0 border-t border-white/10 pt-7">
-              <div className="pr-4">
-                <div className="text-3xl sm:text-4xl font-bold text-white tracking-tight">500+</div>
-                <p className="mt-1 text-[11px] font-medium text-slate-400 leading-snug">Cars Washed<br />Every Week</p>
-              </div>
-              <div className="border-x border-white/10 px-4">
-                <div className="flex items-center gap-1.5 text-3xl sm:text-4xl font-bold text-white tracking-tight">
-                  <span>4.6</span>
-                  <span className="text-amber-400 text-2xl">★</span>
+            {/* Stats */}
+            <div className="mt-11 flex divide-x divide-white/10 border-t border-white/10 pt-7">
+              {site.stats?.slice(0, 3).map((stat, i) => (
+                <div key={i} className={`flex-1 ${i === 0 ? 'pr-4' : i === 2 ? 'pl-4' : 'px-4'}`}>
+                  <div className="flex items-center gap-1.5 text-3xl sm:text-4xl font-bold text-white tracking-tight">
+                    {stat.value.includes('★') ? (
+                      <>
+                        <span>{stat.value.replace('★', '').trim()}</span>
+                        <span className="text-amber-400 text-2xl">★</span>
+                      </>
+                    ) : (
+                      stat.value
+                    )}
+                  </div>
+                  <p className="mt-1 text-[11px] font-medium text-slate-400 leading-snug whitespace-pre-line">
+                    {stat.label.replace(/ /g, ' \n')}
+                  </p>
                 </div>
-                <p className="mt-1 text-[11px] font-medium text-slate-400 leading-snug">Average<br />Customer Rating</p>
-              </div>
-              <div className="pl-4">
-                <div className="text-3xl sm:text-4xl font-bold text-white tracking-tight">3</div>
-                <p className="mt-1 text-[11px] font-medium text-slate-400 leading-snug">Areas Across<br />Nagpur</p>
-              </div>
+              ))}
             </div>
           </div>
         </div>
@@ -219,7 +202,7 @@ export default async function HomePage() {
               SIMPLE. CONVENIENT. RELIABLE.
             </span>
             <h2 className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight text-slate-900">
-              How it works
+              {site.howTitle || 'How it works'}
             </h2>
             <p className="mt-2 text-sm text-slate-500 max-w-sm mx-auto">
               A sparkling clean car in 3 easy steps. We handle everything.
@@ -231,46 +214,43 @@ export default async function HomePage() {
             {/* Dotted connector line — desktop only */}
             <div className="hidden md:block absolute top-12 left-[calc(33.33%+12px)] right-[calc(33.33%+12px)] border-t-2 border-dashed border-blue-200 z-0" />
 
-            {[
-              {
-                num: '1',
-                icon: (
+            {site.howSteps?.map((step, i) => {
+              const num = String(i + 1);
+              let icon;
+              let accent;
+              
+              if (i === 0) {
+                icon = (
                   <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                     <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" />
                   </svg>
-                ),
-                title: 'Tell us where you park',
-                desc: 'Your building, your slot, your time. We fit the service entirely around your schedule.',
-                accent: 'border-t-blue-500',
-              },
-              {
-                num: '2',
-                icon: <IconCar className="w-5 h-5" />,
-                title: 'We come to you',
-                desc: 'Our trained wash boy arrives right on time. No calls, no chasing, no waiting around.',
-                accent: 'border-t-amber-500',
-              },
-              {
-                num: '3',
-                icon: <IconCamera width={22} height={22} strokeWidth={2} />,
-                title: 'You see the proof',
-                desc: 'Receive before & after photos of every wash so you always know what you paid for.',
-                accent: 'border-t-green-500',
-              },
-            ].map(({ num, icon, title, desc, accent }) => (
-              <div key={num} className={`relative z-10 flex flex-col rounded-2xl border-t-4 border border-slate-200 bg-white p-7 shadow-sm hover:shadow-md transition-shadow ${accent}`}>
-                <div className="flex items-start justify-between mb-5">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#071739] text-sm font-bold text-white shadow-sm">
-                    {num}
-                  </span>
-                  <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
-                    {icon}
-                  </span>
+                );
+                accent = 'border-t-blue-500';
+              } else if (i === 1) {
+                icon = <IconCar className="w-5 h-5" />;
+                accent = 'border-t-amber-500';
+              } else {
+                icon = <IconCamera width={22} height={22} strokeWidth={2} />;
+                accent = 'border-t-green-500';
+              }
+              
+              return (
+                <div key={num} className={`relative z-10 flex flex-col rounded-2xl border-t-4 border border-slate-200 bg-white p-7 shadow-sm hover:shadow-md transition-shadow ${accent}`}>
+                  <div className="flex items-start justify-between mb-5">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#071739] text-sm font-bold text-white shadow-sm">
+                      {num}
+                    </span>
+                    <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+                      {icon}
+                    </span>
+                  </div>
+                  <h3 className="text-[17px] font-bold text-slate-900">{step.title}</h3>
+                  <p className="mt-2 text-[13px] text-slate-500 leading-relaxed font-medium">
+                    {step.body}
+                  </p>
                 </div>
-                <h3 className="text-base font-bold text-slate-900">{title}</h3>
-                <p className="mt-2 text-sm text-slate-500 leading-relaxed">{desc}</p>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Bottom CTA */}
@@ -302,87 +282,105 @@ export default async function HomePage() {
                   TRANSPARENT PRICING
                 </span>
                 <h2 className="mt-2 text-3xl sm:text-4xl font-bold tracking-tight text-slate-900">
-                  Our Packages
+                  {site.packagesTitle || 'Our Packages'}
                 </h2>
                 <p className="mt-2 text-sm text-slate-500">
-                  Pick the package that fits your car. Nothing is added later — the price you see is what you pay.
+                  {site.packagesBody || 'Pick the package that fits your car. Nothing is added later — the price you see is what you pay.'}
                 </p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-                {packages.map((pkg) => {
-                  const isDetailing = pkg.name.toLowerCase().includes('detail');
-                  const icon = pkg.name.toLowerCase().includes('bucket') ? '🪣' : isDetailing ? '✨' : '🚿';
+                {packages.length > 0 ? (
+                  packages.map((pkg) => {
+                    const isDetailing = pkg.name.toLowerCase().includes('detail');
+                    const icon = pkg.name.toLowerCase().includes('bucket') ? '🪣' : isDetailing ? '✨' : '🚿';
 
-                  return (
-                    <div
-                      key={pkg.id}
-                      className={`relative flex flex-col rounded-2xl p-6 transition-all ${
-                        isDetailing
-                          ? 'border-2 border-amber-400 bg-gradient-to-b from-amber-50/60 to-white shadow-xl shadow-amber-100'
-                          : 'border border-slate-200 bg-white shadow-sm hover:shadow-md hover:border-slate-300'
-                      }`}
-                    >
-                      {isDetailing && (
-                        <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
-                          <span className="inline-flex items-center gap-1 rounded-full bg-[#f59e0b] px-3.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-[#071739] shadow-md">
-                            ⭐ Most Popular
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Icon & name */}
-                      <div className="flex items-center justify-between">
-                        <span className={`flex h-9 w-9 items-center justify-center rounded-xl text-base ${isDetailing ? 'bg-amber-100' : 'bg-blue-50'}`}>
-                          {icon}
-                        </span>
-                        {!isDetailing && (
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                            {pkg.washesPerMonth}× / mo
-                          </span>
-                        )}
-                      </div>
-                      <h3 className="mt-3 text-sm font-bold text-slate-900">{pkg.name}</h3>
-
-                      {/* Price */}
-                      <div className="mt-4 pb-4 border-b border-slate-100">
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-3xl font-bold tracking-tight text-slate-900">
-                            {money(pkg.price)}
-                          </span>
-                          <span className="text-xs font-bold text-slate-400">/ month</span>
-                        </div>
-                        <p className="mt-1 text-[11px] text-slate-500 font-semibold">
-                          {pkg.washesPerMonth} washes · {money(Math.round(pkg.price / Math.max(1, pkg.washesPerMonth)))} each
-                        </p>
-                      </div>
-
-                      {/* Services */}
-                      <ul className="mt-4 space-y-2.5 flex-1">
-                        {pkg.services.map((service) => (
-                          <li key={service} className="flex items-center gap-2.5">
-                            <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${isDetailing ? 'bg-amber-100 text-amber-600' : 'bg-emerald-100 text-emerald-600'}`}>
-                              <IconCheck width={10} height={10} strokeWidth={3.5} />
-                            </span>
-                            <span className="text-[12px] font-semibold text-slate-600">{service}</span>
-                          </li>
-                        ))}
-                      </ul>
-
-                      {/* CTA */}
-                      <a
-                        href="#book"
-                        className={`mt-6 block w-full rounded-xl py-3 text-center text-xs font-semibold transition-all ${
+                    return (
+                      <div
+                        key={pkg.id}
+                        className={`relative flex flex-col rounded-2xl p-6 transition-all ${
                           isDetailing
-                            ? 'bg-[#f59e0b] text-[#071739] hover:bg-[#e08900] shadow-md shadow-amber-200'
-                            : 'border border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:border-slate-400'
+                            ? 'border-2 border-amber-400 bg-gradient-to-b from-amber-50/60 to-white shadow-xl shadow-amber-100'
+                            : 'border border-slate-200 bg-white shadow-sm hover:shadow-md hover:border-slate-300'
                         }`}
                       >
-                        Choose {pkg.name}
-                      </a>
+                        {isDetailing && (
+                          <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-[#f59e0b] px-3.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-[#071739] shadow-md">
+                              ⭐ Most Popular
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Icon & name */}
+                        <div className="flex items-center justify-between">
+                          <span className={`flex h-9 w-9 items-center justify-center rounded-xl text-base ${isDetailing ? 'bg-amber-100' : 'bg-blue-50'}`}>
+                            {icon}
+                          </span>
+                          {!isDetailing && (
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                              {pkg.washesPerMonth}× / mo
+                            </span>
+                          )}
+                        </div>
+                        <h3 className="mt-3 text-sm font-bold text-slate-900">{pkg.name}</h3>
+
+                        {/* Price */}
+                        <div className="mt-4 pb-4 border-b border-slate-100">
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-3xl font-bold tracking-tight text-slate-900">
+                              {money(pkg.price)}
+                            </span>
+                            <span className="text-xs font-bold text-slate-400">/ month</span>
+                          </div>
+                          <p className="mt-1 text-[11px] text-slate-500 font-semibold">
+                            {pkg.washesPerMonth} washes · {money(Math.round(pkg.price / Math.max(1, pkg.washesPerMonth)))} each
+                          </p>
+                        </div>
+
+                        {/* Services */}
+                        <ul className="mt-4 space-y-2.5 flex-1">
+                          {pkg.services.map((service) => (
+                            <li key={service} className="flex items-center gap-2.5">
+                              <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${isDetailing ? 'bg-amber-100 text-amber-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                                <IconCheck width={10} height={10} strokeWidth={3.5} />
+                              </span>
+                              <span className="text-[12px] font-semibold text-slate-600">{service}</span>
+                            </li>
+                          ))}
+                        </ul>
+
+                        {/* CTA */}
+                        <a
+                          href="#book"
+                          className={`mt-6 block w-full rounded-xl py-3 text-center text-xs font-semibold transition-all ${
+                            isDetailing
+                              ? 'bg-[#f59e0b] text-[#071739] hover:bg-[#e08900] shadow-md shadow-amber-200'
+                              : 'border border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:border-slate-400'
+                          }`}
+                        >
+                          Choose {pkg.name}
+                        </a>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="col-span-1 sm:col-span-3 rounded-2xl border-2 border-dashed border-amber-200 bg-[#fffbeb] p-8 text-center flex flex-col items-center justify-center h-full">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-amber-600 mb-4 text-2xl">
+                      🛠️
                     </div>
-                  );
-                })}
+                    <h3 className="text-lg font-bold text-slate-900 mb-2">Custom Wash Plans</h3>
+                    <p className="text-sm text-slate-600 max-w-md mx-auto mb-6">
+                      We tailor our service exactly to your car's needs. Request a callback and we'll offer you our best available pricing based on your location and vehicle.
+                    </p>
+                    <a
+                      href="#book"
+                      className="inline-flex items-center gap-2 rounded-xl bg-[#f59e0b] px-6 py-3 text-sm font-semibold text-[#071739] shadow-md hover:bg-[#e08900] transition-colors"
+                    >
+                      Request a callback
+                    </a>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -392,8 +390,8 @@ export default async function HomePage() {
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-blue-600">
                   WHERE WE OPERATE
                 </span>
-                <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-900">Service Areas</h2>
-                <p className="mt-1 text-sm text-slate-500">Currently serving these areas in Nagpur.</p>
+                <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-900">{site.areasTitle || 'Service Areas'}</h2>
+                <p className="mt-1 text-sm text-slate-500">{site.areasBody || 'Currently serving these areas in Nagpur.'}</p>
               </div>
 
               {/* Area chips */}
@@ -447,7 +445,7 @@ export default async function HomePage() {
               WHY CHOOSE CARZ
             </span>
             <h2 className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight text-white">
-              We do it better
+              {site.featuresTitle || 'We do it better'}
             </h2>
             <p className="mt-2 text-sm text-slate-400 max-w-sm mx-auto">
               Every feature is built so you never have to worry about your car again.
@@ -455,40 +453,29 @@ export default async function HomePage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {[
-              {
-                icon: '📷',
-                title: 'Photo Proof',
-                desc: 'Before & after photos sent for every single wash. No photos? The wash is free.',
-                accent: 'bg-blue-600/15 text-blue-300',
-              },
-              {
-                icon: '🗓️',
-                title: 'Flexible Schedule',
-                desc: 'Pick your days and time. We adjust around your parking and work hours.',
-                accent: 'bg-amber-500/15 text-amber-300',
-              },
-              {
-                icon: '🛡️',
-                title: 'Verified Staff',
-                desc: 'Background-checked, trained wash boys. The same person shows up every week.',
-                accent: 'bg-green-600/15 text-green-300',
-              },
-              {
-                icon: '💳',
-                title: 'Easy Payment',
-                desc: 'Pay monthly by UPI, cash, or card. No advance, no hidden charges.',
-                accent: 'bg-purple-600/15 text-purple-300',
-              },
-            ].map(({ icon, title, desc, accent }) => (
-              <div key={title} className="group rounded-2xl border border-white/8 bg-white/5 p-6 hover:bg-white/8 hover:border-white/15 transition-all">
-                <div className={`inline-flex h-12 w-12 items-center justify-center rounded-2xl text-2xl mb-4 ${accent}`}>
-                  {icon}
-                </div>
-                <h3 className="text-base font-semibold text-white">{title}</h3>
-                <p className="mt-2 text-sm text-slate-400 leading-relaxed">{desc}</p>
-              </div>
-            ))}
+            {site.features?.map((feature, i) => {
+                const accent = [
+                  'bg-blue-600/15 text-blue-300',
+                  'bg-amber-500/15 text-amber-300',
+                  'bg-green-600/15 text-green-300',
+                  'bg-purple-600/15 text-purple-300',
+                ][i % 4];
+                const Icon = feature.icon === 'camera' ? IconCamera :
+                             feature.icon === 'check' ? IconCheck :
+                             feature.icon === 'car' ? IconCar :
+                             feature.icon === 'rupee' ? IconRupee :
+                             feature.icon === 'shield' ? IconShield : IconStar;
+                
+                return (
+                  <div key={feature.id} className="group rounded-2xl border border-white/8 bg-white/5 p-6 hover:bg-white/8 hover:border-white/15 transition-all">
+                    <div className={`inline-flex h-12 w-12 items-center justify-center rounded-2xl mb-4 ${accent}`}>
+                      <Icon width={24} height={24} strokeWidth={2} />
+                    </div>
+                    <h3 className="text-base font-semibold text-white">{feature.title}</h3>
+                    <p className="mt-2 text-sm text-slate-400 leading-relaxed">{feature.body}</p>
+                  </div>
+                );
+              })}
           </div>
         </div>
       </section>
@@ -541,7 +528,7 @@ export default async function HomePage() {
                 REAL PEOPLE. REAL CARS.
               </span>
               <h2 className="mt-2 text-3xl sm:text-4xl font-bold tracking-tight text-slate-900">
-                What our customers say
+                {site.testimonialsTitle || 'What our customers say'}
               </h2>
               <p className="mt-2 text-sm text-slate-500 max-w-sm">
                 Thousands of car owners trust us for a cleaner, hassle-free experience every week.
@@ -580,40 +567,45 @@ export default async function HomePage() {
 
           {/* Testimonial cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-            {[
-              { initials: 'SP', name: 'Shyam Patil', location: 'Wadi', time: '2 weeks ago', quote: '"Two cars, one bill, and I stopped phoning anyone to ask when the wash is. The photos settle everything."', color: 'bg-blue-600', border: 'border-l-blue-500' },
-              { initials: 'KD', name: 'Kavita Deshmukh', location: 'Green Park', time: '1 month ago', quote: '"They missed a wash in the rain and it came back into my count automatically. I did not have to argue for it."', color: 'bg-purple-600', border: 'border-l-purple-500' },
-              { initials: 'NB', name: 'Nitin Bhosale', location: 'Bajaj Nagar', time: '3 weeks ago', quote: '"Same boy every week, same time. My car is clean before I leave for work."', color: 'bg-emerald-600', border: 'border-l-emerald-500' },
-            ].map(({ initials, name, location, time, quote, color, border }) => (
-              <div key={name} className={`rounded-2xl border border-slate-200 border-l-4 bg-white p-6 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between ${border}`}>
-                <div>
-                  {/* Big quote mark */}
-                  <span className="text-5xl font-bold text-slate-100 leading-none select-none block -mb-2">&ldquo;</span>
-                  {/* Stars */}
-                  <div className="flex gap-0.5 text-amber-400 mt-1 mb-4">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <IconStar key={i} width={14} height={14} fill="currentColor" />
-                    ))}
-                  </div>
-                  <blockquote className="text-sm leading-relaxed text-slate-700">
-                    {quote}
-                  </blockquote>
-                </div>
-                {/* Author */}
-                <div className="mt-5 flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className={`flex h-9 w-9 items-center justify-center rounded-full ${color} text-xs font-semibold text-white flex-shrink-0`}>
-                      {initials}
+            {site.testimonials?.filter((t) => t.visible).slice(0, 3).map((item, i) => {
+              const initials = item.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'CX';
+              const colors = [
+                { color: 'bg-blue-600', border: 'border-l-blue-500' },
+                { color: 'bg-purple-600', border: 'border-l-purple-500' },
+                { color: 'bg-emerald-600', border: 'border-l-emerald-500' },
+              ][i % 3];
+              
+              return (
+                <div key={item.id || item.name} className={`rounded-2xl border border-slate-200 border-l-4 bg-white p-6 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between ${colors.border}`}>
+                  <div>
+                    {/* Big quote mark */}
+                    <span className="text-5xl font-bold text-slate-100 leading-none select-none block -mb-2">&ldquo;</span>
+                    {/* Stars */}
+                    <div className="flex gap-0.5 text-amber-400 mt-1 mb-4">
+                      {Array.from({ length: item.rating || 5 }).map((_, i) => (
+                        <IconStar key={i} width={14} height={14} fill="currentColor" />
+                      ))}
                     </div>
-                    <div>
-                      <p className="text-xs font-semibold text-slate-900">{name}</p>
-                      <p className="text-[10px] font-medium text-slate-500">{location}</p>
-                    </div>
+                    <blockquote className="text-sm leading-relaxed text-slate-700 whitespace-pre-wrap">
+                      {item.quote}
+                    </blockquote>
                   </div>
-                  <span className="text-[10px] text-slate-400 font-medium">{time}</span>
+                  {/* Author */}
+                  <div className="mt-5 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className={`flex h-9 w-9 items-center justify-center rounded-full ${colors.color} text-xs font-semibold text-white flex-shrink-0`}>
+                        {initials}
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-slate-900">{item.name}</p>
+                        <p className="text-[10px] font-medium text-slate-500">{item.area}</p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-slate-400 font-medium">Verified</span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
@@ -630,10 +622,10 @@ export default async function HomePage() {
               GET STARTED TODAY
             </span>
             <h2 className="mt-2 text-3xl sm:text-4xl font-bold tracking-tight text-slate-900">
-              Book your doorstep car wash
+              {site.contactTitle || 'Book your doorstep car wash'}
             </h2>
             <p className="mt-2 text-sm text-slate-500">
-              No advance payment. We confirm available slots same day.
+              {site.contactBody || 'No advance payment. We confirm available slots same day.'}
             </p>
           </div>
 
@@ -722,58 +714,67 @@ export default async function HomePage() {
               </div>
 
               {/* Service Areas card */}
-              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-md">
+              <div id="areas" className="scroll-mt-24 rounded-3xl border border-slate-200 bg-white p-6 shadow-md">
                 <div className="flex items-center gap-2 mb-4">
                   <span className="text-blue-600 text-base">📍</span>
-                  <h3 className="text-sm font-bold text-slate-900">Service Areas</h3>
+                  <h3 className="text-sm font-bold text-slate-900">{site.mapTitle || 'Service Areas'}</h3>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2.5 mb-5">
+                <div className="flex flex-col gap-2.5 mb-5">
                   {areasList.map((area, i) => (
-                    <div key={area.id} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+                    <div key={area.id} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
                       <span className={`h-2.5 w-2.5 rounded-full flex-shrink-0 ${i === 0 ? 'bg-blue-500' : i === 1 ? 'bg-purple-500' : 'bg-emerald-500'}`} />
-                      <div className="min-w-0">
-                        <p className="text-xs font-semibold text-slate-900 truncate">{area.name}</p>
-                        <p className="text-[9px] text-slate-500">{area.city}</p>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-slate-900 truncate">{area.name}</p>
+                        <p className="text-[10px] text-slate-500">{area.city}</p>
                       </div>
                     </div>
                   ))}
                 </div>
 
                 {/* Map + don't see your area */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-2xl overflow-hidden border border-slate-200 bg-[#e8f0f8]">
-                    <svg viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-                      <rect width="200" height="120" fill="#e8f0f8" />
-                      <line x1="0" y1="60" x2="200" y2="60" stroke="#c8d8e8" strokeWidth="4" />
-                      <line x1="100" y1="0" x2="100" y2="120" stroke="#c8d8e8" strokeWidth="4" />
-                      <line x1="0" y1="30" x2="200" y2="30" stroke="#d8e4ee" strokeWidth="2" />
-                      <line x1="0" y1="90" x2="200" y2="90" stroke="#d8e4ee" strokeWidth="2" />
-                      <line x1="50" y1="0" x2="50" y2="120" stroke="#d8e4ee" strokeWidth="2" />
-                      <line x1="150" y1="0" x2="150" y2="120" stroke="#d8e4ee" strokeWidth="2" />
-                      <rect x="10" y="10" width="30" height="15" fill="#d4e2ef" rx="2" />
-                      <rect x="55" y="10" width="35" height="15" fill="#d4e2ef" rx="2" />
-                      <rect x="155" y="10" width="30" height="15" fill="#d4e2ef" rx="2" />
-                      <rect x="10" y="38" width="30" height="18" fill="#d4e2ef" rx="2" />
-                      <rect x="155" y="38" width="30" height="18" fill="#d4e2ef" rx="2" />
-                      <rect x="10" y="68" width="30" height="18" fill="#d4e2ef" rx="2" />
-                      <rect x="55" y="68" width="35" height="18" fill="#d4e2ef" rx="2" />
-                      <rect x="155" y="68" width="30" height="18" fill="#d4e2ef" rx="2" />
-                      <circle cx="100" cy="55" r="12" fill="#2563eb" opacity="0.15" />
-                      <circle cx="100" cy="55" r="7" fill="#2563eb" />
-                      <circle cx="100" cy="55" r="3" fill="white" />
-                      <text x="100" y="92" textAnchor="middle" fontSize="8" fontWeight="bold" fill="#1e40af" fontFamily="sans-serif">Nagpur</text>
-                    </svg>
+                <div className="flex flex-col gap-3">
+                  <div className="rounded-2xl overflow-hidden border border-slate-200 bg-[#e8f0f8] aspect-[2/1]">
+                    {site.mapEmbedUrl ? (
+                      <iframe 
+                        src={site.mapEmbedUrl} 
+                        className="w-full h-full border-0" 
+                        loading="lazy" 
+                        referrerPolicy="no-referrer-when-downgrade" 
+                      />
+                    ) : (
+                      <svg viewBox="0 0 200 120" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+                        <rect width="200" height="120" fill="#e8f0f8" />
+                        <line x1="0" y1="60" x2="200" y2="60" stroke="#c8d8e8" strokeWidth="4" />
+                        <line x1="100" y1="0" x2="100" y2="120" stroke="#c8d8e8" strokeWidth="4" />
+                        <line x1="0" y1="30" x2="200" y2="30" stroke="#d8e4ee" strokeWidth="2" />
+                        <line x1="0" y1="90" x2="200" y2="90" stroke="#d8e4ee" strokeWidth="2" />
+                        <line x1="50" y1="0" x2="50" y2="120" stroke="#d8e4ee" strokeWidth="2" />
+                        <line x1="150" y1="0" x2="150" y2="120" stroke="#d8e4ee" strokeWidth="2" />
+                        <rect x="10" y="10" width="30" height="15" fill="#d4e2ef" rx="2" />
+                        <rect x="55" y="10" width="35" height="15" fill="#d4e2ef" rx="2" />
+                        <rect x="155" y="10" width="30" height="15" fill="#d4e2ef" rx="2" />
+                        <rect x="10" y="38" width="30" height="18" fill="#d4e2ef" rx="2" />
+                        <rect x="155" y="38" width="30" height="18" fill="#d4e2ef" rx="2" />
+                        <rect x="10" y="68" width="30" height="18" fill="#d4e2ef" rx="2" />
+                        <rect x="55" y="68" width="35" height="18" fill="#d4e2ef" rx="2" />
+                        <rect x="155" y="68" width="30" height="18" fill="#d4e2ef" rx="2" />
+                        <circle cx="100" cy="55" r="12" fill="#2563eb" opacity="0.15" />
+                        <circle cx="100" cy="55" r="7" fill="#2563eb" />
+                        <circle cx="100" cy="55" r="3" fill="white" />
+                        <text x="100" y="92" textAnchor="middle" fontSize="8" fontWeight="bold" fill="#1e40af" fontFamily="sans-serif">Nagpur</text>
+                      </svg>
+                    )}
                   </div>
 
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3.5 flex flex-col justify-between">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 flex flex-row items-center justify-between gap-3">
                     <div>
                       <p className="text-xs font-bold text-slate-900">Don&apos;t see your area?</p>
                       <p className="text-[10px] text-slate-500 mt-0.5">We&apos;re expanding fast!</p>
                     </div>
                     <a
                       href="#book"
-                      className="mt-3 block w-full rounded-lg border border-slate-300 bg-white py-2 text-center text-[10px] font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
+                      className="flex-shrink-0 rounded-lg border border-slate-300 bg-white px-4 py-2 text-center text-[10px] font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
                     >
                       Request area →
                     </a>
