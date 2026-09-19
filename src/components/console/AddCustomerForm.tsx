@@ -645,11 +645,15 @@ export function AddCustomerForm({
                         value={car.packageId}
                         onChange={(e) => updateCar(index, { packageId: e.target.value })}
                       >
-                        {options.packages.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name} — {p.washesPerMonth} washes — {money(p.price)}
-                          </option>
-                        ))}
+                        {options.packages.length === 0 ? (
+                          <option value="">No packages available</option>
+                        ) : (
+                          options.packages.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name} — {p.washesPerMonth} washes — {money(p.price)}
+                            </option>
+                          ))
+                        )}
                       </select>
                       {(() => {
                         const pkg = options.packages.find((p) => p.id === car.packageId);
