@@ -22,7 +22,7 @@ for (const block of schema.matchAll(/^model\s+(\w+)\s*\{([\s\S]*?)^\}/gm)) {
   const found = { dateOnly: [] as string[], timestamp: [] as string[] };
 
   for (const line of body.split('\n')) {
-    const field = /^\s*(\w+)\s+DateTime\??\s*(.*)$/.exec(line);
+    const field = /^\s*(\w+)\s+DateTime(?:\?|\[\])?\s*(.*)$/.exec(line);
     if (!field) continue;
     const [, name, attributes] = field;
     (attributes.includes('@db.Date') ? found.dateOnly : found.timestamp).push(name);

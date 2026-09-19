@@ -62,6 +62,8 @@ function toDb(kind: DateKind, value: unknown): unknown {
 }
 
 function fromDb(kind: DateKind, value: unknown): unknown {
+  if (value === null || value === undefined) return value;
+  if (Array.isArray(value)) return value.map((v) => fromDb(kind, v));
   if (!(value instanceof Date)) return value;
   const iso = value.toISOString();
   return kind === 'date' ? iso.slice(0, 10) : iso;
