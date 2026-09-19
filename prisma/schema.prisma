@@ -97,6 +97,7 @@ enum WeekdayPattern {
   TUE_FRI
   WED_SAT
   THU_SUN
+  CUSTOM
 }
 
 enum VisitStatus {
@@ -417,6 +418,7 @@ model Car {
   serviceStartedBeforePayment Boolean @default(false)
   serviceStartedByUserId String?
   serviceStartNote    String?
+  customDates         DateTime[]     @db.Date
 
   customer      Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
   servicePackage ServicePackage @relation(fields: [packageId], references: [id])

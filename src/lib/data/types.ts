@@ -310,12 +310,7 @@ export interface ServicePackage {
   active: boolean;
 }
 
-export const WEEKDAY_PATTERNS = [
-  'MON_THU',
-  'TUE_FRI',
-  'WED_SAT',
-  'THU_SUN',
-] as const;
+export const WEEKDAY_PATTERNS = ['MON_THU', 'TUE_FRI', 'WED_SAT', 'THU_SUN', 'CUSTOM'] as const;
 export type WeekdayPattern = (typeof WEEKDAY_PATTERNS)[number];
 
 export interface Car {
@@ -335,9 +330,10 @@ export interface Car {
   active: boolean;
   serviceStarted?: boolean;
   serviceStartedAt?: Timestamp | null;
-  serviceStartedBeforePayment?: boolean;
-  serviceStartedByUserId?: Id | null;
+  serviceStartedBeforePayment: boolean;
+  serviceStartedByUserId: string | null;
   serviceStartNote?: string | null;
+  customDates?: string[] | Date[];
 }
 
 /* -------------------------------------------------------------------------- */

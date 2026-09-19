@@ -199,11 +199,11 @@ export async function ConsoleCustomerDetail({
                 key={car.id}
                 className="mb-3 rounded-lg border border-line bg-white p-3.5 last:mb-0 shadow-xs"
               >
-                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b border-line/60 pb-2 mb-2 min-w-0">
-                  <b className="text-sm font-bold text-ink min-w-0 flex-1 break-words">
+                <div className="flex flex-col gap-3 border-b border-line/60 pb-3 mb-3 min-w-0">
+                  <b className="text-base font-bold text-ink min-w-0 break-words">
                     {car.make} {car.model} — {car.plate}
                   </b>
-                  <div className="flex flex-wrap items-center justify-start sm:justify-end gap-1.5 min-w-0">
+                  <div className="flex flex-wrap items-center gap-1.5 min-w-0">
                     {isStarted ? (
                       car.serviceStartedBeforePayment ? (
                         <Tag tone="warn">Started Before Payment (Override)</Tag>

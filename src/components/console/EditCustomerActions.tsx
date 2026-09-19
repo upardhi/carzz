@@ -275,10 +275,22 @@ export function EditCarModalButton({
   const [schedulePattern, setSchedulePattern] = useState<WeekdayPattern>(car.schedulePattern);
   const [scheduleTime, setScheduleTime] = useState(car.scheduleTime);
   const [specialInstructions, setSpecialInstructions] = useState(car.specialInstructions || '');
+  const [customDates, setCustomDates] = useState<string[]>(() => {
+    return (car.customDates || []).map(d => typeof d === 'string' ? d.slice(0, 10) : new Date(d).toISOString().slice(0, 10));
+  });
   const [active, setActive] = useState(car.active ?? true);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
+    
+    if (schedulePattern === 'CUSTOM') {
+      const pkg = packages.find(p => p.id === packageId);
+      if (pkg && customDates.filter(Boolean).length !== pkg.washesPerMonth) {
+        toast.error(`For custom dates, you must select exactly ${pkg.washesPerMonth} dates.`);
+        return;
+      }
+    }
+
     if (!make.trim() || !model.trim() || !plate.trim()) {
       toast.error('Make, Model and Plate Number are required.');
       return;
@@ -302,6 +314,7 @@ export function EditCarModalButton({
           schedulePattern,
           scheduleTime,
           specialInstructions: specialInstructions.trim() || null,
+          customDates: schedulePattern === 'CUSTOM' ? customDates : undefined,
           active,
         }),
       });
@@ -458,6 +471,34 @@ export function EditCarModalButton({
                   />
                 </div>
               </div>
+
+              {schedulePattern === 'CUSTOM' && (() => {
+                const pkg = packages.find((p) => p.id === packageId);
+                if (!pkg) return null;
+                
+                return (
+                  <div className="mt-2">
+                    <label className="mb-2 block text-xs font-bold text-slate-700">
+                      Select exactly {pkg.washesPerMonth} dates *
+                    </label>
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      {Array.from({ length: pkg.washesPerMonth }).map((_, dateIndex) => (
+                        <input
+                          key={dateIndex}
+                          type="date"
+                          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold focus:border-blue-500 focus:outline-none"
+                          value={customDates[dateIndex] || ''}
+                          onChange={(e) => {
+                            const newDates = [...customDates];
+                            newDates[dateIndex] = e.target.value;
+                            setCustomDates(newDates);
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div>
                 <label className="block font-bold text-slate-700 mb-1">Special Instructions / Parking Spot</label>

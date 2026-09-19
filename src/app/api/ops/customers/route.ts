@@ -50,6 +50,7 @@ const carSchema = z.object({
   schedulePattern: z.enum(WEEKDAY_PATTERNS).optional().default('MON_THU'),
   scheduleTime: z.string().regex(/^\d{2}:\d{2}$/),
   specialInstructions: z.string().max(300).optional(),
+  customDates: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional(),
 });
 
 const createSchema = z.object({
@@ -128,6 +129,7 @@ const updateCarSchema = z.object({
   scheduleTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
   specialInstructions: z.string().max(300).optional().nullable(),
   active: z.boolean().optional(),
+  customDates: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional(),
 });
 
 const addCarSchema = z.object({
@@ -144,6 +146,7 @@ const addCarSchema = z.object({
   specialInstructions: z.string().max(300).optional().nullable(),
   autoStartService: z.boolean().optional(),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  customDates: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional(),
 });
 
 const deleteCarSchema = z.object({
@@ -441,6 +444,7 @@ export async function POST(request: Request) {
       if (parsed.data.scheduleTime !== undefined) patch.scheduleTime = parsed.data.scheduleTime;
       if (parsed.data.specialInstructions !== undefined) patch.specialInstructions = parsed.data.specialInstructions;
       if (parsed.data.active !== undefined) patch.active = parsed.data.active;
+      if (parsed.data.customDates !== undefined) patch.customDates = parsed.data.customDates;
 
       const updatedCar = await store.cars.update(car.id, patch);
 
@@ -487,6 +491,7 @@ export async function POST(request: Request) {
         serviceStartedBeforePayment: false,
         serviceStartedByUserId: session.user.id,
         serviceStartNote: 'Added from Customer Management',
+        customDates: parsed.data.customDates || [],
       });
 
       const cycle = currentCycle();
@@ -620,6 +625,7 @@ export async function POST(request: Request) {
         serviceStartedBeforePayment: false,
         serviceStartedByUserId: isPrepaidPaid ? session.user.id : null,
         serviceStartNote: null,
+        customDates: input.customDates || [],
       });
 
       if (isPrepaidPaid) {
