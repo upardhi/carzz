@@ -113,7 +113,7 @@ export async function missWash(
     // If no explicit reschedule date was given, balance workload across available slots
     if (!date && car) {
       let candidate = nextSlotAfter(car, visit.scheduledDate);
-      if (visit.staffId) {
+      if (candidate && visit.staffId) {
         // Up to 5 slots checked: pick the first slot where staff has under 14 scheduled washes
         for (let attempt = 0; attempt < 5; attempt++) {
           const staffLoad = await store.visits.find({
@@ -126,43 +126,43 @@ export async function missWash(
           if (staffLoad.length < 14) {
             break;
           }
-          candidate = nextSlotAfter(car, candidate);
+          const next = nextSlotAfter(car, candidate);
+          if (!next) break;
+          candidate = next;
         }
       }
       date = candidate;
-    } else if (!date) {
-      date = visit.scheduledDate;
     }
 
-    replacement = await store.visits.create({
-      carId: visit.carId,
-      customerId: visit.customerId,
-      areaId: visit.areaId,
-      staffId: visit.staffId,
-      // The replacement stays in the same billing cycle: the customer is not
-      // charged again, and the month's count still balances.
-      cycle: visit.cycle,
-      scheduledDate: date,
-      scheduledTime: visit.scheduledTime,
-      status: 'PENDING',
-      startedAt: null,
-      completedAt: null,
-      servicesDone: [],
-      beforePhotoUrl: null,
-      afterPhotoUrl: null,
-      beforePhotoBytes: null,
-      afterPhotoBytes: null,
-      missReason: null,
-      missNote: null,
-      rescheduledToVisitId: null,
-      rating: null,
-      ratingComment: null,
-      onTime: false,
-      managerRating: null,
-      managerRatingComment: null,
-      managerRatedAt: null,
-      managerRatedByUserId: null,
-    });
+    if (date) {
+      replacement = await store.visits.create({
+        carId: visit.carId,
+        customerId: visit.customerId,
+        areaId: visit.areaId,
+        staffId: visit.staffId,
+        cycle: visit.cycle,
+        scheduledDate: date,
+        scheduledTime: visit.scheduledTime,
+        status: 'PENDING',
+        startedAt: null,
+        completedAt: null,
+        servicesDone: [],
+        beforePhotoUrl: null,
+        afterPhotoUrl: null,
+        beforePhotoBytes: null,
+        afterPhotoBytes: null,
+        missReason: null,
+        missNote: null,
+        rescheduledToVisitId: null,
+        rating: null,
+        ratingComment: null,
+        onTime: false,
+        managerRating: null,
+        managerRatingComment: null,
+        managerRatedAt: null,
+        managerRatedByUserId: null,
+      });
+    }
   }
 
   const updated = await store.visits.update(visitId, {

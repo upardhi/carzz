@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { WashDatesPicker } from '@/components/ui/WashDatesPicker';
 
 interface PackageOption {
   id: string;
@@ -21,14 +22,21 @@ export function AddCarModal({ packages }: { packages: PackageOption[] }) {
   const [colour, setColour] = useState('White');
   const [plate, setPlate] = useState('');
   const [packageId, setPackageId] = useState(packages[0]?.id || '');
-  const [schedulePattern, setSchedulePattern] = useState<'MON_THU' | 'TUE_FRI' | 'WED_SAT' | 'THU_SUN'>('MON_THU');
   const [scheduleTime, setScheduleTime] = useState('06:30');
   const [instructions, setInstructions] = useState('');
+  const [customDates, setCustomDates] = useState<string[]>([]);
+
+  const selectedPkg = packages.find((p) => p.id === packageId);
+  const washCount = selectedPkg?.washesPerMonth ?? 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!model.trim() || !plate.trim()) {
       setError('Please provide car model and plate number.');
+      return;
+    }
+    if (customDates.filter(Boolean).length !== washCount) {
+      setError(`Please select exactly ${washCount} wash date${washCount !== 1 ? 's' : ''}.`);
       return;
     }
 
@@ -45,9 +53,10 @@ export function AddCarModal({ packages }: { packages: PackageOption[] }) {
           colour: colour.trim() || 'White',
           plate: plate.trim().toUpperCase(),
           packageId: packageId || undefined,
-          schedulePattern,
+          schedulePattern: 'CUSTOM',
           scheduleTime,
           specialInstructions: instructions.trim() || undefined,
+          customDates,
         }),
       });
 
@@ -60,6 +69,7 @@ export function AddCarModal({ packages }: { packages: PackageOption[] }) {
       setModel('');
       setPlate('');
       setInstructions('');
+      setCustomDates([]);
       setIsOpen(false);
       router.refresh();
     } catch (err) {
@@ -81,7 +91,7 @@ export function AddCarModal({ packages }: { packages: PackageOption[] }) {
 
       {isOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/60 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-slate-200 animate-fade-up max-h-[90vh] overflow-y-auto">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl border border-slate-200 animate-fade-up max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
                 <h3 className="text-lg font-bold text-navy-950">Add Another Car</h3>
@@ -162,7 +172,7 @@ export function AddCarModal({ packages }: { packages: PackageOption[] }) {
                 <label className="block font-medium text-slate-700 mb-1">Wash Package</label>
                 <select
                   value={packageId}
-                  onChange={(e) => setPackageId(e.target.value)}
+                  onChange={(e) => { setPackageId(e.target.value); setCustomDates([]); }}
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-navy-600 focus:outline-hidden bg-white"
                 >
                   {packages.map((pkg) => (
@@ -173,36 +183,31 @@ export function AddCarModal({ packages }: { packages: PackageOption[] }) {
                 </select>
               </div>
 
-              {/* Wash Days Pattern */}
-              <div className="grid grid-cols-2 gap-2.5">
-                <div>
-                  <label className="block font-medium text-slate-700 mb-1">Wash Schedule</label>
-                  <select
-                    value={schedulePattern}
-                    onChange={(e) => setSchedulePattern(e.target.value as 'MON_THU' | 'TUE_FRI' | 'WED_SAT' | 'THU_SUN')}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-navy-600 focus:outline-hidden bg-white"
-                  >
-                    <option value="MON_THU">Mon / Thu</option>
-                    <option value="TUE_FRI">Tue / Fri</option>
-                    <option value="WED_SAT">Wed / Sat</option>
-                    <option value="THU_SUN">Thu / Sun</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block font-medium text-slate-700 mb-1">Time Slot</label>
-                  <select
-                    value={scheduleTime}
-                    onChange={(e) => setScheduleTime(e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-navy-600 focus:outline-hidden bg-white"
-                  >
-                    <option value="06:30">06:30 AM</option>
-                    <option value="07:30">07:30 AM</option>
-                    <option value="08:30">08:30 AM</option>
-                    <option value="17:30">05:30 PM</option>
-                    <option value="18:30">06:30 PM</option>
-                  </select>
-                </div>
+              {/* Time Slot */}
+              <div>
+                <label className="block font-medium text-slate-700 mb-1">Preferred Time Slot</label>
+                <select
+                  value={scheduleTime}
+                  onChange={(e) => setScheduleTime(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-navy-600 focus:outline-hidden bg-white"
+                >
+                  <option value="06:30">06:30 AM</option>
+                  <option value="07:30">07:30 AM</option>
+                  <option value="08:30">08:30 AM</option>
+                  <option value="17:30">05:30 PM</option>
+                  <option value="18:30">06:30 PM</option>
+                </select>
               </div>
+
+              {/* Wash Date Picker */}
+              {washCount > 0 && (
+                <WashDatesPicker
+                  count={washCount}
+                  dates={customDates}
+                  onChange={setCustomDates}
+                  size="sm"
+                />
+              )}
 
               {/* Special Instructions */}
               <div>
