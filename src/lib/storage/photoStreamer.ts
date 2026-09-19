@@ -1,14 +1,19 @@
 import { NextResponse } from 'next/server';
-import { get as vercelBlobGet } from '@vercel/blob';
+import { get as vercelBlobGet, head as vercelBlobHead } from '@vercel/blob';
 import { getPhotoStorage } from '@/lib/storage';
 import { getStore } from '@/lib/data';
+
+export interface ServePhotoOptions {
+  customToken?: string | null;
+}
 
 /**
  * Universal photo streaming handler.
  * Fetches and streams photos from private or public cloud storage (Vercel Blob,
  * S3, Firebase, Memory) directly to client apps with CORS and caching enabled.
+ * Supports external sites and React Native apps passing blob tokens via query or headers.
  */
-export async function servePhoto(target: string) {
+export async function servePhoto(target: string, options?: ServePhotoOptions) {
   if (!target) {
     return NextResponse.json(
       { error: 'Missing photo target' },
@@ -23,24 +28,29 @@ export async function servePhoto(target: string) {
     decoded = target.trim();
   }
 
-  // Support an explicitly dedicated private token, otherwise fall back to the generic public/default token
+  // Support an explicitly provided custom token (from query/header), or fallback to server env tokens
   const token =
+    options?.customToken ||
     process.env.PRIVATE_BLOB_READ_WRITE_TOKEN ||
-    process.env.PUBLIC_BLOB_READ_WRITE_TOKEN ||
     process.env.BLOB_READ_WRITE_TOKEN ||
-    process.env.VERCEL_BLOB_READ_WRITE_TOKEN;
+    process.env.VERCEL_BLOB_READ_WRITE_TOKEN ||
+    process.env.BLOB_STORE_READ_WRITE_TOKEN ||
+    process.env.PUBLIC_BLOB_READ_WRITE_TOKEN;
 
-  // 1. If it's a Vercel Blob URL, use the official @vercel/blob SDK get method
+  // 1. If it's a Vercel Blob URL, use the official @vercel/blob SDK get/head methods
   if (decoded.includes('.blob.vercel-storage.com')) {
+    const isPrivate = decoded.includes('.private.blob.vercel-storage.com');
+
+    // 1a. Try @vercel/blob get method
     try {
-      const isPrivate = decoded.includes('.private.blob.vercel-storage.com');
       const blobResult = await vercelBlobGet(decoded, {
         access: isPrivate ? 'private' : 'public',
         token,
       });
 
       if (blobResult?.statusCode === 200 && blobResult.stream) {
-        return new NextResponse(blobResult.stream as never, {
+        const arrayBuf = await new Response(blobResult.stream as BodyInit).arrayBuffer();
+        return new NextResponse(Buffer.from(arrayBuf), {
           status: 200,
           headers: {
             'Content-Type': blobResult.blob.contentType || 'image/jpeg',
@@ -50,7 +60,29 @@ export async function servePhoto(target: string) {
         });
       }
     } catch (blobErr) {
-      console.warn('[photoStreamer] @vercel/blob SDK get failed, trying direct fetch:', blobErr);
+      console.warn('[photoStreamer] @vercel/blob SDK get failed, trying head/download fallback:', blobErr);
+    }
+
+    // 1b. Try @vercel/blob head method to obtain a presigned downloadUrl
+    try {
+      const headInfo = await vercelBlobHead(decoded, { token });
+      if (headInfo?.downloadUrl) {
+        const downloadRes = await fetch(headInfo.downloadUrl);
+        if (downloadRes.ok) {
+          const contentType = downloadRes.headers.get('content-type') || headInfo.contentType || 'image/jpeg';
+          const arrayBuf = await downloadRes.arrayBuffer();
+          return new NextResponse(Buffer.from(arrayBuf), {
+            status: 200,
+            headers: {
+              'Content-Type': contentType,
+              'Cache-Control': 'public, max-age=86400, stale-while-revalidate=3600',
+              ...corsHeaders(),
+            },
+          });
+        }
+      }
+    } catch (headErr) {
+      console.warn('[photoStreamer] @vercel/blob SDK head fallback failed:', headErr);
     }
   }
 
@@ -70,7 +102,7 @@ export async function servePhoto(target: string) {
             error: 'Photo not found or inaccessible from storage provider',
             upstreamStatus: res.status,
             hint: decoded.includes('.private.blob.vercel-storage.com') && !token
-              ? 'BLOB_READ_WRITE_TOKEN is missing on server for private Vercel Blob access'
+              ? 'BLOB_READ_WRITE_TOKEN is missing on server or in query params for private Vercel Blob access'
               : undefined,
           },
           { status: res.status === 404 ? 404 : 502, headers: corsHeaders() },
@@ -115,7 +147,7 @@ export async function servePhoto(target: string) {
     console.warn('Storage provider get failed, falling back to DB lookup:', err);
   }
 
-  // 3. Fallback: Lookup in database store by visit key
+  // 4. Fallback: Lookup in database store by visit key
   try {
     const cleanKey = decoded.replace(/^washes\//, '');
     const isBefore = cleanKey.endsWith('-before');
@@ -129,23 +161,7 @@ export async function servePhoto(target: string) {
       if (visit) {
         const targetUrl = isBefore ? visit.beforePhotoUrl : visit.afterPhotoUrl;
         if (targetUrl && (targetUrl.startsWith('http://') || targetUrl.startsWith('https://'))) {
-          const headers: Record<string, string> = {};
-          if (token && targetUrl.includes('.private.blob.vercel-storage.com')) {
-            headers['Authorization'] = `Bearer ${token}`;
-          }
-          const res = await fetch(targetUrl, { headers });
-          if (res.ok) {
-            const contentType = res.headers.get('content-type') || 'image/jpeg';
-            const arrayBuf = await res.arrayBuffer();
-            return new NextResponse(Buffer.from(arrayBuf), {
-              status: 200,
-              headers: {
-                'Content-Type': contentType,
-                'Cache-Control': 'public, max-age=86400, stale-while-revalidate=3600',
-                ...corsHeaders(),
-              },
-            });
-          }
+          return await servePhoto(targetUrl, options);
         }
       }
     }
@@ -163,7 +179,7 @@ export function corsHeaders(): Record<string, string> {
   return {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-blob-token',
     'Access-Control-Max-Age': '86400',
   };
 }

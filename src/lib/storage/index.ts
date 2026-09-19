@@ -338,6 +338,7 @@ const globalForPhotos = globalThis as unknown as {
  */
 export function getPhotoStorage(): PhotoStorage {
   const hasBlobToken = Boolean(
+    process.env.PRIVATE_BLOB_READ_WRITE_TOKEN ||
     process.env.PUBLIC_BLOB_READ_WRITE_TOKEN ||
     process.env.BLOB_READ_WRITE_TOKEN ||
     process.env.VERCEL_BLOB_READ_WRITE_TOKEN,
