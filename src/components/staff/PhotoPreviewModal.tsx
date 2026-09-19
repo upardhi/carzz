@@ -7,9 +7,10 @@ interface PhotoPreviewModalProps {
   kind: 'before' | 'after';
   url: string;
   onClose: () => void;
+  onRetake?: () => void;
 }
 
-export function PhotoPreviewModal({ kind, url, onClose }: PhotoPreviewModalProps) {
+export function PhotoPreviewModal({ kind, url, onClose, onRetake }: PhotoPreviewModalProps) {
   const title = kind === 'before' ? 'Before-Wash Photo' : 'After-Wash Photo';
   const initialResolved = resolvePublicPhotoUrl(url) || url;
   const [currentSrc, setCurrentSrc] = useState<string>(initialResolved);
@@ -63,8 +64,17 @@ export function PhotoPreviewModal({ kind, url, onClose }: PhotoPreviewModalProps
               <span className="text-3xl mb-2">⚠️</span>
               <p className="text-sm font-semibold text-white">Could not preview photo</p>
               <p className="text-xs text-slate-400 mt-1 max-w-xs">
-                The image storage token may be missing or inaccessible. The photo is securely saved on the server.
+                This image was taken before cloud storage was connected. Please retake the photo below to save it permanently.
               </p>
+              {onRetake && (
+                <button
+                  type="button"
+                  onClick={onRetake}
+                  className="mt-4 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-md hover:bg-blue-500 active:scale-95 transition-all cursor-pointer"
+                >
+                  📷 Retake Photo Now
+                </button>
+              )}
             </div>
           ) : (
             /* eslint-disable-next-line @next/next/no-img-element */
@@ -77,12 +87,21 @@ export function PhotoPreviewModal({ kind, url, onClose }: PhotoPreviewModalProps
           )}
         </div>
 
-        {/* Bottom Close Action Bar */}
-        <div className="shrink-0 bg-[#0c1e3d] border-t border-white/10 px-5 py-3.5">
+        {/* Bottom Action Bar */}
+        <div className="shrink-0 bg-[#0c1e3d] border-t border-white/10 px-5 py-3.5 flex items-center gap-2">
+          {onRetake && (
+            <button
+              type="button"
+              onClick={onRetake}
+              className="flex-1 rounded-xl bg-blue-600/30 border border-blue-400/30 py-3 text-xs sm:text-sm font-semibold text-blue-200 hover:bg-blue-600/50 hover:text-white active:scale-95 transition-all cursor-pointer"
+            >
+              📷 Retake
+            </button>
+          )}
           <button
             type="button"
             onClick={onClose}
-            className="w-full rounded-xl bg-white/10 py-3 text-xs sm:text-sm font-semibold text-white hover:bg-white/20 active:scale-95 transition-all cursor-pointer"
+            className="flex-1 rounded-xl bg-white/10 py-3 text-xs sm:text-sm font-semibold text-white hover:bg-white/20 active:scale-95 transition-all cursor-pointer"
           >
             Close Preview
           </button>
