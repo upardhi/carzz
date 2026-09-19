@@ -119,7 +119,7 @@ export async function GET(request: NextRequest) {
         carPlate: car.plate,
       },
       nextRegularDate,
-      nextRegularDateFormatted: formatDateFull(nextRegularDate),
+      nextRegularDateFormatted: nextRegularDate ? formatDateFull(nextRegularDate) : null,
       candidateSlots,
       reschedulesUsed,
       reschedulesRemaining: Math.max(0, reschedulesAllowed - reschedulesUsed),

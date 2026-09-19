@@ -25,7 +25,15 @@ const toIso = (d: Date) => d.toISOString().slice(0, 10);
 /**
  * Finds the earliest available pattern day on or after `from`.
  */
-export function nextSlotOnOrAfter(car: Car, from: DateOnly): DateOnly {
+export function nextSlotOnOrAfter(car: Car, from: DateOnly): DateOnly | null {
+  if (car.schedulePattern === 'CUSTOM') {
+    const dates = (car.customDates || []).map((d: unknown) => 
+      typeof d === 'string' ? d.slice(0, 10) : (d as Date).toISOString().slice(0, 10)
+    ).sort();
+    const futureOrToday = dates.find(d => d >= from);
+    return futureOrToday || null;
+  }
+
   const days = PATTERN_DAYS[car.schedulePattern] || [1, 4];
   const cursor = toDate(from);
   for (let i = 0; i <= 14; i += 1) {
@@ -39,7 +47,15 @@ export function nextSlotOnOrAfter(car: Car, from: DateOnly): DateOnly {
  * The next free slot strictly after `from` on this car's pattern — where the
  * next wash lands after the current wash completes or is missed.
  */
-export function nextSlotAfter(car: Car, from: DateOnly): DateOnly {
+export function nextSlotAfter(car: Car, from: DateOnly): DateOnly | null {
+  if (car.schedulePattern === 'CUSTOM') {
+    const dates = (car.customDates || []).map((d: unknown) => 
+      typeof d === 'string' ? d.slice(0, 10) : (d as Date).toISOString().slice(0, 10)
+    ).sort();
+    const future = dates.find(d => d > from);
+    return future || null;
+  }
+
   const days = PATTERN_DAYS[car.schedulePattern] || [1, 4];
   const cursor = toDate(from);
   for (let i = 1; i <= 14; i += 1) {
@@ -105,6 +121,10 @@ export async function scheduleNextVisitForCar(
 
   const baseDate = fromDate && fromDate >= today ? fromDate : today;
   const nextDate = nextSlotOnOrAfter(car, baseDate);
+  
+  if (!nextDate) {
+    return null;
+  }
 
   const created = await store.visits.create({
     carId: car.id,

@@ -29,7 +29,7 @@ interface Props {
   initialBefore: string | null;
   initialAfter: string | null;
   requireBothPhotos: boolean;
-  nextSlotDate: string;
+  nextSlotDate: string | null;
   /** Set the moment the before photo was taken — the clock this wash is timed against. */
   startedAt: string | null;
 }
@@ -711,7 +711,7 @@ function MissWashForm({
   onCancel,
 }: {
   visitId: string;
-  nextSlotDate: string;
+  nextSlotDate: string | null;
   onCancel: () => void;
 }) {
   const router = useRouter();
@@ -730,7 +730,7 @@ function MissWashForm({
           action: 'miss',
           visitId,
           reason,
-          rescheduleTo: nextSlotDate,
+          rescheduleTo: nextSlotDate || undefined,
         },
         label: `Record missed wash: ${reason}`,
       });

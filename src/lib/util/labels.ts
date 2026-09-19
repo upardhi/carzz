@@ -72,10 +72,11 @@ export const EXPENSE_HEAD_LABEL: Record<ExpenseHead, string> = {
 };
 
 export const PATTERN_LABEL: Record<WeekdayPattern, string> = {
-  MON_THU: 'Monday / Thursday',
-  TUE_FRI: 'Tuesday / Friday',
-  WED_SAT: 'Wednesday / Saturday',
-  THU_SUN: 'Thursday / Sunday',
+  MON_THU: 'Monday & Thursday',
+  TUE_FRI: 'Tuesday & Friday',
+  WED_SAT: 'Wednesday & Saturday',
+  THU_SUN: 'Thursday & Sunday',
+  CUSTOM: 'Custom Dates (One-off)',
 };
 
 export const PATTERN_SHORT: Record<WeekdayPattern, string> = {
@@ -83,6 +84,7 @@ export const PATTERN_SHORT: Record<WeekdayPattern, string> = {
   TUE_FRI: 'Tue/Fri',
   WED_SAT: 'Wed/Sat',
   THU_SUN: 'Thu/Sun',
+  CUSTOM: 'Custom',
 };
 
 export const LANGUAGE_LABEL: Record<Language, string> = {

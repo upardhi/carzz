@@ -25,6 +25,7 @@ interface CarDraft {
   schedulePattern: WeekdayPattern;
   scheduleTime: string;
   specialInstructions: string;
+  customDates: string[];
 }
 
 export interface IntakeOptions {
@@ -198,6 +199,7 @@ export function AddCustomerForm({
       schedulePattern: 'MON_THU',
       scheduleTime: '09:00',
       specialInstructions: '',
+      customDates: [],
     }));
   });
 
@@ -239,6 +241,17 @@ export function AddCustomerForm({
       setError('Each car needs a company, a model, a number plate and wash days.');
       return;
     }
+    
+    for (const car of cars) {
+      if (car.schedulePattern === 'CUSTOM') {
+        const pkg = options.packages.find((p) => p.id === car.packageId);
+        if (pkg && car.customDates.length !== pkg.washesPerMonth) {
+          setError(`For custom dates, you must select exactly ${pkg.washesPerMonth} dates for ${car.make} ${car.model}.`);
+          return;
+        }
+      }
+    }
+
     if (!loginEmail.trim() || !/.+@.+\..+/.test(loginEmail)) {
       setError('Please provide a valid login email for customer app access.');
       return;
@@ -280,6 +293,7 @@ export function AddCustomerForm({
           schedulePattern: car.schedulePattern,
           scheduleTime: car.scheduleTime,
           specialInstructions: car.specialInstructions || undefined,
+          customDates: car.schedulePattern === 'CUSTOM' ? car.customDates : undefined,
         })),
       };
 
@@ -734,6 +748,36 @@ export function AddCustomerForm({
                         </select>
                       </div>
                     </div>
+
+                    {/* Custom Dates Picker (only shows if CUSTOM pattern is selected) */}
+                    {car.schedulePattern === 'CUSTOM' && (() => {
+                      const pkg = options.packages.find((p) => p.id === car.packageId);
+                      if (!pkg) return null;
+                      
+                      return (
+                        <div className="sm:col-span-2 mt-2">
+                          <label className="mb-2 block text-xs font-bold text-slate-700">
+                            Select exactly {pkg.washesPerMonth} dates <span className="text-rose-500">*</span>
+                          </label>
+                          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                            {Array.from({ length: pkg.washesPerMonth }).map((_, dateIndex) => (
+                              <input
+                                key={dateIndex}
+                                type="date"
+                                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                value={car.customDates[dateIndex] || ''}
+                                onChange={(e) => {
+                                  const newDates = [...car.customDates];
+                                  newDates[dateIndex] = e.target.value;
+                                  updateCar(index, { customDates: newDates });
+                                }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                   </div>
                 </div>
               ))}
@@ -758,6 +802,7 @@ export function AddCustomerForm({
                           )
                         ],
                       specialInstructions: 'Second car — same building',
+                      customDates: [],
                     },
                   ])
                 }
