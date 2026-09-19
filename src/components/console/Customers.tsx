@@ -5,7 +5,7 @@ import type { Session } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { LEAD_SOURCES, type Car, type Customer, type CustomerStatus } from '@/lib/data/types';
 import { currentCycle, formatTime, money } from '@/lib/util/format';
-import { LEAD_SOURCE_LABEL, PATTERN_SHORT } from '@/lib/util/labels';
+import { LEAD_SOURCE_LABEL } from '@/lib/util/labels';
 import {
   IconCalendar,
   IconEye,
@@ -135,14 +135,6 @@ export async function ConsoleCustomers({
     { value: 'NONE', label: 'No bill' },
   ].filter((o) => paymentsInUse.has(o.value));
 
-  const patternsInUse = new Set<string>();
-  for (const car of scopedCars) {
-    if (car.schedulePattern) patternsInUse.add(car.schedulePattern);
-  }
-  const patternOptions = Object.entries(PATTERN_SHORT)
-    .filter(([val]) => patternsInUse.has(val))
-    .map(([value, label]) => ({ value, label }));
-
   const assignedStaffIds = new Set<string>();
   for (const car of scopedCars) {
     if (car.assignedStaffId) assignedStaffIds.add(car.assignedStaffId);
@@ -177,9 +169,6 @@ export async function ConsoleCustomers({
 
     const own = carsByCustomer.get(customer.id) ?? [];
     if (searchParams.staff && !own.some((c) => c.assignedStaffId === searchParams.staff)) {
-      return false;
-    }
-    if (searchParams.pattern && !own.some((c) => c.schedulePattern === searchParams.pattern)) {
       return false;
     }
 
@@ -317,12 +306,6 @@ export async function ConsoleCustomers({
               options: paymentOptions,
             },
             {
-              name: 'pattern',
-              label: 'Day — all',
-              icon: <IconCalendar width={13} height={13} />,
-              options: patternOptions,
-            },
-            {
               name: 'staff',
               label: 'Wash boy — all',
               icon: <IconUser width={13} height={13} />,
@@ -422,14 +405,7 @@ export async function ConsoleCustomers({
           },
           {
             id: 'schedule',
-            header: (
-              <span className="inline-flex items-center gap-1">
-                Schedule
-                <svg className="h-3 w-3 text-slate-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
-                </svg>
-              </span>
-            ),
+            header: 'Slot Time',
             className: 'whitespace-nowrap',
             render: (customer) => {
               const own = carsByCustomer.get(customer.id) ?? [];
@@ -437,9 +413,7 @@ export async function ConsoleCustomers({
               return first ? (
                 <div className="flex items-center gap-1.5 text-xs text-slate-600 font-medium">
                   <IconCalendar width={13} height={13} className="text-slate-400 shrink-0" />
-                  <span>
-                    {PATTERN_SHORT[first.schedulePattern]} · {formatTime(first.scheduleTime)}
-                  </span>
+                  <span>{formatTime(first.scheduleTime)}</span>
                 </div>
               ) : (
                 <span className="text-xs text-slate-400">—</span>

@@ -303,6 +303,7 @@ export function WashFlow({
             busy={uploading === 'before'}
             onPick={() => setActiveCamera('before')}
             onPreview={(url) => setPreviewPhoto({ kind: 'before', url })}
+            onRetake={() => setActiveCamera('before')}
           />
           <PhotoTile
             label="After"
@@ -311,6 +312,7 @@ export function WashFlow({
             disabled={!before}
             onPick={() => setActiveCamera('after')}
             onPreview={(url) => setPreviewPhoto({ kind: 'after', url })}
+            onRetake={() => setActiveCamera('after')}
           />
         </div>
 
@@ -636,6 +638,11 @@ export function WashFlow({
           kind={previewPhoto.kind}
           url={previewPhoto.url}
           onClose={() => setPreviewPhoto(null)}
+          onRetake={() => {
+            const kind = previewPhoto.kind;
+            setPreviewPhoto(null);
+            setActiveCamera(kind);
+          }}
         />
       )}
     </>
@@ -649,6 +656,7 @@ function PhotoTile({
   disabled,
   onPick,
   onPreview,
+  onRetake,
 }: {
   label: string;
   url: string | null;
@@ -656,52 +664,62 @@ function PhotoTile({
   disabled?: boolean;
   onPick: () => void;
   onPreview: (url: string) => void;
+  onRetake?: () => void;
 }) {
   return (
-    <button
-      type="button"
-      onClick={() => {
-        if (url) {
-          onPreview(url);
-        } else {
-          onPick();
-        }
-      }}
-      disabled={disabled || busy}
-      className={`relative flex aspect-[4/3] w-full flex-col items-center justify-center gap-1.5 overflow-hidden rounded-2xl border-2 text-xs font-bold transition-all shadow-2xs ${
-        url
-          ? 'border-emerald-500 bg-emerald-50 text-emerald-700 active:opacity-85'
-          : disabled
-            ? 'border-dashed border-slate-200 bg-slate-50 text-slate-400'
-            : 'border-dashed border-blue-300 bg-blue-50/60 text-blue-900 hover:bg-blue-50 active:scale-[0.98]'
-      }`}
-    >
-      {url ? (
-        <>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={resolvePublicPhotoUrl(url) || url}
-            alt={`${label} photo`}
-            className="h-full w-full object-cover"
-          />
-          <span className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-emerald-600/90 py-1 text-[11px] font-bold text-white backdrop-blur-xs">
-            <IconCheck width={13} height={13} strokeWidth={3} />
-            {label} · View
-          </span>
-          <span className="absolute top-2 right-2 rounded-full bg-black/60 p-1 text-white backdrop-blur-sm">
-            <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-              <circle cx="11" cy="11" r="8" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
-          </span>
-        </>
-      ) : (
-        <>
-          <IconCamera width={26} height={26} className={disabled ? 'text-slate-300' : 'text-blue-700'} />
-          <span>{busy ? 'Saving…' : `${label} Photo`}</span>
-        </>
+    <div className="relative aspect-[4/3] w-full">
+      <button
+        type="button"
+        onClick={() => {
+          if (url) {
+            onPreview(url);
+          } else {
+            onPick();
+          }
+        }}
+        disabled={disabled || busy}
+        className={`relative flex h-full w-full flex-col items-center justify-center gap-1.5 overflow-hidden rounded-2xl border-2 text-xs font-bold transition-all shadow-2xs ${
+          url
+            ? 'border-emerald-500 bg-emerald-50 text-emerald-700 active:opacity-85'
+            : disabled
+              ? 'border-dashed border-slate-200 bg-slate-50 text-slate-400'
+              : 'border-dashed border-blue-300 bg-blue-50/60 text-blue-900 hover:bg-blue-50 active:scale-[0.98]'
+        }`}
+      >
+        {url ? (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={resolvePublicPhotoUrl(url) || url}
+              alt={`${label} photo`}
+              className="h-full w-full object-cover"
+            />
+            <span className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-emerald-600/90 py-1 text-[11px] font-bold text-white backdrop-blur-xs">
+              <IconCheck width={13} height={13} strokeWidth={3} />
+              {label} · Tap to View
+            </span>
+          </>
+        ) : (
+          <>
+            <IconCamera width={26} height={26} className={disabled ? 'text-slate-300' : 'text-blue-700'} />
+            <span>{busy ? 'Saving…' : `${label} Photo`}</span>
+          </>
+        )}
+      </button>
+
+      {url && onRetake && !disabled && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRetake();
+          }}
+          className="absolute top-2 right-2 flex items-center gap-1 rounded-full bg-black/75 px-2.5 py-1 text-[10.5px] font-bold text-white shadow-md backdrop-blur-xs hover:bg-black/90 active:scale-95 transition-all cursor-pointer z-10"
+        >
+          📷 Retake
+        </button>
       )}
-    </button>
+    </div>
   );
 }
 

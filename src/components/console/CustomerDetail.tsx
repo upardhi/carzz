@@ -20,11 +20,11 @@ import {
   formatDateFull,
   formatTime,
   money,
+  todayISO,
 } from '@/lib/util/format';
 import {
   LEAD_SOURCE_LABEL,
   MISS_REASON_LABEL,
-  PATTERN_LABEL,
   PAYMENT_MODE_LABEL,
 } from '@/lib/util/labels';
 import { ActionButton } from './ActionButton';
@@ -194,6 +194,11 @@ export async function ConsoleCustomerDetail({
           </div>
           {cars.map((car) => {
             const isStarted = car.serviceStarted ?? true;
+            const today = todayISO();
+            const todaysVisit = visits.find(
+              (v) => v.carId === car.id && v.scheduledDate === today
+            );
+
             return (
               <div
                 key={car.id}
@@ -214,14 +219,26 @@ export async function ConsoleCustomerDetail({
                       <Tag tone="warn">Pending Payment · Not Started</Tag>
                     )}
                     {isStarted && (
-                      <WashTodayAction
-                        customerId={customer.id}
-                        carId={car.id}
-                        carName={`${car.make} ${car.model}`}
-                        carPlate={car.plate}
-                        currentAssignedStaffId={car.assignedStaffId}
-                        staffList={staff}
-                      />
+                      todaysVisit ? (
+                        todaysVisit.status === 'DONE' ? (
+                          <Tag tone="ok">✓ Washed Today</Tag>
+                        ) : todaysVisit.status === 'IN_PROGRESS' ? (
+                          <Tag tone="warn">⚡ In Progress Today</Tag>
+                        ) : todaysVisit.status === 'MISSED' ? (
+                          <Tag tone="bad">Missed Today</Tag>
+                        ) : (
+                          <Tag tone="ok">📅 Today&apos;s Booking</Tag>
+                        )
+                      ) : (
+                        <WashTodayAction
+                          customerId={customer.id}
+                          carId={car.id}
+                          carName={`${car.make} ${car.model}`}
+                          carPlate={car.plate}
+                          currentAssignedStaffId={car.assignedStaffId}
+                          staffList={staff}
+                        />
+                      )
                     )}
                     <EditCarModalButton
                       customerId={customer.id}
@@ -248,7 +265,7 @@ export async function ConsoleCustomerDetail({
                 />
                 <Row
                   label="Slot"
-                  value={`${PATTERN_LABEL[car.schedulePattern]} · ${formatTime(car.scheduleTime)}`}
+                  value={formatTime(car.scheduleTime)}
                 />
                 <Row
                   label="Wash boy"
