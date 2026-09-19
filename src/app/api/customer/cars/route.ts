@@ -9,9 +9,10 @@ const carInputSchema = z.object({
   colour: z.string().trim().min(1, 'Please enter the car colour'),
   plate: z.string().trim().min(3, 'Please enter the plate number'),
   packageId: z.string().optional(),
-  schedulePattern: z.enum(['MON_THU', 'TUE_FRI', 'WED_SAT', 'THU_SUN']).default('MON_THU'),
+  schedulePattern: z.enum(['MON_THU', 'TUE_FRI', 'WED_SAT', 'THU_SUN', 'CUSTOM']).default('CUSTOM'),
   scheduleTime: z.string().regex(/^\d{2}:\d{2}$/).default('06:30'),
   specialInstructions: z.string().max(300).optional(),
+  customDates: z.array(z.string()).optional(),
 });
 
 export async function POST(request: Request) {
@@ -71,6 +72,7 @@ export async function POST(request: Request) {
       serviceStartedBeforePayment: false,
       serviceStartedByUserId: null,
       serviceStartNote: null,
+      customDates: data.customDates || [],
     });
 
     return NextResponse.json({

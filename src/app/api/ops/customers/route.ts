@@ -47,7 +47,7 @@ const carSchema = z.object({
   colour: z.string().trim().min(1),
   plate: z.string().trim().min(4),
   packageId: z.string().min(1, 'Please select a wash package (or create one first)'),
-  schedulePattern: z.enum(WEEKDAY_PATTERNS).optional().default('MON_THU'),
+  schedulePattern: z.enum(WEEKDAY_PATTERNS).optional().default('CUSTOM'),
   scheduleTime: z.string().regex(/^\d{2}:\d{2}$/),
   specialInstructions: z.string().max(300).optional(),
   customDates: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional(),

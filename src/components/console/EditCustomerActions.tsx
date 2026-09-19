@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { toast } from '@/components/ui/ToastProvider';
 import {
   LEAD_SOURCES,
-  WEEKDAY_PATTERNS,
   type Area,
   type Car,
   type Customer,
@@ -15,6 +14,7 @@ import {
   type WeekdayPattern,
 } from '@/lib/data/types';
 import { LEAD_SOURCE_LABEL, PATTERN_LABEL } from '@/lib/util/labels';
+import { WashDatesPicker } from '@/components/ui/WashDatesPicker';
 
 // ==========================================
 // 1. EDIT CUSTOMER MODAL
@@ -453,9 +453,9 @@ export function EditCarModalButton({
                     onChange={(e) => setSchedulePattern(e.target.value as WeekdayPattern)}
                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold bg-white focus:border-blue-500 focus:outline-none"
                   >
-                    {WEEKDAY_PATTERNS.map((pat) => (
+                    {Array.from(new Set(['CUSTOM', car.schedulePattern])).map((pat) => (
                       <option key={pat} value={pat}>
-                        {PATTERN_LABEL[pat] || pat}
+                        {PATTERN_LABEL[pat as WeekdayPattern] || pat}
                       </option>
                     ))}
                   </select>
@@ -475,28 +475,14 @@ export function EditCarModalButton({
               {schedulePattern === 'CUSTOM' && (() => {
                 const pkg = packages.find((p) => p.id === packageId);
                 if (!pkg) return null;
-                
                 return (
-                  <div className="mt-2">
-                    <label className="mb-2 block text-xs font-bold text-slate-700">
-                      Select exactly {pkg.washesPerMonth} dates *
-                    </label>
-                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                      {Array.from({ length: pkg.washesPerMonth }).map((_, dateIndex) => (
-                        <input
-                          key={dateIndex}
-                          type="date"
-                          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold focus:border-blue-500 focus:outline-none"
-                          value={customDates[dateIndex] || ''}
-                          onChange={(e) => {
-                            const newDates = [...customDates];
-                            newDates[dateIndex] = e.target.value;
-                            setCustomDates(newDates);
-                          }}
-                        />
-                      ))}
-                    </div>
-                  </div>
+                  <WashDatesPicker
+                    count={pkg.washesPerMonth}
+                    dates={customDates}
+                    onChange={setCustomDates}
+                    size="sm"
+                    className="mt-2"
+                  />
                 );
               })()}
 
@@ -570,7 +556,6 @@ export function AddCarModalButton({
   const [plate, setPlate] = useState('');
   const [packageId, setPackageId] = useState(packages[0]?.id || '');
   const [assignedStaffId, setAssignedStaffId] = useState('');
-  const [schedulePattern, setSchedulePattern] = useState<WeekdayPattern>('MON_THU');
   const [scheduleTime, setScheduleTime] = useState('09:00');
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [customDates, setCustomDates] = useState<string[]>([]);
@@ -584,12 +569,10 @@ export function AddCarModalButton({
       return;
     }
 
-    if (schedulePattern === 'CUSTOM') {
-      const pkg = packages.find(p => p.id === packageId);
-      if (pkg && customDates.filter(Boolean).length !== pkg.washesPerMonth) {
-        toast.error(`For custom dates, you must select exactly ${pkg.washesPerMonth} dates.`);
-        return;
-      }
+    const pkg = packages.find(p => p.id === packageId);
+    if (pkg && customDates.filter(Boolean).length !== pkg.washesPerMonth) {
+      toast.error(`Please select exactly ${pkg.washesPerMonth} wash dates.`);
+      return;
     }
 
     setPending(true);
@@ -606,10 +589,10 @@ export function AddCarModalButton({
           plate: plate.trim().toUpperCase(),
           packageId,
           assignedStaffId: assignedStaffId || null,
-          schedulePattern,
+          schedulePattern: 'CUSTOM',
           scheduleTime,
           specialInstructions: specialInstructions.trim() || null,
-          customDates: schedulePattern === 'CUSTOM' ? customDates : undefined,
+          customDates,
           autoStartService,
           startDate: startDate || undefined,
         }),
@@ -745,21 +728,7 @@ export function AddCarModalButton({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Schedule Pattern *</label>
-                  <select
-                    value={schedulePattern}
-                    onChange={(e) => setSchedulePattern(e.target.value as WeekdayPattern)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold bg-white focus:border-blue-500 focus:outline-none"
-                  >
-                    {WEEKDAY_PATTERNS.map((pat) => (
-                      <option key={pat} value={pat}>
-                        {PATTERN_LABEL[pat] || pat}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div className="grid grid-cols-1 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Slot Time *</label>
                   <input
@@ -772,31 +741,17 @@ export function AddCarModalButton({
                 </div>
               </div>
 
-              {schedulePattern === 'CUSTOM' && (() => {
+              {(() => {
                 const pkg = packages.find((p) => p.id === packageId);
                 if (!pkg) return null;
-                
                 return (
-                  <div className="mt-2">
-                    <label className="mb-2 block text-xs font-bold text-slate-700">
-                      Select exactly {pkg.washesPerMonth} dates *
-                    </label>
-                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                      {Array.from({ length: pkg.washesPerMonth }).map((_, dateIndex) => (
-                        <input
-                          key={dateIndex}
-                          type="date"
-                          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold focus:border-blue-500 focus:outline-none"
-                          value={customDates[dateIndex] || ''}
-                          onChange={(e) => {
-                            const newDates = [...customDates];
-                            newDates[dateIndex] = e.target.value;
-                            setCustomDates(newDates);
-                          }}
-                        />
-                      ))}
-                    </div>
-                  </div>
+                  <WashDatesPicker
+                    count={pkg.washesPerMonth}
+                    dates={customDates}
+                    onChange={setCustomDates}
+                    size="sm"
+                    className="mt-2"
+                  />
                 );
               })()}
 

@@ -5,16 +5,15 @@ import { useRef, useState } from 'react';
 import { Note } from '@/components/ui/primitives';
 import {
   LEAD_SOURCES,
-  WEEKDAY_PATTERNS,
   type LeadSource,
   type WeekdayPattern,
 } from '@/lib/data/types';
 import { money } from '@/lib/util/format';
-import { PATTERN_LABEL } from '@/lib/util/labels';
 import { safeOfflineFetch } from '@/lib/util/offlineQueue';
 import { toast } from '@/components/ui/ToastProvider';
 
 import { LocationPickerMap } from '@/components/ui/LocationPickerMap';
+import { WashDatesPicker } from '@/components/ui/WashDatesPicker';
 
 interface CarDraft {
   model: string;
@@ -196,7 +195,7 @@ export function AddCustomerForm({
       colour: '',
       plate: '',
       packageId: defaultPackageId,
-      schedulePattern: 'MON_THU',
+      schedulePattern: 'CUSTOM',
       scheduleTime: '09:00',
       specialInstructions: '',
       customDates: [],
@@ -719,61 +718,17 @@ export function AddCustomerForm({
                       </div>
                     </div>
 
-                    {/* Wash days */}
-                    <div>
-                      <label className="mb-1 block text-xs font-bold text-slate-700">
-                        Wash days <span className="text-rose-500">*</span>
-                      </label>
-                      <div className="relative">
-                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
-                          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                            <line x1="16" y1="2" x2="16" y2="6" />
-                            <line x1="8" y1="2" x2="8" y2="6" />
-                            <line x1="3" y1="10" x2="21" y2="10" />
-                          </svg>
-                        </div>
-                        <select
-                          className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                          value={car.schedulePattern}
-                          onChange={(e) =>
-                            updateCar(index, { schedulePattern: e.target.value as WeekdayPattern })
-                          }
-                        >
-                          {WEEKDAY_PATTERNS.map((p) => (
-                            <option key={p} value={p}>
-                              {PATTERN_LABEL[p]}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* Custom Dates Picker (only shows if CUSTOM pattern is selected) */}
-                    {car.schedulePattern === 'CUSTOM' && (() => {
+                    {/* Custom Wash Dates */}
+                    {(() => {
                       const pkg = options.packages.find((p) => p.id === car.packageId);
                       if (!pkg) return null;
-                      
                       return (
                         <div className="sm:col-span-2 mt-2">
-                          <label className="mb-2 block text-xs font-bold text-slate-700">
-                            Select exactly {pkg.washesPerMonth} dates <span className="text-rose-500">*</span>
-                          </label>
-                          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                            {Array.from({ length: pkg.washesPerMonth }).map((_, dateIndex) => (
-                              <input
-                                key={dateIndex}
-                                type="date"
-                                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                                value={car.customDates[dateIndex] || ''}
-                                onChange={(e) => {
-                                  const newDates = [...car.customDates];
-                                  newDates[dateIndex] = e.target.value;
-                                  updateCar(index, { customDates: newDates });
-                                }}
-                              />
-                            ))}
-                          </div>
+                          <WashDatesPicker
+                            count={pkg.washesPerMonth}
+                            dates={car.customDates}
+                            onChange={(newDates) => updateCar(index, { customDates: newDates })}
+                          />
                         </div>
                       );
                     })()}
@@ -793,7 +748,7 @@ export function AddCustomerForm({
                       colour: '',
                       plate: '',
                       packageId: options.packages[0]?.id ?? '',
-                      schedulePattern: 'MON_THU',
+                      schedulePattern: 'CUSTOM',
                       scheduleTime:
                         SLOTS[
                           Math.min(
