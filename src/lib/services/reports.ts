@@ -206,9 +206,16 @@ async function _computeAreaPerformance(
       (sum, i) => sum + i.quantity * (itemCost.get(i.itemId)?.unitCost ?? 0),
       0,
     );
+    // A staff member who has taken more pocket money than they've earned
+    // this cycle (0 washes done, but an advance already disbursed) has a
+    // NEGATIVE net payout — money owed back, not still owed to them. Summing
+    // that raw would subtract a negative from cost, inflating profit by the
+    // exact amount of cash that actually left the business today. Floor each
+    // person's contribution at 0: an unearned advance is real cash paid out
+    // (a cost/receivable), never a source of profit.
     const payoutCost = payouts
       .filter((p) => p.areaId === area.id)
-      .reduce((sum, p) => sum + p.net, 0);
+      .reduce((sum, p) => sum + Math.max(0, p.net), 0);
 
     const profit = collected - goodsCost - payoutCost;
 
