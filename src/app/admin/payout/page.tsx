@@ -4,7 +4,6 @@ import {
   CardHeading,
   Kpi,
   KpiGrid,
-  Note,
   Row,
 } from '@/components/ui/primitives';
 import { ActionButton } from '@/components/console/ActionButton';
