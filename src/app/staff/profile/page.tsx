@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Row } from '@/components/ui/primitives';
 import {
   IconLogout,
@@ -158,6 +159,14 @@ export default async function StaffProfile() {
             tone={missed.length > 0 ? 'danger' : undefined}
           />
         </div>
+
+        <Link
+          href="/staff/feedback"
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50/80 py-2.5 text-xs font-bold text-blue-700 hover:bg-blue-100 transition-colors"
+        >
+          <IconStar width={14} height={14} />
+          <span>View All Feedback</span>
+        </Link>
       </div>
 
       {/* 4. Logout Action */}

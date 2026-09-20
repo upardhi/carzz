@@ -28,7 +28,7 @@ export default async function CustomerHelp() {
       .map((p) => p[0]?.toUpperCase() ?? '')
       .join('') || 'C';
 
-  // Sort visits descending to ensure the most recent completed wash is selected
+  // Sort visits descending so the most recent completed wash surfaces first.
   const doneVisits = account.visits
     .filter((v) => v.status === 'DONE')
     .sort(
@@ -37,12 +37,30 @@ export default async function CustomerHelp() {
         new Date(a.completedAt || a.scheduledDate).getTime(),
     );
 
-  const lastWash = doneVisits[0] ?? null;
-  const lastCar = lastWash
-    ? account.cars.find((c) => c.id === lastWash.carId) || (await store.cars.get(lastWash.carId))
-    : null;
-  const staff = lastWash?.staffId ? await store.staff.get(lastWash.staffId) : null;
   const rules = await store.getPayoutSettings();
+
+  // Every completed wash can be rated once, not just the latest — a customer
+  // catching up after a busy week should still be able to rate each one.
+  const unratedVisits = doneVisits.filter((v) => v.rating === null).slice(0, 20);
+  const ratedVisits = doneVisits.filter((v) => v.rating !== null).slice(0, 5);
+
+  const accountCars = account.cars;
+  async function describeVisit(visit: (typeof doneVisits)[number]) {
+    const car =
+      accountCars.find((c) => c.id === visit.carId) || (await store.cars.get(visit.carId));
+    const staffMember = visit.staffId ? await store.staff.get(visit.staffId) : null;
+    return {
+      visit,
+      carLabel: car ? `${car.make} ${car.model}`.trim() || car.plate : 'Your Vehicle',
+      dateLabel: formatDateFull(visit.completedAt || visit.scheduledDate),
+      staffName: staffMember?.name ? staffMember.name.split(' ')[0] : null,
+    };
+  }
+
+  const [unratedDetails, ratedDetails] = await Promise.all([
+    Promise.all(unratedVisits.map(describeVisit)),
+    Promise.all(ratedVisits.map(describeVisit)),
+  ]);
 
   const complaints = await store.complaints.find({
     where: { customerId: account.customer.id },
@@ -156,7 +174,7 @@ export default async function CustomerHelp() {
         </form>
       </div>
 
-      {/* 3. Rate Your Last Wash Card */}
+      {/* 3. Rate Your Washes Card */}
       <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs">
         <div className="flex items-center gap-2.5 mb-4">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-amber-600 font-bold text-base">
@@ -164,42 +182,71 @@ export default async function CustomerHelp() {
           </div>
           <div>
             <h3 className="text-sm font-bold uppercase tracking-wider text-slate-900">
-              Rate Your Last Wash
+              Rate Your Washes
             </h3>
-            <p className="text-xs text-slate-500">Reward your cleaner for great service</p>
+            <p className="text-xs text-slate-500">
+              Every completed wash can be rated once — reward your cleaner for great service
+            </p>
           </div>
         </div>
 
-        {lastWash ? (
-          <>
-            <RateWashForm
-              visitId={lastWash.id}
-              carLabel={
-                lastCar
-                  ? `${lastCar.make} ${lastCar.model}`.trim() || lastCar.plate
-                  : 'Your Vehicle'
-              }
-              dateLabel={formatDateFull(lastWash.completedAt || lastWash.scheduledDate)}
-              staffName={staff?.name ? staff.name.split(' ')[0] : null}
-              existingRating={lastWash.rating ?? null}
-            />
-            <div className="mt-3">
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-[12.5px] font-semibold text-emerald-700">
-                A rating of {rules.goodReviewMinStars || 4} stars or more pays your wash
-                cleaner ₹{rules.goodReviewBonus || 10} extra bonus for that wash!
+        {unratedDetails.length > 0 ? (
+          <div className="space-y-4">
+            {unratedDetails.map(({ visit, carLabel, dateLabel, staffName }, i) => (
+              <div key={visit.id}>
+                {i > 0 ? <div className="mb-4 border-t border-slate-100" /> : null}
+                <RateWashForm
+                  visitId={visit.id}
+                  carLabel={carLabel}
+                  dateLabel={dateLabel}
+                  staffName={staffName}
+                  existingRating={null}
+                />
               </div>
+            ))}
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-[12.5px] font-semibold text-emerald-700">
+              A rating of {rules.goodReviewMinStars || 4} stars or more pays your wash
+              cleaner ₹{rules.goodReviewBonus || 10} extra bonus for that wash!
             </div>
-          </>
+          </div>
         ) : (
           <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-5 text-center">
             <p className="text-sm font-medium text-slate-500">
-              No completed washes to rate yet.
+              {doneVisits.length > 0 ? "You're all caught up — every wash is rated." : 'No completed washes to rate yet.'}
             </p>
             <p className="mt-1 text-xs text-slate-400">
               Once your cleaner completes a wash, you will be able to rate the service and leave feedback here.
             </p>
           </div>
         )}
+
+        {ratedDetails.length > 0 ? (
+          <div className="mt-5 border-t border-slate-100 pt-4">
+            <p className="mb-2.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+              Recently rated (locked)
+            </p>
+            <div className="space-y-2">
+              {ratedDetails.map(({ visit, carLabel, dateLabel }) => (
+                <div
+                  key={visit.id}
+                  className="rounded-xl border border-slate-200/70 bg-slate-50 p-3 text-[12.5px]"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold text-slate-700">
+                      {carLabel} · {dateLabel}
+                    </span>
+                    <span className="text-amber-500 font-bold">
+                      {'★'.repeat(visit.rating ?? 0)}
+                    </span>
+                  </div>
+                  {visit.ratingComment ? (
+                    <p className="mt-1 text-slate-500 italic">&ldquo;{visit.ratingComment}&rdquo;</p>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {/* 4. Raise A Complaint Card */}

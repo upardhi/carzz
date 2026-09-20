@@ -12,6 +12,7 @@ import {
   IconLogout,
   IconRupee,
   IconSearch,
+  IconStar,
   IconUser,
   IconWallet,
 } from './icons';
@@ -40,6 +41,7 @@ const DESKTOP_STAFF_NAV: NavSection[] = [
     items: [
       { href: '/staff', label: "Today's Schedule", icon: <IconCalendar width={18} height={18} />, exact: true },
       { href: '/staff/leave', label: 'My Leaves', icon: <IconCalendar width={18} height={18} /> },
+      { href: '/staff/feedback', label: 'My Feedback', icon: <IconStar width={18} height={18} /> },
     ],
   },
   {

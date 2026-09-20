@@ -15,6 +15,12 @@ function revalidatePaymentPages() {
     }
     revalidatePath('/admin/accounting');
     revalidatePath('/admin');
+    // A payment an admin/manager records or confirms must show up on the
+    // customer's own account immediately, not just the console side.
+    revalidatePath('/app');
+    revalidatePath('/app/payments');
+    revalidatePath('/app/cars');
+    revalidatePath('/app/help');
   } catch {
     // ignore — running outside a request context
   }

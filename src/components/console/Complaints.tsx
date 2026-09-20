@@ -88,6 +88,38 @@ export async function ConsoleComplaints({
     limit: 8,
   });
 
+  // A wash boy's low-rating flag — every wash a customer rated under 3★,
+  // scoped to whatever area(s) this session can see (all areas for the
+  // owner, just their own for an area admin or manager).
+  const lowRatedVisits = await store.visits.find({
+    // `ne: null` alongside `lt: 3` — an unrated wash (rating === null) must
+    // never be swept up by a bare `lt` comparison.
+    where: { ...(areaFilter as object), rating: { ne: null, lt: 3 } } as never,
+    orderBy: [{ field: 'completedAt', dir: 'desc' }],
+    limit: 200,
+  });
+  const areaById = new Map(areas.map((a) => [a.id, a]));
+  const lowRatedByStaff = new Map<
+    string,
+    { count: number; lastDate: string; lastComment: string | null; areaId: string }
+  >();
+  for (const v of lowRatedVisits) {
+    if (!v.staffId) continue;
+    const current = lowRatedByStaff.get(v.staffId);
+    const dateStr = v.completedAt || v.scheduledDate;
+    if (!current || dateStr > current.lastDate) {
+      lowRatedByStaff.set(v.staffId, {
+        count: (current?.count ?? 0) + 1,
+        lastDate: dateStr,
+        lastComment: v.ratingComment ?? current?.lastComment ?? null,
+        areaId: v.areaId,
+      });
+    } else {
+      current.count += 1;
+    }
+  }
+  const lowRatedList = [...lowRatedByStaff.entries()].sort((a, b) => b[1].count - a[1].count);
+
   return (
     <>
       <PageHeader
@@ -176,6 +208,47 @@ export async function ConsoleComplaints({
               header: 'RESOLUTION',
               className: 'text-slate-500',
               render: (complaint) => complaint.resolution ?? '—',
+            },
+          ]}
+        />
+      </div>
+
+      <div className="mt-4">
+        <WidgetTable<(typeof lowRatedList)[number]>
+          title="Low-rated washes (below 3★)"
+          data={lowRatedList}
+          keyExtractor={([staffId]) => staffId}
+          emptyMessage="No wash boy has a rating below 3★."
+          columns={[
+            {
+              id: 'staff',
+              header: 'WASH BOY',
+              className: 'font-bold text-navy-950',
+              render: ([staffId]) => staffById.get(staffId)?.name ?? '—',
+            },
+            {
+              id: 'area',
+              header: 'AREA',
+              render: ([, info]) => areaById.get(info.areaId)?.name ?? '—',
+            },
+            {
+              id: 'count',
+              header: 'LOW RATINGS',
+              align: 'center',
+              className: 'font-bold text-rose-600',
+              render: ([, info]) => info.count,
+            },
+            {
+              id: 'last',
+              header: 'LAST ONE',
+              className: 'whitespace-nowrap text-slate-600',
+              render: ([, info]) => formatDateFull(info.lastDate),
+            },
+            {
+              id: 'comment',
+              header: 'CUSTOMER COMMENT',
+              className: 'text-slate-500',
+              render: ([, info]) => info.lastComment ?? '—',
             },
           ]}
         />
