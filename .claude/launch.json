@@ -18,6 +18,17 @@
         "dev"
       ],
       "port": 3000
+    },
+    {
+      "name": "dev-3001",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "next",
+        "dev",
+        "-p",
+        "3001"
+      ],
+      "port": 3001
     }
   ]
 }

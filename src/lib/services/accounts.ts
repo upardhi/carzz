@@ -64,8 +64,12 @@ export async function loadCustomerAccount(
       where: { customerId },
       orderBy: [{ field: 'scheduledDate', dir: 'desc' }],
     }),
+    // Every status is loaded here, not just CONFIRMED — a customer-declared
+    // cash/UPI/gateway payment sits at PENDING until a manager confirms it,
+    // and the customer detail page needs to see (and act on) those, not just
+    // the ones already settled.
     store.payments.find({
-      where: { customerId, status: 'CONFIRMED' },
+      where: { customerId },
       orderBy: [{ field: 'createdAt', dir: 'desc' }],
     }),
     store.invoices.find({
@@ -180,10 +184,14 @@ export async function loadCustomerAccount(
     .filter((c) => c.active)
     .reduce((sum, c) => sum + (packageById.get(c.packageId)?.price ?? 0), 0);
 
-  const advanceDeposited = payments
+  // Balance/credit math must only ever count money that's actually landed —
+  // a customer's own say-so (PENDING) cannot move these until a manager
+  // confirms it, or the account would show credit for money never received.
+  const confirmedPayments = payments.filter((p) => p.status === 'CONFIRMED');
+  const advanceDeposited = confirmedPayments
     .filter((p) => p.kind === 'ADVANCE')
     .reduce((sum, p) => sum + p.amount, 0);
-  const totalPaid = payments
+  const totalPaid = confirmedPayments
     .filter((p) => p.kind !== 'REFUND')
     .reduce((sum, p) => sum + p.amount, 0);
   const totalBilled = invoices.reduce((sum, i) => sum + i.amount, 0);
