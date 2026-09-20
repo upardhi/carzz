@@ -20,7 +20,7 @@ export async function GET(
   }
   const { key } = await params;
   const targetKey = Array.isArray(key) ? key.join('/') : String(key || '');
-  return await servePhoto(targetKey);
+  return await servePhoto(targetKey, session);
 }
 
 export async function OPTIONS() {

@@ -154,6 +154,10 @@ export async function POST(request: Request) {
       if (!staff) throw new HttpError(404, 'Staff member not found.');
       assertInScope(session, staff.areaId);
 
+      if (leave.status !== 'PENDING') {
+        throw new HttpError(409, 'This leave has already been decided.');
+      }
+
       const dates = getDatesInRange(leave.startDate, leave.endDate);
 
       // 1. Update Attendance for all dates in range to 'OFF'
@@ -222,6 +226,10 @@ export async function POST(request: Request) {
       const staff = await store.staff.get(leave.staffId);
       if (!staff) throw new HttpError(404, 'Staff member not found.');
       assertInScope(session, staff.areaId);
+
+      if (leave.status !== 'PENDING') {
+        throw new HttpError(409, 'This leave has already been decided.');
+      }
 
       const updatedLeave = await store.leaves.update(leave.id, {
         status: 'REJECTED',

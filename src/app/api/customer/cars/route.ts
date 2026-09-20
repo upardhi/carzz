@@ -38,9 +38,18 @@ export async function POST(request: Request) {
       throw new HttpError(404, 'Customer account not found.');
     }
 
-    // Resolve service package
-    let pkg = data.packageId ? await store.packages.get(data.packageId) : null;
-    if (!pkg) {
+    // Resolve service package — a caller-supplied id must still be an active
+    // package. Packages are only hidden from the UI's own dropdown; without
+    // this, a stale page or a crafted request could subscribe a new car to a
+    // discontinued plan the owner deliberately retired.
+    let pkg: Awaited<ReturnType<typeof store.packages.get>> = null;
+    if (data.packageId) {
+      const requested = await store.packages.get(data.packageId);
+      if (!requested || !requested.active) {
+        throw new HttpError(400, 'That package is no longer available. Please pick another.');
+      }
+      pkg = requested;
+    } else {
       const activePackages = await store.packages.find({ where: { active: true } });
       pkg = activePackages[0] || null;
     }

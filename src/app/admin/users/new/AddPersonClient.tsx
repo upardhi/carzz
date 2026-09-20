@@ -49,7 +49,7 @@ function getInitials(name: string) {
 export function AddPersonClient({
   regions,
   areas,
-  initialRole = 'SUPER_ADMIN',
+  initialRole = 'EMPLOYEE',
   backHref = '/admin/users',
   backLabel = 'Back to People & Roles',
   title = 'Add New Team Member',

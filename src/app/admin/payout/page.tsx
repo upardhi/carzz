@@ -155,26 +155,6 @@ export default async function AdminPayout({
           />
         </Card>
 
-        <Card accent="gold" className="p-4">
-          <CardHeading>Open question on the base rate</CardHeading>
-          <Note>
-            The brief left one thing unsettled: whether the ₹300 / ₹350 / ₹400
-            figures are a <b>slab by the car&rsquo;s position in the day</b>, or
-            whether a flat per-wash rate applies instead. The two differ by
-            roughly three times on the same work.
-            <br />
-            <br />
-            This is currently set to{' '}
-            <b>
-              {rules.baseMode === 'PER_WASH'
-                ? `a flat ${money(rules.perWashRate)} per wash`
-                : 'the day slab'}
-            </b>
-            , which reproduces the figures in your prototype. Change it on the
-            Settings screen once you decide — every payout recalculates, and no
-            code changes.
-          </Note>
-        </Card>
       </div>
     </>
   );

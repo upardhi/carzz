@@ -56,12 +56,13 @@ export default async function AdminSettings() {
 
       <div className="grid gap-3 lg:grid-cols-2">
         <Card accent="gold" className="p-4">
-          <CardHeading>Base pay rule — needs your decision</CardHeading>
+          <CardHeading>Base pay rule</CardHeading>
           <Note>
-            Your brief left this unsettled: are the ₹300 / ₹350 / ₹400 figures a
-            slab by the car&rsquo;s position in the day, or does a flat per-wash
-            rate apply? The two differ by roughly three times on the same work,
-            so it is the single most consequential setting here.
+            Choose how each wash boy&rsquo;s base pay is worked out: a flat
+            amount for every wash, or a slab that changes with how many cars he
+            has done that day (₹300 / ₹350 / ₹400). The two can differ by
+            roughly three times for the same work, so this is the setting with
+            the biggest effect on payouts.
           </Note>
           <div className="mt-3">
             <PayoutBaseForm settings={payout} />

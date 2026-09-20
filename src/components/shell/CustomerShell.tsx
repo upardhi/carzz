@@ -215,7 +215,6 @@ export function CustomerShell({
               className="relative flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition-colors hover:bg-slate-200 hover:text-slate-900 border border-slate-200/60"
             >
               <IconBell width={17} height={17} />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-white" />
             </button>
 
             <Link

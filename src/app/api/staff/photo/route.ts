@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     if (file.size > MAX_BYTES) {
       throw new HttpError(413, 'That photo is too large. Try again.');
     }
-    if (file.type && !ALLOWED.includes(file.type)) {
+    if (!ALLOWED.includes(file.type)) {
       throw new HttpError(415, 'Only photos can be uploaded.');
     }
 
@@ -49,7 +49,12 @@ export async function POST(request: Request) {
       key,
       folder: 'washes',
       contentType: file.type || 'image/jpeg',
-      access: 'public',
+      // A customer's car outside their home — private by design, served only
+      // through /api/photos to a signed-in, in-scope account. Requesting
+      // 'public' here and relying on the storage account happening to be
+      // private-only would silently turn genuinely public the moment that
+      // account setting ever changed.
+      access: 'private',
     });
 
     // Record it on the visit immediately so a crash between upload and submit

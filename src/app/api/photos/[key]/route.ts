@@ -18,7 +18,7 @@ export async function GET(
     );
   }
   const { key } = await params;
-  return await servePhoto(key);
+  return await servePhoto(key, session);
 }
 
 export async function OPTIONS() {

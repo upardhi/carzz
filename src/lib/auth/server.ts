@@ -42,6 +42,19 @@ export const getSession = cache(async (): Promise<Session | null> => {
     // A cookie outliving its user (deactivated, deleted) must not grant access.
     if (!user || !user.active) return null;
 
+    // Disabling an area or region is meant to cut off everyone assigned to it
+    // immediately, not just block their next login — a session already
+    // issued (these last 30 days, for field devices) must not keep working
+    // after that. Mirrors the same checks `login` makes.
+    if (user.areaId) {
+      const area = await store.areas.get(user.areaId);
+      if (area && !area.active) return null;
+    }
+    if (user.regionId) {
+      const region = await store.regions.get(user.regionId);
+      if (region && !region.active) return null;
+    }
+
     // Only AREA_ADMIN uses the areas table to map its region; other roles
     // determine their scope directly from the user record.
     const areas = user.role === 'AREA_ADMIN' ? await store.areas.find() : [];

@@ -32,7 +32,7 @@ export async function POST(request: Request) {
       if (file.size > MAX_BYTES) {
         throw new HttpError(413, 'That image is too large — keep each under 8MB.');
       }
-      if (file.type && !ALLOWED.includes(file.type)) {
+      if (!ALLOWED.includes(file.type)) {
         throw new HttpError(415, 'Only JPEG, PNG or WebP images can be used.');
       }
     }

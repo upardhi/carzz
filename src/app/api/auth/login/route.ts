@@ -120,7 +120,6 @@ async function signIn(request: Request) {
   return NextResponse.json({
     ok: true,
     redirect: homeFor(user.role),
-    token,
     user: {
       id: user.id,
       name: user.name,

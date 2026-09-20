@@ -118,7 +118,10 @@ async function _computeAreaPerformance(
       where: { status: { in: ['OPEN', 'ESCALATED'] }, ...areaFilter } as never,
     }),
     skipExtra ? Promise.resolve([]) : store.stockIssues.find({ where: areaFilter as never }),
-    skipExtra ? Promise.resolve([]) : store.cars.find({ where: { active: true } }),
+    // Active car count feeds the dashboard's own "Active Cars" KPI, so it
+    // must not be skipped by the same flag that skips payout/goods cost —
+    // those are unrelated concerns that happened to share one switch.
+    store.cars.find({ where: { active: true } }),
   ]);
 
   if (allAreas.length === 0) return [];

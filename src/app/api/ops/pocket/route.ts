@@ -32,6 +32,15 @@ export async function GET(request: Request) {
     const store = await getStore();
     const cycle = currentCycle();
 
+    // A caller-supplied areaId/staffId narrows the search, but must never
+    // widen it past the caller's own scope — checked before it ever reaches
+    // the query, the same way every other ops list route enforces this.
+    if (areaId) assertInScope(session, areaId);
+    if (staffId) {
+      const targetStaff = await store.staff.get(staffId);
+      if (targetStaff) assertInScope(session, targetStaff.areaId);
+    }
+
     // Step 1: Fetch only the staff (and settings) we need — scoped to session areas.
     // Staff are small in number (~10-100 per scope), so this is fine.
     const [staffList, areas, rules] = await Promise.all([

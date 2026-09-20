@@ -74,6 +74,20 @@ export async function POST(request: Request) {
     // Branch before destructuring so the discriminated union stays narrowed.
     if (parsed.data.scope === 'app') {
       const { scope: _scope, ...patch } = parsed.data;
+
+      // A partial update (only one of the pair) must still be checked against
+      // whatever the other one already is in the database, or the same
+      // impossible range can be reached one field at a time.
+      const current = await store.getAppSettings();
+      const nextMin = patch.minWashMinutes ?? current.minWashMinutes;
+      const nextMax = patch.maxWashMinutes ?? current.maxWashMinutes;
+      if (nextMin >= nextMax) {
+        return NextResponse.json(
+          { error: 'The fastest a wash can take must be less than the slowest.' },
+          { status: 400 },
+        );
+      }
+
       const saved = await store.saveAppSettings(patch);
       revalidateSettingsPages();
       return NextResponse.json({

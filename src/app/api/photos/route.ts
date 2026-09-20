@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { servePhoto, corsHeaders } from '@/lib/storage/photoStreamer';
+import { getSession } from '@/lib/auth/server';
 
 /**
  * Universal photo streaming endpoint:
@@ -7,9 +8,16 @@ import { servePhoto, corsHeaders } from '@/lib/storage/photoStreamer';
  * GET /api/photos?key=<storage_key>
  */
 export async function GET(request: NextRequest) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json(
+      { error: 'Please sign in to view photos.' },
+      { status: 401, headers: corsHeaders() },
+    );
+  }
   const { searchParams } = new URL(request.url);
   const target = searchParams.get('url') || searchParams.get('key') || '';
-  return await servePhoto(target);
+  return await servePhoto(target, session);
 }
 
 export async function OPTIONS() {

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireApiSession } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { currentCycle } from '@/lib/util/format';
-import { opsError } from '../../_guard';
+import { assertInScope, opsError } from '../../_guard';
 
 export async function GET(request: Request) {
   try {
@@ -13,6 +13,10 @@ export async function GET(request: Request) {
     const areaId = url.searchParams.get('areaId');
     const type = url.searchParams.get('type') || 'ALL';
     const q = (url.searchParams.get('q') || '').trim().toLowerCase();
+
+    // A caller-supplied areaId narrows the search, but must never widen it
+    // past the caller's own scope.
+    if (areaId) assertInScope(session, areaId);
 
     const store = await getStore();
     const cycle = currentCycle();

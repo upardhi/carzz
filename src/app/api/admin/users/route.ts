@@ -1,12 +1,50 @@
 import { revalidatePath } from 'next/cache';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { HttpError, requireApiSession } from '@/lib/auth/server';
+import { HttpError, requireApiSession, type Session } from '@/lib/auth/server';
 import { hashPassword } from '@/lib/auth/password';
-import { ROLES } from '@/lib/data/types';
+import { ROLES, type Role } from '@/lib/data/types';
 import { getStore } from '@/lib/data';
 import { todayISO } from '@/lib/util/format';
 import { uploadMedia } from '@/lib/storage';
+
+/**
+ * `user:manage`/`staff:create` say an Area Admin may reach this endpoint at
+ * all — they say nothing about which region or which role. Without this, an
+ * Area Admin (scoped to one region) could plant a Manager in someone else's
+ * area, or worse, hand out an Area Admin or Super Admin account: the
+ * permission check alone can't see the payload's role or area.
+ *
+ * Only a Super Admin may create, promote to, or edit a Super Admin or Area
+ * Admin account. Anyone else acting on a Manager/Employee account must
+ * outrank that role and the account's area must be inside their own scope.
+ */
+function assertCanActOnRole(session: Session, role: Role): void {
+  if (role === 'SUPER_ADMIN' || role === 'AREA_ADMIN') {
+    if (session.user.role !== 'SUPER_ADMIN') {
+      throw new HttpError(403, 'Only the owner can create or edit that role.');
+    }
+    return;
+  }
+  const rank: Record<Role, number> = {
+    SUPER_ADMIN: 0,
+    AREA_ADMIN: 1,
+    MANAGER: 2,
+    EMPLOYEE: 3,
+    CUSTOMER: 4,
+  };
+  if (rank[session.user.role] >= rank[role]) {
+    throw new HttpError(403, 'You do not have permission to manage that role.');
+  }
+}
+
+function assertAreaInScope(session: Session, areaId: string | null | undefined): void {
+  if (!areaId) return;
+  if (session.scope.areaIds === null) return;
+  if (!session.scope.areaIds.includes(areaId)) {
+    throw new HttpError(403, 'That area is outside the areas you manage.');
+  }
+}
 
 function revalidateUserPages() {
   try {
@@ -242,17 +280,24 @@ export async function POST(request: Request) {
     );
     const store = await getStore();
 
+    const ALLOWED_DOC_TYPES = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'];
+
     async function handleUpload(file: unknown, docType: string) {
       if (!(file instanceof File)) return undefined;
       const MAX_BYTES = 10 * 1024 * 1024;
       if (file.size > MAX_BYTES) throw new HttpError(413, 'Document file must be under 10MB.');
+      if (!ALLOWED_DOC_TYPES.includes(file.type)) {
+        throw new HttpError(415, 'Only PDF, PNG, JPG, or WebP files can be uploaded.');
+      }
       const ext = file.name.split('.').pop() || 'pdf';
       const key = `doc_${docType}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.${ext}`;
       const stored = await uploadMedia(file, {
         key,
         folder: 'staff-docs',
         contentType: file.type || 'application/octet-stream',
-        access: 'public',
+        // Aadhaar/PAN scans are government ID — stored private, viewable only
+        // through the authenticated doc-preview proxy (getSafeDocumentUrl).
+        access: 'private',
       });
       return stored.url;
     }
@@ -263,6 +308,8 @@ export async function POST(request: Request) {
       }
       const user = await store.users.get(parsed.data.userId);
       if (!user) throw new HttpError(404, 'User not found.');
+      assertCanActOnRole(session, user.role);
+      assertAreaInScope(session, user.areaId);
 
       await store.users.update(user.id, { active: parsed.data.active });
       // Keep the staff record in step, or a deactivated manager still shows as
@@ -303,6 +350,13 @@ export async function POST(request: Request) {
       const data = parsed.data;
       const user = await store.users.get(data.userId);
       if (!user) throw new HttpError(404, 'User not found.');
+      // Both the account's current role/area and whatever it's being changed
+      // to must be within what this caller is allowed to touch — otherwise an
+      // Area Admin could "update" their way around the create-time checks.
+      assertCanActOnRole(session, user.role);
+      assertAreaInScope(session, user.areaId);
+      if (data.role) assertCanActOnRole(session, data.role);
+      if (data.areaId !== undefined) assertAreaInScope(session, data.areaId);
 
       if (data.email && data.email.toLowerCase() !== user.email.toLowerCase()) {
         const existing = await store.users.findOne({
@@ -399,6 +453,9 @@ export async function POST(request: Request) {
     }
 
     const data = parsed.data;
+    assertCanActOnRole(session, data.role);
+    assertAreaInScope(session, data.areaId);
+
     const existing = await store.users.findOne({
       where: { email: data.email.toLowerCase() },
     });

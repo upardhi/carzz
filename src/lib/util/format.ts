@@ -117,6 +117,14 @@ export function previousCycle(cycle: string = currentCycle()): string {
   return `${y}-${String(m - 1).padStart(2, '0')}`;
 }
 
+export function nextCycle(cycle: string = currentCycle()): string {
+  const [y, m] = cycle.split('-').map(Number);
+  if (m === 12) {
+    return `${y + 1}-01`;
+  }
+  return `${y}-${String(m + 1).padStart(2, '0')}`;
+}
+
 export function addDays(value: DateOnly | Date, days: number): Date {
   return new Date(toDate(value).getTime() + days * 86400000);
 }

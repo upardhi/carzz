@@ -43,7 +43,14 @@ export async function GET() {
     }
   } catch (error) {
     health.database = 'unreachable';
-    health.detail = error instanceof Error ? error.message : String(error);
+    // This endpoint is unauthenticated by design, so in production it must not
+    // echo back raw driver errors — those can contain hostnames or credentials.
+    health.detail =
+      process.env.NODE_ENV === 'production'
+        ? 'Database unreachable. Check server logs for details.'
+        : error instanceof Error
+          ? error.message
+          : String(error);
   }
 
   health.ok =

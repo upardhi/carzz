@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     if (file.size > MAX_BYTES) {
       throw new HttpError(413, 'Document file must be under 10MB.');
     }
-    if (file.type && !ALLOWED.includes(file.type)) {
+    if (!ALLOWED.includes(file.type)) {
       throw new HttpError(415, 'Only PDF, JPEG, PNG, or WebP files are supported.');
     }
 
@@ -40,7 +40,9 @@ export async function POST(request: Request) {
       key,
       folder: 'staff-docs',
       contentType: file.type || 'application/octet-stream',
-      access: 'public',
+      // Aadhaar/PAN/license scans are government ID — stored private,
+      // viewable only through the authenticated doc-preview proxy.
+      access: 'private',
     });
 
     return NextResponse.json({

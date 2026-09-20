@@ -281,6 +281,10 @@ export async function POST(request: Request) {
       });
     }
 
+    if (complaint.status === 'RESOLVED') {
+      throw new HttpError(409, 'This complaint is already closed.');
+    }
+
     if (!parsed.data.resolution?.trim()) {
       throw new HttpError(400, 'Say what you did before closing this.');
     }

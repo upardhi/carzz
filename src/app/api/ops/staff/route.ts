@@ -85,17 +85,24 @@ export async function POST(request: Request) {
     }
     const store = await getStore();
 
+    const ALLOWED_DOC_TYPES = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'];
+
     async function handleUpload(file: unknown, docType: string) {
       if (!(file instanceof File)) return undefined;
       const MAX_BYTES = 10 * 1024 * 1024;
       if (file.size > MAX_BYTES) throw new HttpError(413, 'Document file must be under 10MB.');
+      if (!ALLOWED_DOC_TYPES.includes(file.type)) {
+        throw new HttpError(415, 'Only PDF, PNG, JPG, or WebP files can be uploaded.');
+      }
       const ext = file.name.split('.').pop() || 'pdf';
       const key = `doc_${docType}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.${ext}`;
       const stored = await uploadMedia(file, {
         key,
         folder: 'staff-docs',
         contentType: file.type || 'application/octet-stream',
-        access: 'public',
+        // Aadhaar/PAN scans are government ID — stored private, viewable only
+        // through the authenticated doc-preview proxy (getSafeDocumentUrl).
+        access: 'private',
       });
       return stored.url;
     }

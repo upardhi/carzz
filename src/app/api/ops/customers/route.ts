@@ -13,7 +13,7 @@ import {
 } from '@/lib/data/types';
 import { loadCustomerAccount, recordPayment } from '@/lib/services/accounts';
 import { generateVisitsForCar } from '@/lib/services/schedule';
-import { currentCycle, todayISO } from '@/lib/util/format';
+import { currentCycle, nextCycle, todayISO } from '@/lib/util/format';
 import { scopeAreaFilter } from '@/lib/auth/rbac';
 import { assertInScope, opsError } from '../_guard';
 
@@ -433,6 +433,15 @@ export async function POST(request: Request) {
         await assertPlateAvailable(store, parsed.data.plate.toUpperCase(), car.id);
       }
 
+      if (parsed.data.packageId !== undefined) {
+        const pkg = await store.packages.get(parsed.data.packageId);
+        // An unvalidated packageId would silently zero out this car's
+        // billing everywhere `packageById.get(car.packageId)` is looked up.
+        if (!pkg || !pkg.active) {
+          throw new HttpError(400, 'Selected package is not available.');
+        }
+      }
+
       const patch: Partial<Car> = {};
       if (parsed.data.make !== undefined) patch.make = parsed.data.make;
       if (parsed.data.model !== undefined) patch.model = parsed.data.model;
@@ -470,7 +479,7 @@ export async function POST(request: Request) {
       assertInScope(session, customer.areaId);
 
       const pkg = await store.packages.get(parsed.data.packageId);
-      if (!pkg) throw new HttpError(400, 'Selected package not found.');
+      if (!pkg || !pkg.active) throw new HttpError(400, 'Selected package is not available.');
 
       await assertPlateAvailable(store, parsed.data.plate.toUpperCase());
 
@@ -550,9 +559,9 @@ export async function POST(request: Request) {
       }
     }
 
-    // Check every car's plate before creating anything, so a duplicate plate
-    // on the second car of a multi-car signup doesn't leave a half-created
-    // customer behind.
+    // Check every car's plate and package before creating anything, so a
+    // problem on the second car of a multi-car signup doesn't leave a
+    // half-created customer behind.
     const requestedPlates = new Set<string>();
     for (const input of data.cars) {
       const plate = input.plate.toUpperCase();
@@ -561,6 +570,10 @@ export async function POST(request: Request) {
       }
       requestedPlates.add(plate);
       await assertPlateAvailable(store, plate);
+      const pkg = await store.packages.get(input.packageId);
+      if (!pkg || !pkg.active) {
+        throw new HttpError(400, 'Unknown or discontinued package on one of the cars.');
+      }
     }
 
     const cycle = currentCycle();
@@ -582,90 +595,115 @@ export async function POST(request: Request) {
       joinedOn: todayISO(),
     } as Omit<Customer, 'id'>);
 
-    if (data.createLogin && data.loginEmail && data.loginPassword) {
-      const user = await store.users.create({
-        name: data.name,
-        email: data.loginEmail.toLowerCase(),
-        phone: data.phone,
-        role: 'CUSTOMER',
-        regionId: null,
-        areaId: data.areaId,
+    // Everything from here on can still fail (a car's schedule generation, an
+    // unexpected DB hiccup) — this repository layer has no cross-model
+    // transaction, so a failure here must be unwound by hand, or the customer
+    // and their login are left behind with no car and no way to sign up
+    // again against the same email/plate.
+    let createdUserId: string | null = null;
+    try {
+      if (data.createLogin && data.loginEmail && data.loginPassword) {
+        const user = await store.users.create({
+          name: data.name,
+          email: data.loginEmail.toLowerCase(),
+          phone: data.phone,
+          role: 'CUSTOMER',
+          regionId: null,
+          areaId: data.areaId,
+          customerId: customer.id,
+          staffId: null,
+          language: 'en',
+          active: true,
+          createdAt: new Date().toISOString(),
+        });
+        createdUserId = user.id;
+        await store.customers.update(customer.id, { userId: user.id });
+        await store.setCredential(user.id, await hashPassword(data.loginPassword));
+      }
+
+      let monthly = 0;
+      const isPrepaidPaid = data.advance > 0;
+
+      for (const input of data.cars) {
+        const pkg = await store.packages.get(input.packageId);
+        if (!pkg) throw new HttpError(400, 'Unknown package on one of the cars.');
+        monthly += pkg.price;
+
+        const car = await store.cars.create({
+          customerId: customer.id,
+          model: input.model,
+          make: input.make,
+          colour: input.colour,
+          plate: input.plate.toUpperCase(),
+          packageId: input.packageId,
+          assignedStaffId: data.assignedStaffId || null,
+          schedulePattern: input.schedulePattern,
+          scheduleTime: input.scheduleTime,
+          specialInstructions: input.specialInstructions || null,
+          active: true,
+          serviceStarted: isPrepaidPaid,
+          serviceStartedAt: isPrepaidPaid ? new Date().toISOString() : null,
+          serviceStartedBeforePayment: false,
+          serviceStartedByUserId: isPrepaidPaid ? session.user.id : null,
+          serviceStartNote: null,
+          customDates: input.customDates || [],
+        });
+
+        if (isPrepaidPaid) {
+          await generateVisitsForCar(store, car, customer, cycle, data.startDate ?? undefined);
+        }
+      }
+
+      // Billing always falls due on the 5th, but a customer signing up after
+      // the 5th must not be billed as already overdue on day one — that both
+      // reads badly to them and wrongly puts them on the manager's overdue
+      // list before they have ever had a chance to pay. Push the due date to
+      // the following cycle's 5th in that case.
+      const firstDueOn =
+        `${cycle}-05` < todayISO() ? `${nextCycle(cycle)}-05` : `${cycle}-05`;
+
+      await store.invoices.create({
         customerId: customer.id,
-        staffId: null,
-        language: 'en',
-        active: true,
+        areaId: customer.areaId,
+        cycle,
+        amount: monthly,
+        dueOn: firstDueOn,
+        paidAmount: 0,
+        status: 'OPEN',
         createdAt: new Date().toISOString(),
       });
-      await store.customers.update(customer.id, { userId: user.id });
-      await store.setCredential(user.id, await hashPassword(data.loginPassword));
-    }
 
-    let monthly = 0;
-    const isPrepaidPaid = data.advance > 0;
-
-    for (const input of data.cars) {
-      const pkg = await store.packages.get(input.packageId);
-      if (!pkg) throw new HttpError(400, 'Unknown package on one of the cars.');
-      monthly += pkg.price;
-
-      const car = await store.cars.create({
-        customerId: customer.id,
-        model: input.model,
-        make: input.make,
-        colour: input.colour,
-        plate: input.plate.toUpperCase(),
-        packageId: input.packageId,
-        assignedStaffId: data.assignedStaffId || null,
-        schedulePattern: input.schedulePattern,
-        scheduleTime: input.scheduleTime,
-        specialInstructions: input.specialInstructions || null,
-        active: true,
-        serviceStarted: isPrepaidPaid,
-        serviceStartedAt: isPrepaidPaid ? new Date().toISOString() : null,
-        serviceStartedBeforePayment: false,
-        serviceStartedByUserId: isPrepaidPaid ? session.user.id : null,
-        serviceStartNote: null,
-        customDates: input.customDates || [],
-      });
-
-      if (isPrepaidPaid) {
-        await generateVisitsForCar(store, car, customer, cycle, data.startDate ?? undefined);
-      }
-    }
-
-    await store.invoices.create({
-      customerId: customer.id,
-      areaId: customer.areaId,
-      cycle,
-      amount: monthly,
-      dueOn: `${cycle}-05`,
-      paidAmount: 0,
-      status: 'OPEN',
-      createdAt: new Date().toISOString(),
-    });
-
-    if (data.advance > 0) {
-      await recordPayment(store, {
-        customerId: customer.id,
-        amount: data.advance,
-        mode: data.paymentMode,
-        kind: 'ADVANCE',
-        cycle,
-        recordedByUserId: session.user.id,
-        note: 'Opening advance',
-      });
-    }
-
-    if (data.enquiryId) {
-      const enq = await store.enquiries.get(data.enquiryId);
-      if (enq) {
-        await store.enquiries.update(enq.id, {
-          status: 'CONVERTED',
-          convertedCustomerId: customer.id,
-          handledByUserId: session.user.id,
-          handledAt: new Date().toISOString(),
+      if (data.advance > 0) {
+        await recordPayment(store, {
+          customerId: customer.id,
+          amount: data.advance,
+          mode: data.paymentMode,
+          kind: 'ADVANCE',
+          cycle,
+          recordedByUserId: session.user.id,
+          note: 'Opening advance',
         });
       }
+
+      if (data.enquiryId) {
+        const enq = await store.enquiries.get(data.enquiryId);
+        if (enq) {
+          await store.enquiries.update(enq.id, {
+            status: 'CONVERTED',
+            convertedCustomerId: customer.id,
+            handledByUserId: session.user.id,
+            handledAt: new Date().toISOString(),
+          });
+        }
+      }
+    } catch (innerError) {
+      try {
+        await store.customers.delete(customer.id);
+        if (createdUserId) await store.users.delete(createdUserId);
+      } catch (cleanupError) {
+        console.error('Failed to unwind a half-created customer signup:', cleanupError);
+      }
+      throw innerError;
     }
 
     const visits = await store.visits.count({ customerId: customer.id, cycle });
@@ -694,6 +732,7 @@ export async function GET(request: Request) {
       if (!account) {
         return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
       }
+      assertInScope(session, account.customer.areaId);
       const [area, staff, user, allAreas, allPackages] = await Promise.all([
         store.areas.get(account.customer.areaId),
         store.staff.find({ where: { areaId: account.customer.areaId, role: 'EMPLOYEE' } }),

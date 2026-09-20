@@ -54,7 +54,7 @@ export async function verifySession(
 export const sessionCookieOptions = {
   httpOnly: true,
   sameSite: 'lax' as const,
-  secure: process.env.NODE_ENV === 'production' && process.env.VERCEL !== '1', // Temporarily false if not on Vercel to fix localhost HTTP issues
+  secure: process.env.NODE_ENV === 'production', // localhost dev runs over HTTP, so this is off outside production
   path: '/',
   maxAge: MAX_AGE_SECONDS,
 };

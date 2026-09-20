@@ -7,6 +7,7 @@ import { loadCustomerAccount } from '@/lib/services/accounts';
 import { parsePackageServices } from '@/lib/data/types';
 import {
   currentCycle,
+  cycleLabel,
   formatDateFull,
   formatClock,
   formatTime,
@@ -149,7 +150,7 @@ export default async function CarDetail({
               Included Package Services ({car.package?.name ?? 'Plan'})
             </h3>
             <span className="text-xs font-semibold text-slate-500">
-              Cycle: {activeCycle}
+              {cycleLabel(activeCycle)}
             </span>
           </div>
 

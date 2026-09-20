@@ -13,10 +13,12 @@ const schema = z.object({
 /**
  * A customer-initiated payment.
  *
- * Only the gateway path confirms itself. Cash and manual UPI are recorded as
- * PENDING because the money has not actually arrived until a manager confirms
- * it — recording them as paid would put the collection report out of step with
- * the cash box.
+ * None of these confirm themselves: there is no payment-gateway webhook wired
+ * up to verify money actually moved, so a "GATEWAY" mode here is still just
+ * the customer's own say-so, same as cash or manual UPI. Every mode is
+ * recorded as PENDING until a manager confirms it — auto-confirming a
+ * self-reported gateway payment would let anyone grant themselves account
+ * credit for free.
  */
 export async function POST(request: Request) {
   try {
@@ -41,22 +43,17 @@ export async function POST(request: Request) {
       mode: parsed.data.mode,
       cycle: currentCycle(),
       recordedByUserId: session.user.id,
-      status: parsed.data.mode === 'GATEWAY' ? 'CONFIRMED' : 'PENDING',
-      note:
-        parsed.data.mode === 'GATEWAY'
-          ? 'Paid online by customer'
-          : 'Declared by customer, awaiting manager confirmation',
+      status: 'PENDING',
+      note: 'Declared by customer, awaiting manager confirmation',
     });
 
     return NextResponse.json({
       ok: true,
       payment,
       message:
-        parsed.data.mode === 'GATEWAY'
-          ? 'Payment received. Your receipt is on the way.'
-          : parsed.data.mode === 'CASH'
-            ? 'Noted. Please hand the cash to your wash boy on the next visit.'
-            : 'Noted. Your manager will confirm the UPI transfer.',
+        parsed.data.mode === 'CASH'
+          ? 'Noted. Please hand the cash to your wash boy on the next visit.'
+          : 'Noted. Your manager will confirm the payment shortly.',
     });
   } catch (error) {
     if (error instanceof HttpError) {
