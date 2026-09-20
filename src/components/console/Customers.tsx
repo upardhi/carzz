@@ -5,7 +5,7 @@ import type { Session } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { LEAD_SOURCES, type Car, type Customer, type CustomerStatus } from '@/lib/data/types';
 import { currentCycle, formatTime, money } from '@/lib/util/format';
-import { LEAD_SOURCE_LABEL } from '@/lib/util/labels';
+import { LEAD_SOURCE_LABEL, PATTERN_SHORT } from '@/lib/util/labels';
 import {
   IconCalendar,
   IconEye,
@@ -153,6 +153,11 @@ export async function ConsoleCustomers({
     .filter((a) => areasInUse.has(a.id))
     .map((a) => ({ value: a.id, label: a.name }));
 
+  const patternsInUse = new Set(scopedCars.map((c) => c.schedulePattern));
+  const patternOptions = Object.entries(PATTERN_SHORT)
+    .filter(([value]) => patternsInUse.has(value as Car['schedulePattern']))
+    .map(([value, label]) => ({ value, label }));
+
   // Filtering
   const rawQuery = (searchParams.q ?? '').trim().toLowerCase();
   let query = rawQuery;
@@ -169,6 +174,9 @@ export async function ConsoleCustomers({
 
     const own = carsByCustomer.get(customer.id) ?? [];
     if (searchParams.staff && !own.some((c) => c.assignedStaffId === searchParams.staff)) {
+      return false;
+    }
+    if (searchParams.pattern && !own.some((c) => c.schedulePattern === searchParams.pattern)) {
       return false;
     }
 
@@ -317,6 +325,12 @@ export async function ConsoleCustomers({
               icon: <IconTag width={13} height={13} />,
               options: sourceOptions,
             },
+            {
+              name: 'pattern',
+              label: 'Schedule — all',
+              icon: <IconCalendar width={13} height={13} />,
+              options: patternOptions,
+            },
             ...(areaOptions.length > 1
               ? [
                   {
@@ -405,7 +419,7 @@ export async function ConsoleCustomers({
           },
           {
             id: 'schedule',
-            header: 'Slot Time',
+            header: 'Schedule',
             className: 'whitespace-nowrap',
             render: (customer) => {
               const own = carsByCustomer.get(customer.id) ?? [];
@@ -413,7 +427,9 @@ export async function ConsoleCustomers({
               return first ? (
                 <div className="flex items-center gap-1.5 text-xs text-slate-600 font-medium">
                   <IconCalendar width={13} height={13} className="text-slate-400 shrink-0" />
-                  <span>{formatTime(first.scheduleTime)}</span>
+                  <span>
+                    {PATTERN_SHORT[first.schedulePattern]} · {formatTime(first.scheduleTime)}
+                  </span>
                 </div>
               ) : (
                 <span className="text-xs text-slate-400">—</span>

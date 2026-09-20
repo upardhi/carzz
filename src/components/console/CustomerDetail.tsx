@@ -25,6 +25,7 @@ import {
 import {
   LEAD_SOURCE_LABEL,
   MISS_REASON_LABEL,
+  PATTERN_LABEL,
   PAYMENT_MODE_LABEL,
 } from '@/lib/util/labels';
 import { ActionButton } from './ActionButton';
@@ -265,7 +266,7 @@ export async function ConsoleCustomerDetail({
                 />
                 <Row
                   label="Slot"
-                  value={formatTime(car.scheduleTime)}
+                  value={`${PATTERN_LABEL[car.schedulePattern]} · ${formatTime(car.scheduleTime)}`}
                 />
                 <Row
                   label="Wash boy"
