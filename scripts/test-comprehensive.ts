@@ -219,7 +219,7 @@ async function runTests() {
       plate: carPlate,
       servicePackage: { connect: { id: pkg.id } },
       assignedStaff: { connect: { id: staffMember.id } },
-      schedulePattern: 'MON_THU',
+      weeklyDays: ['MON', 'THU'],
       scheduleTime: '07:30',
       specialInstructions: 'Parking slot B-12 near pillar',
       active: true,

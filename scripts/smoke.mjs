@@ -302,11 +302,11 @@ async function suiteOperations() {
   /* Intake */
   const intake = {
     action: 'create', source: 'GUARD_REF', name: 'Smoke Test Customer', phone: '9800001234',
-    address: 'Test Society, Flat 12', schedulePattern: 'MON_THU',
+    address: 'Test Society, Flat 12',
     advance: 2000, paymentMode: 'CASH',
     cars: [
-      { model: 'Swift', make: 'Maruti', colour: 'White', plate: 'MH31 ZZ 1111', packageId: 'pkg_bucket', scheduleTime: '09:00' },
-      { model: 'i20', make: 'Hyundai', colour: 'Red', plate: 'MH31 ZZ 2222', packageId: 'pkg_bucket', scheduleTime: '09:30' },
+      { model: 'Swift', make: 'Maruti', colour: 'White', plate: 'MH31 ZZ 1111', packageId: 'pkg_bucket', weeklyDays: ['MON', 'THU'], scheduleTime: '09:00' },
+      { model: 'i20', make: 'Hyundai', colour: 'Red', plate: 'MH31 ZZ 2222', packageId: 'pkg_bucket', weeklyDays: ['MON', 'THU'], scheduleTime: '09:30' },
     ],
   };
   const created = await post('/api/ops/customers', { ...intake, areaId: 'ar_wadi' }, manager);
@@ -570,7 +570,7 @@ async function suiteServiceActivationAndCustomerFlexibility() {
     colour: 'Silver',
     plate: 'MH31 SM 9999',
     packageId: 'pkg_bucket',
-    schedulePattern: 'MON_THU',
+    weeklyDays: ['MON', 'THU'],
     scheduleTime: '06:30',
   }, customer);
   check('customer adds a new car', addCarRes.ok, addCarRes.body.message);
@@ -609,7 +609,7 @@ async function suiteServiceActivationAndCustomerFlexibility() {
     colour: 'Dark Edition',
     plate: 'MH31 SM 8888',
     packageId: 'pkg_bucket',
-    schedulePattern: 'TUE_FRI',
+    weeklyDays: ['TUE', 'FRI'],
     scheduleTime: '07:00',
   }, customer);
   check('customer adds a second car', addCar2Res.ok);
