@@ -504,19 +504,25 @@ export function AreaDetailClient({
       align: 'right',
       className: 'whitespace-nowrap',
       render: (item) => {
-        if (item.beforePhotoUrl || item.afterPhotoUrl) {
-          return (
-            <button
-              type="button"
-              onClick={() => setPreviewVisit(item)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 hover:bg-blue-100 hover:border-blue-300 transition-colors shadow-2xs cursor-pointer"
-            >
-              <IconDroplet width={12} height={12} className="text-blue-600" />
-              <span>View Photos</span>
-            </button>
-          );
-        }
-        return <span className="text-xs text-slate-400 font-normal">—</span>;
+        // Always opens the inspection modal, even with no photos — that modal
+        // is also where a manager rates the wash, and a wash completed
+        // without photos (requireBothPhotos off) must stay rateable.
+        const hasPhotos = Boolean(item.beforePhotoUrl || item.afterPhotoUrl);
+        return (
+          <button
+            type="button"
+            onClick={() => setPreviewVisit(item)}
+            className={clsx(
+              'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold transition-colors shadow-2xs cursor-pointer',
+              hasPhotos
+                ? 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:border-blue-300'
+                : 'border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100',
+            )}
+          >
+            <IconDroplet width={12} height={12} className={hasPhotos ? 'text-blue-600' : 'text-slate-400'} />
+            <span>{hasPhotos ? 'View Photos' : 'Rate Wash'}</span>
+          </button>
+        );
       },
     },
   ];
@@ -641,19 +647,24 @@ export function AreaDetailClient({
       align: 'right',
       className: 'whitespace-nowrap',
       render: (item) => {
-        if (item.beforePhotoUrl || item.afterPhotoUrl) {
-          return (
-            <button
-              type="button"
-              onClick={() => setPreviewVisit(item)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 hover:bg-blue-100 hover:border-blue-300 transition-colors shadow-2xs cursor-pointer"
-            >
-              <IconDroplet width={12} height={12} className="text-blue-600" />
-              <span>View Photos</span>
-            </button>
-          );
-        }
-        return <span className="text-xs text-slate-400 font-normal">No photos</span>;
+        // Same as the Today's Schedule photos column: always clickable, since
+        // this is also the only entry point to the manager rating form.
+        const hasPhotos = Boolean(item.beforePhotoUrl || item.afterPhotoUrl);
+        return (
+          <button
+            type="button"
+            onClick={() => setPreviewVisit(item)}
+            className={clsx(
+              'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold transition-colors shadow-2xs cursor-pointer',
+              hasPhotos
+                ? 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:border-blue-300'
+                : 'border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100',
+            )}
+          >
+            <IconDroplet width={12} height={12} className={hasPhotos ? 'text-blue-600' : 'text-slate-400'} />
+            <span>{hasPhotos ? 'View Photos' : 'Rate Wash'}</span>
+          </button>
+        );
       },
     },
   ];
