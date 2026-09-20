@@ -70,7 +70,10 @@ async function AdminDashboardContent() {
     store.complaints.count({ status: 'ESCALATED' }),
   ]);
 
-  const unapproved = payouts.filter((p) => p.status === 'DRAFT');
+  // A DRAFT payout with nothing earned yet isn't an action for the owner —
+  // it's just staff who haven't done a billable wash this cycle. Only flag
+  // the ones that actually have money riding on the approval.
+  const unapproved = payouts.filter((p) => p.status === 'DRAFT' && p.net > 0);
   const worstSource = [...sources]
     .filter((s) => s.cost > 0)
     .sort((a, b) => b.costPerActiveCar - a.costPerActiveCar)[0];

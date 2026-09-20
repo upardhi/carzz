@@ -59,7 +59,7 @@ export default async function CustomerHome() {
     yearOrMonth: string;
     title: string;
     subtitle: string;
-    status: 'Approved' | 'Cancelled' | 'Pending';
+    status: 'Approved' | 'Cancelled' | 'Rescheduled' | 'Pending';
   }[] = [];
 
   for (const visit of account.visits.slice(0, 5)) {
@@ -87,7 +87,9 @@ export default async function CustomerHome() {
         visit.status === 'DONE'
           ? 'Approved'
           : visit.status === 'MISSED'
-          ? 'Cancelled'
+          ? visit.rescheduledToVisitId
+            ? 'Rescheduled'
+            : 'Cancelled'
           : 'Pending',
     });
   }
@@ -393,6 +395,8 @@ export default async function CustomerHome() {
                       className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold border ${
                         b.status === 'Cancelled'
                           ? 'bg-slate-100 text-slate-600 border-slate-200'
+                          : b.status === 'Rescheduled'
+                          ? 'bg-amber-50 text-amber-700 border-amber-200'
                           : b.status === 'Pending'
                           ? 'bg-blue-50 text-blue-700 border-blue-200'
                           : 'bg-emerald-50 text-emerald-700 border-emerald-200'

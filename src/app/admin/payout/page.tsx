@@ -34,6 +34,10 @@ export default async function AdminPayout({
 
   const total = payouts.reduce((sum, p) => sum + p.net, 0);
   const pending = payouts.filter((p) => p.status === 'DRAFT');
+  // A draft payout with nothing earned this cycle isn't waiting on you —
+  // there's no money to sign off on, so it shouldn't count as a pending
+  // approval or show up in the "N need owner signoff" banner.
+  const pendingWithPay = pending.filter((p) => p.net > 0);
   const approved = payouts.filter((p) => p.status === 'APPROVED');
 
   return (
@@ -58,9 +62,9 @@ export default async function AdminPayout({
         />
         <Kpi
           label="AWAITING APPROVAL"
-          value={pending.length}
-          tone={pending.length ? 'rose' : 'emerald'}
-          subtext={pending.length ? `${pending.length} need owner signoff` : 'All approved'}
+          value={pendingWithPay.length}
+          tone={pendingWithPay.length ? 'rose' : 'emerald'}
+          subtext={pendingWithPay.length ? `${pendingWithPay.length} need owner signoff` : 'All approved'}
         />
         <Kpi
           label="APPROVED"
@@ -83,13 +87,13 @@ export default async function AdminPayout({
       </KpiGrid>
 
       <Card
-        accent={pending.length ? 'danger' : 'success'}
+        accent={pendingWithPay.length ? 'danger' : 'success'}
         className="mt-4 p-4"
       >
         <h3 className="text-sm font-bold">
-          {pending.length
-            ? `${pending.length} payouts waiting for you — ${money(
-                pending.reduce((s, p) => s + p.net, 0),
+          {pendingWithPay.length
+            ? `${pendingWithPay.length} payouts waiting for you — ${money(
+                pendingWithPay.reduce((s, p) => s + p.net, 0),
               )}`
             : 'Every payout this month is approved'}
         </h3>
@@ -98,17 +102,17 @@ export default async function AdminPayout({
           attendance and pocket withdrawals — so any figure can be traced back
           to the day it came from. Nothing is paid until you approve it.
         </p>
-        {pending.length ? (
+        {pendingWithPay.length ? (
           <div className="mt-3">
             <ActionButton
               endpoint="/api/admin/payout"
               size="md"
               payload={{ action: 'approveAll', cycle }}
-              confirm={`Approve all ${pending.length} payouts, totalling ${money(
-                pending.reduce((s, p) => s + p.net, 0),
+              confirm={`Approve all ${pendingWithPay.length} payouts, totalling ${money(
+                pendingWithPay.reduce((s, p) => s + p.net, 0),
               )}?`}
             >
-              Approve all — {money(pending.reduce((s, p) => s + p.net, 0))}
+              Approve all — {money(pendingWithPay.reduce((s, p) => s + p.net, 0))}
             </ActionButton>
           </div>
         ) : null}

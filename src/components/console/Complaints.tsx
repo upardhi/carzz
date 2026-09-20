@@ -48,17 +48,39 @@ export async function ConsoleComplaints({
   const staffById = new Map(staff.map((s) => [s.id, s]));
   const customerById = new Map(customers.map((c) => [c.id, c]));
 
-  // Wash boy complaint attribution from recent database sample
+  // Wash boy complaint attribution from recent database sample. A complaint
+  // tied to a visit missed for an external, no-fault reason (bad weather, no
+  // water/access, an unreachable or car-not-available customer) shouldn't
+  // count against the wash boy the way a quality or behaviour complaint
+  // does — otherwise this leaderboard blames staff for the weather.
+  const NO_FAULT_MISS_REASONS = new Set([
+    'WEATHER',
+    'NO_WATER_OR_ACCESS',
+    'CUSTOMER_UNREACHABLE',
+    'CUSTOMER_SKIPPED',
+    'CAR_NOT_AVAILABLE',
+  ]);
   const recentAttributionSample = await store.complaints.find({
     where: areaFilter as never,
     limit: 100,
   });
+  const attributionVisitIds = [
+    ...new Set(recentAttributionSample.map((c) => c.visitId).filter(Boolean)),
+  ] as string[];
+  const attributionVisits = attributionVisitIds.length
+    ? await store.visits.find({ where: { id: { in: attributionVisitIds } } as never })
+    : [];
+  const missReasonByVisitId = new Map(attributionVisits.map((v) => [v.id, v.missReason]));
+
   const byStaff = new Map<string, number>();
   for (const complaint of recentAttributionSample) {
     if (!complaint.staffId) continue;
+    const missReason = complaint.visitId ? missReasonByVisitId.get(complaint.visitId) : null;
+    if (missReason && NO_FAULT_MISS_REASONS.has(missReason)) continue;
     byStaff.set(complaint.staffId, (byStaff.get(complaint.staffId) ?? 0) + 1);
   }
   const worst = [...byStaff.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const totalAttributed = [...byStaff.values()].reduce((sum, n) => sum + n, 0);
 
   const resolved = await store.complaints.find({
     where: { ...(areaFilter as object), status: 'RESOLVED' } as never,
@@ -103,7 +125,7 @@ export async function ConsoleComplaints({
               render: ([, count]) => (
                 <span
                   className={
-                    count / complaints.length > 0.25
+                    count / totalAttributed > 0.25
                       ? 'font-bold text-rose-600'
                       : 'font-semibold text-slate-700'
                   }
@@ -117,8 +139,8 @@ export async function ConsoleComplaints({
               header: 'SHARE',
               align: 'right',
               render: ([, count]) =>
-                complaints.length
-                  ? `${Math.round((count / complaints.length) * 100)}%`
+                totalAttributed
+                  ? `${Math.round((count / totalAttributed) * 100)}%`
                   : '—',
             },
           ]}
