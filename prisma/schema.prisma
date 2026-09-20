@@ -102,6 +102,12 @@ enum Weekday {
   SUN
 }
 
+enum BillingPeriod {
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
 enum VisitStatus {
   PENDING
   IN_PROGRESS
@@ -391,13 +397,15 @@ model Customer {
 }
 
 model ServicePackage {
-  id             String   @id @default(cuid())
-  name           String
-  washesPerMonth Int
-  price          Int
-  costToDeliver  Int
-  services       String[]
-  active         Boolean  @default(true)
+  id              String         @id @default(cuid())
+  name            String
+  washesPerMonth  Int
+  billingPeriod   BillingPeriod  @default(MONTHLY)
+  washesPerPeriod Int            @default(0)
+  price           Int
+  costToDeliver   Int
+  services        String[]
+  active          Boolean        @default(true)
 
   cars Car[]
 }

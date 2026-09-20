@@ -133,6 +133,8 @@ export default async function CustomerCars() {
             name: p.name,
             price: p.price,
             washesPerMonth: p.washesPerMonth,
+            billingPeriod: p.billingPeriod,
+            washesPerPeriod: p.washesPerPeriod,
           }))}
         />
       </div>

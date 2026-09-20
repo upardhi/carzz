@@ -6,6 +6,7 @@ import { toast } from '@/components/ui/ToastProvider';
 import {
   LEAD_SOURCES,
   parsePackageServices,
+  trimWeeklyDays,
   type Area,
   type Car,
   type Customer,
@@ -283,6 +284,14 @@ export function EditCarModalButton({
   const selectedPackage = packages.find((p) => p.id === packageId);
   const serviceOptions = parsePackageServices(selectedPackage?.services, selectedPackage?.washesPerMonth).map((s) => s.name);
 
+  function handlePackageChange(nextPackageId: string) {
+    setPackageId(nextPackageId);
+    const nextPkg = packages.find((p) => p.id === nextPackageId);
+    if (nextPkg) {
+      setWeeklyDays((cur) => trimWeeklyDays(cur, nextPkg));
+    }
+  }
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
 
@@ -418,7 +427,7 @@ export function EditCarModalButton({
                   <label className="block font-bold text-slate-700 mb-1">Service Package *</label>
                   <select
                     value={packageId}
-                    onChange={(e) => setPackageId(e.target.value)}
+                    onChange={(e) => handlePackageChange(e.target.value)}
                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold bg-white focus:border-blue-500 focus:outline-none"
                   >
                     {packages.map((pkg) => (
@@ -460,7 +469,7 @@ export function EditCarModalButton({
                 weeklyDays={weeklyDays}
                 dayServices={dayServices}
                 serviceOptions={serviceOptions}
-                washesPerMonth={selectedPackage?.washesPerMonth}
+                pkg={selectedPackage}
                 onChange={(next) => {
                   setWeeklyDays(next.weeklyDays);
                   setDayServices(next.dayServices);
@@ -537,7 +546,9 @@ export function AddCarModalButton({
   const [plate, setPlate] = useState('');
   const [packageId, setPackageId] = useState(packages[0]?.id || '');
   const [assignedStaffId, setAssignedStaffId] = useState('');
-  const [weeklyDays, setWeeklyDays] = useState<Weekday[]>(['MON', 'THU']);
+  const [weeklyDays, setWeeklyDays] = useState<Weekday[]>(() =>
+    trimWeeklyDays(['MON', 'THU'], packages[0] ?? { washesPerMonth: 8 }),
+  );
   const [dayServices, setDayServices] = useState<DayServices>({});
   const [scheduleTime, setScheduleTime] = useState('09:00');
   const [specialInstructions, setSpecialInstructions] = useState('');
@@ -546,6 +557,14 @@ export function AddCarModalButton({
 
   const selectedPackage = packages.find((p) => p.id === packageId);
   const serviceOptions = parsePackageServices(selectedPackage?.services, selectedPackage?.washesPerMonth).map((s) => s.name);
+
+  function handlePackageChange(nextPackageId: string) {
+    setPackageId(nextPackageId);
+    const nextPkg = packages.find((p) => p.id === nextPackageId);
+    if (nextPkg) {
+      setWeeklyDays((cur) => trimWeeklyDays(cur, nextPkg));
+    }
+  }
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -685,7 +704,7 @@ export function AddCarModalButton({
                   <label className="block font-bold text-slate-700 mb-1">Package *</label>
                   <select
                     value={packageId}
-                    onChange={(e) => setPackageId(e.target.value)}
+                    onChange={(e) => handlePackageChange(e.target.value)}
                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold bg-white focus:border-blue-500 focus:outline-none"
                   >
                     {packages.map((pkg) => (
@@ -727,7 +746,7 @@ export function AddCarModalButton({
                 weeklyDays={weeklyDays}
                 dayServices={dayServices}
                 serviceOptions={serviceOptions}
-                washesPerMonth={selectedPackage?.washesPerMonth}
+                pkg={selectedPackage}
                 onChange={(next) => {
                   setWeeklyDays(next.weeklyDays);
                   setDayServices(next.dayServices);

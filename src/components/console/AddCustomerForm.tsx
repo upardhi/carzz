@@ -6,6 +6,8 @@ import { Note } from '@/components/ui/primitives';
 import {
   LEAD_SOURCES,
   parsePackageServices,
+  trimWeeklyDays,
+  type BillingPeriod,
   type DayServices,
   type LeadSource,
   type Weekday,
@@ -31,7 +33,15 @@ interface CarDraft {
 
 export interface IntakeOptions {
   areas: { id: string; name: string; city: string }[];
-  packages: { id: string; name: string; price: number; washesPerMonth: number; services?: string[] }[];
+  packages: {
+    id: string;
+    name: string;
+    price: number;
+    washesPerMonth: number;
+    billingPeriod?: BillingPeriod;
+    washesPerPeriod?: number;
+    services?: string[];
+  }[];
   staff: { id: string; name: string; areaId: string }[];
   defaultAreaId: string;
 }
@@ -197,7 +207,10 @@ export function AddCustomerForm({
       colour: '',
       plate: '',
       packageId: defaultPackageId,
-      weeklyDays: ['MON', 'THU'] as Weekday[],
+      weeklyDays: trimWeeklyDays(
+        ['MON', 'THU'],
+        options.packages.find((p) => p.id === defaultPackageId) ?? { washesPerMonth: 8 },
+      ),
       dayServices: {},
       scheduleTime: '09:00',
       specialInstructions: '',
@@ -648,7 +661,13 @@ export function AddCustomerForm({
                       <select
                         className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                         value={car.packageId}
-                        onChange={(e) => updateCar(index, { packageId: e.target.value })}
+                        onChange={(e) => {
+                          const nextPkg = options.packages.find((p) => p.id === e.target.value);
+                          updateCar(index, {
+                            packageId: e.target.value,
+                            weeklyDays: nextPkg ? trimWeeklyDays(car.weeklyDays, nextPkg) : car.weeklyDays,
+                          });
+                        }}
                       >
                         {options.packages.length === 0 ? (
                           <option value="">No packages available</option>
@@ -720,7 +739,7 @@ export function AddCustomerForm({
                             weeklyDays={car.weeklyDays}
                             dayServices={car.dayServices}
                             serviceOptions={serviceOptions}
-                            washesPerMonth={pkg?.washesPerMonth}
+                            pkg={pkg}
                             onChange={(next) => updateCar(index, { weeklyDays: next.weeklyDays, dayServices: next.dayServices })}
                           />
                         </div>
@@ -742,7 +761,7 @@ export function AddCustomerForm({
                       colour: '',
                       plate: '',
                       packageId: options.packages[0]?.id ?? '',
-                      weeklyDays: ['MON', 'THU'] as Weekday[],
+                      weeklyDays: trimWeeklyDays(['MON', 'THU'], options.packages[0] ?? { washesPerMonth: 8 }),
                       dayServices: {},
                       scheduleTime:
                         SLOTS[

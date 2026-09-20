@@ -55,6 +55,8 @@ export default async function AdminAddCustomer({
             name: p.name,
             price: p.price,
             washesPerMonth: p.washesPerMonth,
+            billingPeriod: p.billingPeriod,
+            washesPerPeriod: p.washesPerPeriod,
             services: p.services,
           })),
           staff: staff.map((s) => ({ id: s.id, name: s.name, areaId: s.areaId })),

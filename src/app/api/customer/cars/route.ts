@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { HttpError, requireApiSession } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
+import { maxWeeklyDaysForPackage } from '@/lib/data/types';
 
 const carInputSchema = z.object({
   make: z.string().trim().min(1).default('Car'),
@@ -55,6 +56,14 @@ export async function POST(request: Request) {
     }
     if (!pkg) {
       throw new HttpError(400, 'No active service package available.');
+    }
+
+    const maxDays = maxWeeklyDaysForPackage(pkg);
+    if (data.weeklyDays.length > maxDays) {
+      throw new HttpError(
+        400,
+        `This package (${pkg.washesPerMonth}/month) allows at most ${maxDays} day${maxDays === 1 ? '' : 's'}/week — ${data.weeklyDays.length} were selected.`,
+      );
     }
 
     // Inherit assigned staff from existing cars if present

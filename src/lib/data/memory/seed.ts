@@ -212,15 +212,15 @@ export function buildSeed(today = new Date()): Db {
   /* ---- packages ---- */
   const packages: ServicePackage[] = [
     {
-      id: 'pkg_bucket', name: 'Bucket Wash', washesPerMonth: 8, price: 1600,
+      id: 'pkg_bucket', name: 'Bucket Wash', washesPerMonth: 8, billingPeriod: 'MONTHLY', washesPerPeriod: 8, price: 1600,
       costToDeliver: 536, services: ['Exterior wash', 'Interior vacuum'], active: true,
     },
     {
-      id: 'pkg_pressure', name: 'Pressure Wash', washesPerMonth: 8, price: 2000,
+      id: 'pkg_pressure', name: 'Pressure Wash', washesPerMonth: 8, billingPeriod: 'MONTHLY', washesPerPeriod: 8, price: 2000,
       costToDeliver: 712, services: ['Pressure wash', 'Interior vacuum', 'Tyre dressing'], active: true,
     },
     {
-      id: 'pkg_detailing', name: 'Detailing', washesPerMonth: 4, price: 3200,
+      id: 'pkg_detailing', name: 'Detailing', washesPerMonth: 4, billingPeriod: 'MONTHLY', washesPerPeriod: 4, price: 3200,
       costToDeliver: 1640, services: ['Pressure wash', 'Interior vacuum', 'Polish / wax', 'Tyre dressing'], active: true,
     },
   ];

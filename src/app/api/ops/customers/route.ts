@@ -8,6 +8,8 @@ import type { DataStore } from '@/lib/data/ports/store';
 import {
   LEAD_SOURCES,
   WEEKDAYS,
+  maxWeeklyDaysForPackage,
+  type BillingPeriod,
   type Customer,
   type Car,
 } from '@/lib/data/types';
@@ -26,6 +28,22 @@ async function assertPlateAvailable(
   const existing = await store.cars.findOne({ where: { plate } as never });
   if (existing && existing.id !== excludeCarId) {
     throw new HttpError(409, `Plate ${plate} is already registered to another car.`);
+  }
+}
+
+/** A 4-wash/month package spread across all 7 days front-loads the whole
+ * month's quota into the first week — cap the weekly-day count server-side
+ * too, since the client's own guardrail can be bypassed by a direct call. */
+function assertWeeklyDaysFitPackage(
+  weeklyDays: string[],
+  pkg: { washesPerMonth: number; billingPeriod?: BillingPeriod; washesPerPeriod?: number },
+): void {
+  const max = maxWeeklyDaysForPackage(pkg);
+  if (weeklyDays.length > max) {
+    throw new HttpError(
+      400,
+      `This package (${pkg.washesPerMonth}/month) allows at most ${max} day${max === 1 ? '' : 's'}/week — ${weeklyDays.length} were selected.`,
+    );
   }
 }
 
@@ -446,13 +464,20 @@ export async function POST(request: Request) {
         await assertPlateAvailable(store, parsed.data.plate.toUpperCase(), car.id);
       }
 
+      let effectivePackage = null as Awaited<ReturnType<typeof store.packages.get>>;
       if (parsed.data.packageId !== undefined) {
-        const pkg = await store.packages.get(parsed.data.packageId);
+        effectivePackage = await store.packages.get(parsed.data.packageId);
         // An unvalidated packageId would silently zero out this car's
         // billing everywhere `packageById.get(car.packageId)` is looked up.
-        if (!pkg || !pkg.active) {
+        if (!effectivePackage || !effectivePackage.active) {
           throw new HttpError(400, 'Selected package is not available.');
         }
+      }
+
+      if (parsed.data.weeklyDays !== undefined || parsed.data.packageId !== undefined) {
+        const pkgForCheck = effectivePackage ?? (await store.packages.get(car.packageId));
+        const daysForCheck = parsed.data.weeklyDays ?? car.weeklyDays;
+        if (pkgForCheck) assertWeeklyDaysFitPackage(daysForCheck, pkgForCheck);
       }
 
       const patch: Partial<Car> = {};
@@ -493,6 +518,7 @@ export async function POST(request: Request) {
 
       const pkg = await store.packages.get(parsed.data.packageId);
       if (!pkg || !pkg.active) throw new HttpError(400, 'Selected package is not available.');
+      assertWeeklyDaysFitPackage(parsed.data.weeklyDays, pkg);
 
       await assertPlateAvailable(store, parsed.data.plate.toUpperCase());
 
@@ -620,6 +646,7 @@ export async function POST(request: Request) {
       if (!pkg || !pkg.active) {
         throw new HttpError(400, 'Unknown or discontinued package on one of the cars.');
       }
+      assertWeeklyDaysFitPackage(input.weeklyDays, pkg);
     }
 
     const cycle = currentCycle();

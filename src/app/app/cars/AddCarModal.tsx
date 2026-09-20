@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { WEEKDAYS, type Weekday } from '@/lib/data/types';
+import { WEEKDAYS, maxWeeklyDaysForPackage, trimWeeklyDays, type BillingPeriod, type Weekday } from '@/lib/data/types';
 import { WEEKDAY_SHORT } from '@/lib/util/labels';
 
 interface PackageOption {
@@ -10,6 +10,8 @@ interface PackageOption {
   name: string;
   price: number;
   washesPerMonth: number;
+  billingPeriod?: BillingPeriod;
+  washesPerPeriod?: number;
 }
 
 export function AddCarModal({ packages }: { packages: PackageOption[] }) {
@@ -25,12 +27,27 @@ export function AddCarModal({ packages }: { packages: PackageOption[] }) {
   const [packageId, setPackageId] = useState(packages[0]?.id || '');
   const [scheduleTime, setScheduleTime] = useState('06:30');
   const [instructions, setInstructions] = useState('');
-  const [weeklyDays, setWeeklyDays] = useState<Weekday[]>(['MON', 'THU']);
+  const [weeklyDays, setWeeklyDays] = useState<Weekday[]>(() =>
+    trimWeeklyDays(['MON', 'THU'], packages[0] ?? { washesPerMonth: 8 }),
+  );
+
+  const selectedPackage = packages.find((p) => p.id === packageId);
+  const maxDays = selectedPackage ? maxWeeklyDaysForPackage(selectedPackage) : 7;
+
+  function handlePackageChange(nextPackageId: string) {
+    setPackageId(nextPackageId);
+    const nextPkg = packages.find((p) => p.id === nextPackageId);
+    if (nextPkg) {
+      setWeeklyDays((cur) => trimWeeklyDays(cur, nextPkg));
+    }
+  }
 
   function toggleDay(day: Weekday) {
-    setWeeklyDays((current) =>
-      current.includes(day) ? current.filter((d) => d !== day) : [...current, day],
-    );
+    setWeeklyDays((current) => {
+      const isOn = current.includes(day);
+      if (!isOn && current.length >= maxDays) return current;
+      return isOn ? current.filter((d) => d !== day) : [...current, day];
+    });
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -174,7 +191,7 @@ export function AddCarModal({ packages }: { packages: PackageOption[] }) {
                 <label className="block font-medium text-slate-700 mb-1">Wash Package</label>
                 <select
                   value={packageId}
-                  onChange={(e) => setPackageId(e.target.value)}
+                  onChange={(e) => handlePackageChange(e.target.value)}
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-navy-600 focus:outline-hidden bg-white"
                 >
                   {packages.map((pkg) => (
@@ -204,18 +221,25 @@ export function AddCarModal({ packages }: { packages: PackageOption[] }) {
               {/* Weekly wash days */}
               <div>
                 <label className="block font-medium text-slate-700 mb-1">Wash Days (every week)</label>
+                <p className="mb-1.5 text-[11px] text-slate-500">
+                  This package allows up to {maxDays} day{maxDays === 1 ? '' : 's'}/week.
+                </p>
                 <div className="flex flex-wrap gap-1.5">
                   {WEEKDAYS.map((day) => {
                     const checked = weeklyDays.includes(day);
+                    const disabled = !checked && weeklyDays.length >= maxDays;
                     return (
                       <button
                         key={day}
                         type="button"
+                        disabled={disabled}
                         onClick={() => toggleDay(day)}
                         className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${
                           checked
                             ? 'border-navy-600 bg-navy-600 text-white'
-                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                            : disabled
+                              ? 'border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed'
+                              : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
                         }`}
                       >
                         {WEEKDAY_SHORT[day]}

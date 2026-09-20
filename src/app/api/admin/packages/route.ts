@@ -3,7 +3,13 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { HttpError, requireApiSession } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
-import { formatPackageServices, parsePackageServices, type PackageServiceItem } from '@/lib/data/types';
+import {
+  BILLING_PERIODS,
+  formatPackageServices,
+  parsePackageServices,
+  washesPerMonthFor,
+  type PackageServiceItem,
+} from '@/lib/data/types';
 
 const serviceItemSchema = z.union([
   z.string(),
@@ -17,7 +23,8 @@ const schema = z.discriminatedUnion('action', [
   z.object({
     action: z.literal('create'),
     name: z.string().trim().min(2),
-    washesPerMonth: z.number().int().positive().max(31),
+    billingPeriod: z.enum(BILLING_PERIODS).default('MONTHLY'),
+    washesPerPeriod: z.number().int().positive().max(366),
     price: z.number().int().positive(),
     costToDeliver: z.number().int().min(0),
     services: z.array(serviceItemSchema).min(1),
@@ -27,7 +34,8 @@ const schema = z.discriminatedUnion('action', [
     packageId: z.string().min(1),
     name: z.string().trim().min(2).optional(),
     price: z.number().int().positive().optional(),
-    washesPerMonth: z.number().int().positive().max(31).optional(),
+    billingPeriod: z.enum(BILLING_PERIODS).optional(),
+    washesPerPeriod: z.number().int().positive().max(366).optional(),
     costToDeliver: z.number().int().min(0).optional(),
     services: z.array(serviceItemSchema).min(1).optional(),
     active: z.boolean().optional(),
@@ -149,12 +157,14 @@ export async function POST(request: Request) {
     }
 
     if (parsed.data.action === 'create') {
-      const washesPerMonth = parsed.data.washesPerMonth;
+      const washesPerMonth = washesPerMonthFor(parsed.data.billingPeriod, parsed.data.washesPerPeriod);
       const normalizedServices = normalizeServices(parsed.data.services, washesPerMonth);
 
       const created = await store.packages.create({
         name: parsed.data.name,
         washesPerMonth,
+        billingPeriod: parsed.data.billingPeriod,
+        washesPerPeriod: parsed.data.washesPerPeriod,
         price: parsed.data.price,
         costToDeliver: parsed.data.costToDeliver,
         services: normalizedServices,
@@ -174,20 +184,27 @@ export async function POST(request: Request) {
     const existing = await store.packages.get(packageId);
     if (!existing) throw new HttpError(404, 'Package not found.');
 
-    const targetWashes = patch.washesPerMonth ?? existing.washesPerMonth;
+    const nextBillingPeriod = patch.billingPeriod ?? existing.billingPeriod;
+    const nextWashesPerPeriod = patch.washesPerPeriod ?? existing.washesPerPeriod;
+    const washesChanged = patch.billingPeriod !== undefined || patch.washesPerPeriod !== undefined;
+    const targetWashes = washesChanged
+      ? washesPerMonthFor(nextBillingPeriod, nextWashesPerPeriod)
+      : existing.washesPerMonth;
     let finalServices = existing.services;
 
     if (patch.services) {
       finalServices = normalizeServices(patch.services, targetWashes);
-    } else if (patch.washesPerMonth && patch.washesPerMonth !== existing.washesPerMonth) {
+    } else if (washesChanged && targetWashes !== existing.washesPerMonth) {
       // Re-normalize existing services to not exceed new wash limit
-      finalServices = normalizeServices(existing.services, patch.washesPerMonth);
+      finalServices = normalizeServices(existing.services, targetWashes);
     }
 
     const updated = await store.packages.update(packageId, {
       ...(patch.name !== undefined ? { name: patch.name } : {}),
       ...(patch.price !== undefined ? { price: patch.price } : {}),
-      ...(patch.washesPerMonth !== undefined ? { washesPerMonth: patch.washesPerMonth } : {}),
+      ...(washesChanged
+        ? { washesPerMonth: targetWashes, billingPeriod: nextBillingPeriod, washesPerPeriod: nextWashesPerPeriod }
+        : {}),
       ...(patch.costToDeliver !== undefined ? { costToDeliver: patch.costToDeliver } : {}),
       services: finalServices,
       ...(patch.active !== undefined ? { active: patch.active } : {}),

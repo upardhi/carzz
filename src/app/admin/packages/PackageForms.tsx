@@ -5,7 +5,19 @@ import { useState } from 'react';
 import { Button, Note } from '@/components/ui/primitives';
 import { toast } from '@/components/ui/ToastProvider';
 import { IconCheck } from '@/components/shell/icons';
-import { parsePackageServices, type PackageServiceItem } from '@/lib/data/types';
+import {
+  BILLING_PERIODS,
+  parsePackageServices,
+  washesPerMonthFor,
+  type BillingPeriod,
+  type PackageServiceItem,
+} from '@/lib/data/types';
+
+const PERIOD_LABEL: Record<BillingPeriod, string> = {
+  WEEKLY: 'week',
+  MONTHLY: 'month',
+  YEARLY: 'year',
+};
 
 const PREDEFINED_SERVICES = [
   'Exterior wash',
@@ -77,6 +89,7 @@ function Feedback({ state }: { state: { ok?: string; error?: string } }) {
 export function CreatePackageForm() {
   const { save, pending, state } = useSave();
   const [name, setName] = useState('');
+  const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>('MONTHLY');
   const [washes, setWashes] = useState('8');
   const [price, setPrice] = useState('');
   const [cost, setCost] = useState('');
@@ -92,7 +105,8 @@ export function CreatePackageForm() {
   const [customName, setCustomName] = useState('');
   const [customWashes, setCustomWashes] = useState('8');
 
-  const maxWashes = Number(washes) || 8;
+  const washesPerPeriod = Number(washes) || 8;
+  const maxWashes = washesPerMonthFor(billingPeriod, washesPerPeriod);
 
   function toggleService(serviceName: string) {
     const exists = serviceItems.some((s) => s.name.toLowerCase() === serviceName.toLowerCase());
@@ -121,10 +135,16 @@ export function CreatePackageForm() {
     setShowAddCustom(false);
   }
 
-  // Update all items if main wash count drops below their counts
+  // Update all items if the effective monthly wash count drops below their counts
   function handleMainWashesChange(val: string) {
     setWashes(val);
-    const newMax = Number(val) || 1;
+    const newMax = washesPerMonthFor(billingPeriod, Number(val) || 1);
+    setServiceItems((cur) => cur.map((s) => ({ ...s, washesPerMonth: Math.min(s.washesPerMonth, newMax) })));
+  }
+
+  function handlePeriodChange(period: BillingPeriod) {
+    setBillingPeriod(period);
+    const newMax = washesPerMonthFor(period, washesPerPeriod);
     setServiceItems((cur) => cur.map((s) => ({ ...s, washesPerMonth: Math.min(s.washesPerMonth, newMax) })));
   }
 
@@ -144,10 +164,33 @@ export function CreatePackageForm() {
       <label className="field-label" htmlFor="pk-name">Package Name</label>
       <input id="pk-name" className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Premium Monthly Wash" />
 
+      <div className="mt-2">
+        <label className="field-label">Billing period</label>
+        <div className="grid grid-cols-3 gap-2">
+          {BILLING_PERIODS.map((period) => (
+            <button
+              key={period}
+              type="button"
+              onClick={() => handlePeriodChange(period)}
+              className={`rounded-lg border px-3 py-1.5 text-xs font-bold capitalize transition-colors ${
+                billingPeriod === period
+                  ? 'border-blue-600 bg-blue-600 text-white'
+                  : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              {period.toLowerCase()}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="mt-2 grid grid-cols-3 gap-2">
         <div>
-          <label className="field-label">Total washes / mo</label>
-          <input className="field" type="number" min="1" max="31" inputMode="numeric" value={washes} onChange={(e) => handleMainWashesChange(e.target.value)} />
+          <label className="field-label">Washes / {PERIOD_LABEL[billingPeriod]}</label>
+          <input className="field" type="number" min="1" max="366" inputMode="numeric" value={washes} onChange={(e) => handleMainWashesChange(e.target.value)} />
+          {billingPeriod !== 'MONTHLY' && (
+            <p className="mt-0.5 text-[10.5px] text-slate-400">≈ {maxWashes} washes/month</p>
+          )}
         </div>
         <div>
           <label className="field-label">Price (₹)</label>
@@ -264,7 +307,8 @@ export function CreatePackageForm() {
           save({
             action: 'create',
             name,
-            washesPerMonth: Number(washes),
+            billingPeriod,
+            washesPerPeriod: Number(washes),
             price: Number(price),
             costToDeliver: Number(cost) || 0,
             services: serviceItems,
@@ -287,6 +331,8 @@ export function EditPackageForm({
   packageName,
   price,
   washesPerMonth,
+  billingPeriod: initialBillingPeriod,
+  washesPerPeriod: initialWashesPerPeriod,
   costToDeliver,
   services,
   active,
@@ -295,6 +341,8 @@ export function EditPackageForm({
   packageName: string;
   price: number;
   washesPerMonth: number;
+  billingPeriod: BillingPeriod;
+  washesPerPeriod: number;
   costToDeliver: number;
   services: string[];
   active: boolean;
@@ -308,7 +356,8 @@ export function EditPackageForm({
 
   const [nextName, setName] = useState(packageName);
   const [nextPrice, setPrice] = useState(String(price));
-  const [nextWashes, setWashes] = useState(String(washesPerMonth));
+  const [nextBillingPeriod, setNextBillingPeriod] = useState<BillingPeriod>(initialBillingPeriod);
+  const [nextWashes, setWashes] = useState(String(initialWashesPerPeriod || washesPerMonth));
   const [nextCost, setCost] = useState(String(costToDeliver));
   const [nextActive, setActive] = useState(active);
 
@@ -320,7 +369,13 @@ export function EditPackageForm({
   const [customName, setCustomName] = useState('');
   const [customWashes, setCustomWashes] = useState(String(washesPerMonth));
 
-  const maxWashes = Number(nextWashes) || 8;
+  const maxWashes = washesPerMonthFor(nextBillingPeriod, Number(nextWashes) || 8);
+
+  function handlePeriodChange(period: BillingPeriod) {
+    setNextBillingPeriod(period);
+    const newMax = washesPerMonthFor(period, Number(nextWashes) || 1);
+    setServiceItems((cur) => cur.map((s) => ({ ...s, washesPerMonth: Math.min(s.washesPerMonth, newMax) })));
+  }
 
   function toggleService(serviceName: string) {
     const exists = serviceItems.some((s) => s.name.toLowerCase() === serviceName.toLowerCase());
@@ -403,7 +458,8 @@ export function EditPackageForm({
       packageId,
       name: nextName,
       price: Number(nextPrice),
-      washesPerMonth: Number(nextWashes),
+      billingPeriod: nextBillingPeriod,
+      washesPerPeriod: Number(nextWashes),
       costToDeliver: Number(nextCost),
       services: serviceItems,
       active: nextActive,
@@ -498,21 +554,44 @@ export function EditPackageForm({
                 />
               </div>
 
+              <div>
+                <label className="block mb-1 text-slate-600">Billing period</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {BILLING_PERIODS.map((period) => (
+                    <button
+                      key={period}
+                      type="button"
+                      onClick={() => handlePeriodChange(period)}
+                      className={`rounded-lg border px-3 py-1.5 text-xs font-bold capitalize transition-colors ${
+                        nextBillingPeriod === period
+                          ? 'border-blue-600 bg-blue-600 text-white'
+                          : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      {period.toLowerCase()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <label className="block mb-1 text-slate-600">Washes / mo</label>
+                  <label className="block mb-1 text-slate-600">Washes / {PERIOD_LABEL[nextBillingPeriod]}</label>
                   <input
                     type="number"
                     min="1"
-                    max="31"
+                    max="366"
                     value={nextWashes}
                     onChange={(e) => {
                       setWashes(e.target.value);
-                      const m = Number(e.target.value) || 1;
+                      const m = washesPerMonthFor(nextBillingPeriod, Number(e.target.value) || 1);
                       setServiceItems((cur) => cur.map((s) => ({ ...s, washesPerMonth: Math.min(s.washesPerMonth, m) })));
                     }}
                     className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-blue-500"
                   />
+                  {nextBillingPeriod !== 'MONTHLY' && (
+                    <p className="mt-0.5 text-[10.5px] text-slate-400">≈ {maxWashes} washes/month</p>
+                  )}
                 </div>
                 <div>
                   <label className="block mb-1 text-slate-600">Price (₹)</label>

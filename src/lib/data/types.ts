@@ -298,11 +298,30 @@ export function formatPackageServices(items: PackageServiceItem[]): string[] {
   return items.map((i) => `${i.name.trim()}:${i.washesPerMonth}`);
 }
 
+export const BILLING_PERIODS = ['WEEKLY', 'MONTHLY', 'YEARLY'] as const;
+export type BillingPeriod = (typeof BILLING_PERIODS)[number];
+
+/** Converts a wash count given in some billing period into the equivalent
+ * monthly count the scheduling and quota engine runs on — everything else
+ * (cycles, invoices, payouts) is keyed to a calendar month. */
+export function washesPerMonthFor(period: BillingPeriod, countPerPeriod: number): number {
+  if (period === 'WEEKLY') return Math.max(1, Math.round(countPerPeriod * 4.345));
+  if (period === 'YEARLY') return Math.max(1, Math.round(countPerPeriod / 12));
+  return countPerPeriod;
+}
+
 export interface ServicePackage {
   id: Id;
   name: string;
-  /** Washes (or visits, for detailing) included per month. */
+  /** Washes (or visits, for detailing) included per month — always the
+   * normalized figure the quota engine uses, regardless of billingPeriod. */
   washesPerMonth: number;
+  /** The period the package was actually sold in — "8/month" and "2/week"
+   * both normalize to the same washesPerMonth, but should still edit and
+   * display as what the admin originally typed. */
+  billingPeriod: BillingPeriod;
+  /** The wash count as entered for `billingPeriod`, e.g. 2 for "2/week". */
+  washesPerPeriod: number;
   price: Rupees;
   /** Internal delivery cost per month, used for margin reporting. */
   costToDeliver: Rupees;
@@ -312,6 +331,35 @@ export interface ServicePackage {
 
 export const WEEKDAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'] as const;
 export type Weekday = (typeof WEEKDAYS)[number];
+
+/** How many distinct weekdays a car may run on for a package with this many
+ * washes/month — capped to roughly one week's share of the monthly quota, so
+ * the whole month's washes can't be front-loaded into a single week (e.g. a
+ * 4-wash/month package should get ~1 day/week, not all 7). */
+export function maxWeeklyDaysForPackage(
+  pkg: { washesPerMonth: number; billingPeriod?: BillingPeriod; washesPerPeriod?: number },
+): number {
+  // A package explicitly sold "per week" (e.g. "2 washes/week") has an exact
+  // weekly count — use it as-is instead of the monthly approximation, which
+  // would round a clean 2/week down to something else.
+  if (pkg.billingPeriod === 'WEEKLY' && pkg.washesPerPeriod) {
+    return Math.max(1, Math.min(7, pkg.washesPerPeriod));
+  }
+  return Math.max(1, Math.min(7, Math.ceil(pkg.washesPerMonth / 4)));
+}
+
+/** Trims a weekly-day selection down to a package's day cap, keeping the
+ * earliest-in-the-week days — used when switching to a lower-frequency
+ * package leaves too many days checked. */
+export function trimWeeklyDays(
+  days: Weekday[],
+  pkg: { washesPerMonth: number; billingPeriod?: BillingPeriod; washesPerPeriod?: number },
+): Weekday[] {
+  const max = maxWeeklyDaysForPackage(pkg);
+  if (days.length <= max) return days;
+  const order: Weekday[] = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+  return order.filter((d) => days.includes(d)).slice(0, max);
+}
 
 /** Maps a weekday code to `Date#getUTCDay()`'s 0(Sun)-6(Sat) numbering. */
 export const WEEKDAY_NUM: Record<Weekday, number> = {

@@ -41,7 +41,9 @@ export default async function AdminPackages() {
                   <div>
                     <h3 className="text-base font-bold text-slate-900">{pkg.name}</h3>
                     <p className="text-xs text-slate-500 font-medium">
-                      {pkg.washesPerMonth} washes/month total
+                      {pkg.washesPerPeriod} wash{pkg.washesPerPeriod === 1 ? '' : 'es'} /{' '}
+                      {pkg.billingPeriod === 'WEEKLY' ? 'week' : pkg.billingPeriod === 'YEARLY' ? 'year' : 'month'}
+                      {pkg.billingPeriod !== 'MONTHLY' ? ` · ≈${pkg.washesPerMonth}/month` : ' total'}
                     </p>
                   </div>
                   <Tag tone={pkg.active ? 'ok' : 'neutral'}>
@@ -96,6 +98,8 @@ export default async function AdminPackages() {
                 packageName={pkg.name}
                 price={pkg.price}
                 washesPerMonth={pkg.washesPerMonth}
+                billingPeriod={pkg.billingPeriod}
+                washesPerPeriod={pkg.washesPerPeriod}
                 costToDeliver={pkg.costToDeliver}
                 services={pkg.services}
                 active={pkg.active}
