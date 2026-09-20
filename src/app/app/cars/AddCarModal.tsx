@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { WashDatesPicker } from '@/components/ui/WashDatesPicker';
+import { WEEKDAYS, type Weekday } from '@/lib/data/types';
+import { WEEKDAY_SHORT } from '@/lib/util/labels';
 
 interface PackageOption {
   id: string;
@@ -24,10 +25,13 @@ export function AddCarModal({ packages }: { packages: PackageOption[] }) {
   const [packageId, setPackageId] = useState(packages[0]?.id || '');
   const [scheduleTime, setScheduleTime] = useState('06:30');
   const [instructions, setInstructions] = useState('');
-  const [customDates, setCustomDates] = useState<string[]>([]);
+  const [weeklyDays, setWeeklyDays] = useState<Weekday[]>(['MON', 'THU']);
 
-  const selectedPkg = packages.find((p) => p.id === packageId);
-  const washCount = selectedPkg?.washesPerMonth ?? 0;
+  function toggleDay(day: Weekday) {
+    setWeeklyDays((current) =>
+      current.includes(day) ? current.filter((d) => d !== day) : [...current, day],
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,8 +39,8 @@ export function AddCarModal({ packages }: { packages: PackageOption[] }) {
       setError('Please provide car model and plate number.');
       return;
     }
-    if (customDates.filter(Boolean).length !== washCount) {
-      setError(`Please select exactly ${washCount} wash date${washCount !== 1 ? 's' : ''}.`);
+    if (weeklyDays.length === 0) {
+      setError('Please pick at least one day of the week for washing.');
       return;
     }
 
@@ -53,10 +57,9 @@ export function AddCarModal({ packages }: { packages: PackageOption[] }) {
           colour: colour.trim() || 'White',
           plate: plate.trim().toUpperCase(),
           packageId: packageId || undefined,
-          schedulePattern: 'CUSTOM',
+          weeklyDays,
           scheduleTime,
           specialInstructions: instructions.trim() || undefined,
-          customDates,
         }),
       });
 
@@ -69,7 +72,6 @@ export function AddCarModal({ packages }: { packages: PackageOption[] }) {
       setModel('');
       setPlate('');
       setInstructions('');
-      setCustomDates([]);
       setIsOpen(false);
       router.refresh();
     } catch (err) {
@@ -172,7 +174,7 @@ export function AddCarModal({ packages }: { packages: PackageOption[] }) {
                 <label className="block font-medium text-slate-700 mb-1">Wash Package</label>
                 <select
                   value={packageId}
-                  onChange={(e) => { setPackageId(e.target.value); setCustomDates([]); }}
+                  onChange={(e) => setPackageId(e.target.value)}
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-navy-600 focus:outline-hidden bg-white"
                 >
                   {packages.map((pkg) => (
@@ -199,15 +201,29 @@ export function AddCarModal({ packages }: { packages: PackageOption[] }) {
                 </select>
               </div>
 
-              {/* Wash Date Picker */}
-              {washCount > 0 && (
-                <WashDatesPicker
-                  count={washCount}
-                  dates={customDates}
-                  onChange={setCustomDates}
-                  size="sm"
-                />
-              )}
+              {/* Weekly wash days */}
+              <div>
+                <label className="block font-medium text-slate-700 mb-1">Wash Days (every week)</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {WEEKDAYS.map((day) => {
+                    const checked = weeklyDays.includes(day);
+                    return (
+                      <button
+                        key={day}
+                        type="button"
+                        onClick={() => toggleDay(day)}
+                        className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                          checked
+                            ? 'border-navy-600 bg-navy-600 text-white'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        {WEEKDAY_SHORT[day]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
               {/* Special Instructions */}
               <div>

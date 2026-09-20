@@ -3,7 +3,7 @@ import 'server-only';
 import type { DataStore } from '../data/ports/store';
 import type { Id, MissReason, WashVisit } from '../data/types';
 import { slotInstant } from '../util/time';
-import { nextSlotAfter, scheduleNextVisitForCar } from './schedule';
+import { nextSlotAfter, plannedServiceFor, scheduleNextVisitForCar } from './schedule';
 import { invalidateAreaPerformanceCache } from './reports';
 
 export class WashRuleError extends Error {}
@@ -146,6 +146,7 @@ export async function missWash(
         status: 'PENDING',
         startedAt: null,
         completedAt: null,
+        plannedService: car ? plannedServiceFor(car, date) : null,
         servicesDone: [],
         beforePhotoUrl: null,
         afterPhotoUrl: null,

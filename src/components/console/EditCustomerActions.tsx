@@ -5,17 +5,18 @@ import { useRouter } from 'next/navigation';
 import { toast } from '@/components/ui/ToastProvider';
 import {
   LEAD_SOURCES,
-  WEEKDAY_PATTERNS,
+  parsePackageServices,
   type Area,
   type Car,
   type Customer,
+  type DayServices,
   type LeadSource,
   type ServicePackage,
   type Staff,
-  type WeekdayPattern,
+  type Weekday,
 } from '@/lib/data/types';
-import { LEAD_SOURCE_LABEL, PATTERN_LABEL } from '@/lib/util/labels';
-import { WashDatesPicker } from '@/components/ui/WashDatesPicker';
+import { LEAD_SOURCE_LABEL } from '@/lib/util/labels';
+import { WeeklyScheduleEditor } from '@/components/ui/WeeklyScheduleEditor';
 
 // ==========================================
 // 1. EDIT CUSTOMER MODAL
@@ -273,23 +274,21 @@ export function EditCarModalButton({
   const [plate, setPlate] = useState(car.plate);
   const [packageId, setPackageId] = useState(car.packageId);
   const [assignedStaffId, setAssignedStaffId] = useState(car.assignedStaffId || '');
-  const [schedulePattern, setSchedulePattern] = useState<WeekdayPattern>(car.schedulePattern);
+  const [weeklyDays, setWeeklyDays] = useState<Weekday[]>(car.weeklyDays || []);
+  const [dayServices, setDayServices] = useState<DayServices>(car.dayServices || {});
   const [scheduleTime, setScheduleTime] = useState(car.scheduleTime);
   const [specialInstructions, setSpecialInstructions] = useState(car.specialInstructions || '');
-  const [customDates, setCustomDates] = useState<string[]>(() => {
-    return (car.customDates || []).map(d => typeof d === 'string' ? d.slice(0, 10) : new Date(d).toISOString().slice(0, 10));
-  });
   const [active, setActive] = useState(car.active ?? true);
+
+  const selectedPackage = packages.find((p) => p.id === packageId);
+  const serviceOptions = parsePackageServices(selectedPackage?.services, selectedPackage?.washesPerMonth).map((s) => s.name);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
 
-    if (schedulePattern === 'CUSTOM') {
-      const pkg = packages.find(p => p.id === packageId);
-      if (pkg && customDates.filter(Boolean).length !== pkg.washesPerMonth) {
-        toast.error(`For custom dates, you must select exactly ${pkg.washesPerMonth} dates.`);
-        return;
-      }
+    if (weeklyDays.length === 0) {
+      toast.error('Pick at least one weekly wash day.');
+      return;
     }
 
     if (!make.trim() || !model.trim() || !plate.trim()) {
@@ -312,10 +311,10 @@ export function EditCarModalButton({
           plate: plate.trim().toUpperCase(),
           packageId,
           assignedStaffId: assignedStaffId || null,
-          schedulePattern,
+          weeklyDays,
+          dayServices: Object.keys(dayServices).length > 0 ? dayServices : null,
           scheduleTime,
           specialInstructions: specialInstructions.trim() || null,
-          customDates: schedulePattern === 'CUSTOM' ? customDates : undefined,
           active,
         }),
       });
@@ -446,46 +445,27 @@ export function EditCarModalButton({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Schedule Pattern *</label>
-                  <select
-                    value={schedulePattern}
-                    onChange={(e) => setSchedulePattern(e.target.value as WeekdayPattern)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold bg-white focus:border-blue-500 focus:outline-none"
-                  >
-                    {WEEKDAY_PATTERNS.map((pat) => (
-                      <option key={pat} value={pat}>
-                        {PATTERN_LABEL[pat]}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Slot Time (HH:MM) *</label>
-                  <input
-                    type="time"
-                    required
-                    value={scheduleTime}
-                    onChange={(e) => setScheduleTime(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold focus:border-blue-500 focus:outline-none"
-                  />
-                </div>
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Slot Time (HH:MM) *</label>
+                <input
+                  type="time"
+                  required
+                  value={scheduleTime}
+                  onChange={(e) => setScheduleTime(e.target.value)}
+                  className="w-full max-w-[160px] rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold focus:border-blue-500 focus:outline-none"
+                />
               </div>
 
-              {schedulePattern === 'CUSTOM' && (() => {
-                const pkg = packages.find((p) => p.id === packageId);
-                if (!pkg) return null;
-                return (
-                  <WashDatesPicker
-                    count={pkg.washesPerMonth}
-                    dates={customDates}
-                    onChange={setCustomDates}
-                    size="sm"
-                    className="mt-2"
-                  />
-                );
-              })()}
+              <WeeklyScheduleEditor
+                weeklyDays={weeklyDays}
+                dayServices={dayServices}
+                serviceOptions={serviceOptions}
+                washesPerMonth={selectedPackage?.washesPerMonth}
+                onChange={(next) => {
+                  setWeeklyDays(next.weeklyDays);
+                  setDayServices(next.dayServices);
+                }}
+              />
 
               <div>
                 <label className="block font-bold text-slate-700 mb-1">Special Instructions / Parking Spot</label>
@@ -557,12 +537,15 @@ export function AddCarModalButton({
   const [plate, setPlate] = useState('');
   const [packageId, setPackageId] = useState(packages[0]?.id || '');
   const [assignedStaffId, setAssignedStaffId] = useState('');
-  const [schedulePattern, setSchedulePattern] = useState<WeekdayPattern>('CUSTOM');
+  const [weeklyDays, setWeeklyDays] = useState<Weekday[]>(['MON', 'THU']);
+  const [dayServices, setDayServices] = useState<DayServices>({});
   const [scheduleTime, setScheduleTime] = useState('09:00');
   const [specialInstructions, setSpecialInstructions] = useState('');
-  const [customDates, setCustomDates] = useState<string[]>([]);
   const [autoStartService, setAutoStartService] = useState(true);
   const [startDate, setStartDate] = useState(() => new Date().toISOString().slice(0, 10));
+
+  const selectedPackage = packages.find((p) => p.id === packageId);
+  const serviceOptions = parsePackageServices(selectedPackage?.services, selectedPackage?.washesPerMonth).map((s) => s.name);
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -571,12 +554,9 @@ export function AddCarModalButton({
       return;
     }
 
-    if (schedulePattern === 'CUSTOM') {
-      const pkg = packages.find(p => p.id === packageId);
-      if (pkg && customDates.filter(Boolean).length !== pkg.washesPerMonth) {
-        toast.error(`For custom dates, you must select exactly ${pkg.washesPerMonth} dates.`);
-        return;
-      }
+    if (weeklyDays.length === 0) {
+      toast.error('Pick at least one weekly wash day.');
+      return;
     }
 
     setPending(true);
@@ -593,10 +573,10 @@ export function AddCarModalButton({
           plate: plate.trim().toUpperCase(),
           packageId,
           assignedStaffId: assignedStaffId || null,
-          schedulePattern,
+          weeklyDays,
+          dayServices: Object.keys(dayServices).length > 0 ? dayServices : null,
           scheduleTime,
           specialInstructions: specialInstructions.trim() || null,
-          customDates: schedulePattern === 'CUSTOM' ? customDates : undefined,
           autoStartService,
           startDate: startDate || undefined,
         }),
@@ -732,46 +712,27 @@ export function AddCarModalButton({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Schedule Pattern *</label>
-                  <select
-                    value={schedulePattern}
-                    onChange={(e) => setSchedulePattern(e.target.value as WeekdayPattern)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold bg-white focus:border-blue-500 focus:outline-none"
-                  >
-                    {WEEKDAY_PATTERNS.map((pat) => (
-                      <option key={pat} value={pat}>
-                        {PATTERN_LABEL[pat]}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Slot Time *</label>
-                  <input
-                    type="time"
-                    required
-                    value={scheduleTime}
-                    onChange={(e) => setScheduleTime(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold focus:border-blue-500 focus:outline-none"
-                  />
-                </div>
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Slot Time *</label>
+                <input
+                  type="time"
+                  required
+                  value={scheduleTime}
+                  onChange={(e) => setScheduleTime(e.target.value)}
+                  className="w-full max-w-[160px] rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold focus:border-blue-500 focus:outline-none"
+                />
               </div>
 
-              {schedulePattern === 'CUSTOM' && (() => {
-                const pkg = packages.find((p) => p.id === packageId);
-                if (!pkg) return null;
-                return (
-                  <WashDatesPicker
-                    count={pkg.washesPerMonth}
-                    dates={customDates}
-                    onChange={setCustomDates}
-                    size="sm"
-                    className="mt-2"
-                  />
-                );
-              })()}
+              <WeeklyScheduleEditor
+                weeklyDays={weeklyDays}
+                dayServices={dayServices}
+                serviceOptions={serviceOptions}
+                washesPerMonth={selectedPackage?.washesPerMonth}
+                onChange={(next) => {
+                  setWeeklyDays(next.weeklyDays);
+                  setDayServices(next.dayServices);
+                }}
+              />
 
               <div>
                 <label className="block font-bold text-slate-700 mb-1">Special Instructions / Parking Spot</label>
@@ -892,5 +853,154 @@ export function DeleteCarButton({
       <span>🗑️</span>
       <span>{pending ? 'Removing…' : 'Remove'}</span>
     </button>
+  );
+}
+
+// ==========================================
+// 5. RESCHEDULE (ONE-OFF) NEXT VISIT
+// ==========================================
+export function RescheduleVisitButton({
+  customerId,
+  visitId,
+  currentDate,
+  currentTime,
+  staffList,
+  currentStaffId,
+}: {
+  customerId: string;
+  visitId: string;
+  currentDate: string;
+  currentTime: string;
+  staffList: Staff[];
+  currentStaffId: string | null;
+}) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [date, setDate] = useState(currentDate);
+  const [time, setTime] = useState(currentTime);
+  const [staffId, setStaffId] = useState(currentStaffId || '');
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    setPending(true);
+    try {
+      const res = await fetch('/api/ops/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'rescheduleVisit',
+          customerId,
+          visitId,
+          scheduledDate: date,
+          scheduledTime: time,
+          staffId: staffId || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || 'Failed to reschedule.');
+        return;
+      }
+      toast.success(data.message || 'Wash rescheduled.');
+      setOpen(false);
+      router.refresh();
+    } catch {
+      toast.error('Network error. Please try again.');
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+      >
+        <span>🗓️</span>
+        <span>Reschedule</span>
+      </button>
+
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="relative w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Reschedule this wash</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  One-off change — next week still follows the usual weekly plan.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="text-slate-400 hover:text-slate-600 text-lg font-bold p-1 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSave} className="space-y-3.5 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">New Date *</label>
+                  <input
+                    type="date"
+                    required
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">New Time *</label>
+                  <input
+                    type="time"
+                    required
+                    value={time}
+                    onChange={(e) => setTime(e.target.value)}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Wash Boy</label>
+                <select
+                  value={staffId}
+                  onChange={(e) => setStaffId(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold bg-white focus:border-blue-500 focus:outline-none"
+                >
+                  <option value="">Unassigned</option>
+                  {staffList.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.phone})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  className="rounded-lg border border-slate-300 px-4 py-2 font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={pending}
+                  className="rounded-lg bg-blue-600 px-5 py-2 font-bold text-white hover:bg-blue-700 transition-colors disabled:opacity-50"
+                >
+                  {pending ? 'Saving…' : 'Save New Date'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

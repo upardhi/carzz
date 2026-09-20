@@ -39,7 +39,7 @@ export const DATE_FIELDS = {
   customer: f(['holdUntil', 'joinedOn'], []),
 
   servicePackage: NO_DATE_FIELDS,
-  car: f(['customDates'], ['serviceStartedAt']),
+  car: f([], ['serviceStartedAt']),
   washVisit: f(['scheduledDate'], ['startedAt', 'completedAt', 'managerRatedAt']),
   payment: f([], ['createdAt']),
   invoice: f(['dueOn'], ['createdAt']),

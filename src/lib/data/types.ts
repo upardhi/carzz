@@ -310,8 +310,23 @@ export interface ServicePackage {
   active: boolean;
 }
 
-export const WEEKDAY_PATTERNS = ['MON_THU', 'TUE_FRI', 'WED_SAT', 'THU_SUN', 'CUSTOM'] as const;
-export type WeekdayPattern = (typeof WEEKDAY_PATTERNS)[number];
+export const WEEKDAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'] as const;
+export type Weekday = (typeof WEEKDAYS)[number];
+
+/** Maps a weekday code to `Date#getUTCDay()`'s 0(Sun)-6(Sat) numbering. */
+export const WEEKDAY_NUM: Record<Weekday, number> = {
+  SUN: 0,
+  MON: 1,
+  TUE: 2,
+  WED: 3,
+  THU: 4,
+  FRI: 5,
+  SAT: 6,
+};
+
+/** Which named service (from the package's service list) runs on a given
+ * weekday. A day with no entry gets the package's default full service. */
+export type DayServices = Partial<Record<Weekday, string>>;
 
 export interface Car {
   id: Id;
@@ -323,7 +338,11 @@ export interface Car {
   packageId: Id;
   /** Staff id of the wash boy who normally services this car. */
   assignedStaffId: Id | null;
-  schedulePattern: WeekdayPattern;
+  /** The weekdays this car gets washed, recurring every week going forward. */
+  weeklyDays: Weekday[];
+  /** Optional per-weekday service override — a day left out gets the
+   * package's default (full) service. */
+  dayServices: DayServices | null;
   /** `HH:mm`, 24-hour. */
   scheduleTime: string;
   specialInstructions: string | null;
@@ -333,7 +352,6 @@ export interface Car {
   serviceStartedBeforePayment: boolean;
   serviceStartedByUserId: string | null;
   serviceStartNote?: string | null;
-  customDates?: string[] | Date[];
 }
 
 /* -------------------------------------------------------------------------- */
@@ -367,6 +385,10 @@ export interface WashVisit {
   status: VisitStatus;
   startedAt: Timestamp | null;
   completedAt: Timestamp | null;
+  /** The service this visit was scheduled to deliver, from the car's
+   * per-weekday plan — distinct from `servicesDone` below. Null means the
+   * package's default (full) service. */
+  plannedService: string | null;
   servicesDone: string[];
   beforePhotoUrl: string | null;
   afterPhotoUrl: string | null;

@@ -7,35 +7,36 @@ import type {
   DateOnly,
   Id,
   WashVisit,
-  WeekdayPattern,
 } from '../data/types';
+import { WEEKDAY_NUM } from '../data/types';
 
 import { todayISO } from '../util/format';
 
-export const PATTERN_DAYS: Record<WeekdayPattern, number[]> = {
-  MON_THU: [1, 4],
-  TUE_FRI: [2, 5],
-  WED_SAT: [3, 6],
-  THU_SUN: [4, 0],
-  CUSTOM: [],
-};
+/** The weekday numbers (0=Sun..6=Sat) this car washes on. Falls back to
+ * Mon+Thu for a car with no days configured, rather than never scheduling. */
+function weeklyDayNumbers(car: Car): number[] {
+  const days = car.weeklyDays && car.weeklyDays.length > 0 ? car.weeklyDays : ['MON', 'THU'] as const;
+  return days.map((d) => WEEKDAY_NUM[d]);
+}
+
+/** Which named service (if any) this car's plan assigns to a given date. */
+export function plannedServiceFor(car: Car, date: DateOnly): string | null {
+  if (!car.dayServices) return null;
+  const dayNum = toDate(date).getUTCDay();
+  const code = (Object.keys(WEEKDAY_NUM) as (keyof typeof WEEKDAY_NUM)[]).find(
+    (d) => WEEKDAY_NUM[d] === dayNum,
+  );
+  return (code && car.dayServices[code]) || null;
+}
 
 const toDate = (d: DateOnly) => new Date(`${d}T00:00:00.000Z`);
 const toIso = (d: Date) => d.toISOString().slice(0, 10);
 
 /**
- * Finds the earliest available pattern day on or after `from`.
+ * Finds the earliest configured weekly wash day on or after `from`.
  */
 export function nextSlotOnOrAfter(car: Car, from: DateOnly): DateOnly | null {
-  if (car.schedulePattern === 'CUSTOM') {
-    const dates = (car.customDates || []).map((d: unknown) => 
-      typeof d === 'string' ? d.slice(0, 10) : (d as Date).toISOString().slice(0, 10)
-    ).sort();
-    const futureOrToday = dates.find(d => d >= from);
-    return futureOrToday || null;
-  }
-
-  const days = PATTERN_DAYS[car.schedulePattern] || [1, 4];
+  const days = weeklyDayNumbers(car);
   const cursor = toDate(from);
   for (let i = 0; i <= 14; i += 1) {
     if (days.includes(cursor.getUTCDay())) return toIso(cursor);
@@ -45,19 +46,11 @@ export function nextSlotOnOrAfter(car: Car, from: DateOnly): DateOnly | null {
 }
 
 /**
- * The next free slot strictly after `from` on this car's pattern — where the
- * next wash lands after the current wash completes or is missed.
+ * The next free slot strictly after `from` on this car's weekly plan — where
+ * the next wash lands after the current wash completes or is missed.
  */
 export function nextSlotAfter(car: Car, from: DateOnly): DateOnly | null {
-  if (car.schedulePattern === 'CUSTOM') {
-    const dates = (car.customDates || []).map((d: unknown) => 
-      typeof d === 'string' ? d.slice(0, 10) : (d as Date).toISOString().slice(0, 10)
-    ).sort();
-    const future = dates.find(d => d > from);
-    return future || null;
-  }
-
-  const days = PATTERN_DAYS[car.schedulePattern] || [1, 4];
+  const days = weeklyDayNumbers(car);
   const cursor = toDate(from);
   for (let i = 1; i <= 14; i += 1) {
     cursor.setUTCDate(cursor.getUTCDate() + 1);
@@ -142,6 +135,7 @@ export async function scheduleNextVisitForCar(
     status: 'PENDING',
     startedAt: null,
     completedAt: null,
+    plannedService: plannedServiceFor(car, nextDate),
     servicesDone: [],
     beforePhotoUrl: null,
     afterPhotoUrl: null,
@@ -175,6 +169,24 @@ export async function generateVisitsForCar(
 ): Promise<WashVisit[]> {
   const visit = await scheduleNextVisitForCar(store, car, customer, cycle, fromDate);
   return visit ? [visit] : [];
+}
+
+/**
+ * Moves one still-pending visit to a new date/time/staff, as a one-off
+ * override — it does not touch the car's recurring weekly plan, so the
+ * washes after this one keep landing on the configured weekdays.
+ */
+export async function rescheduleVisit(
+  store: DataStore,
+  visitId: Id,
+  patch: { scheduledDate?: DateOnly; scheduledTime?: string; staffId?: Id | null },
+): Promise<WashVisit> {
+  const visit = await store.visits.get(visitId);
+  if (!visit) throw new Error('Visit not found.');
+  if (visit.status !== 'PENDING') {
+    throw new Error('Only a pending wash can be rescheduled.');
+  }
+  return store.visits.update(visitId, patch);
 }
 
 /** Visits due on one date, for one area or one staff member. */

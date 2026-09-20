@@ -6,7 +6,7 @@ import type {
   MissReason,
   PaymentMode,
   Role,
-  WeekdayPattern,
+  Weekday,
 } from '../data/types';
 
 export const ROLE_LABEL: Record<Role, string> = {
@@ -71,21 +71,35 @@ export const EXPENSE_HEAD_LABEL: Record<ExpenseHead, string> = {
   OTHER: 'Other',
 };
 
-export const PATTERN_LABEL: Record<WeekdayPattern, string> = {
-  MON_THU: 'Monday & Thursday',
-  TUE_FRI: 'Tuesday & Friday',
-  WED_SAT: 'Wednesday & Saturday',
-  THU_SUN: 'Thursday & Sunday',
-  CUSTOM: 'Custom Dates (One-off)',
+export const WEEKDAY_LABEL: Record<Weekday, string> = {
+  MON: 'Monday',
+  TUE: 'Tuesday',
+  WED: 'Wednesday',
+  THU: 'Thursday',
+  FRI: 'Friday',
+  SAT: 'Saturday',
+  SUN: 'Sunday',
 };
 
-export const PATTERN_SHORT: Record<WeekdayPattern, string> = {
-  MON_THU: 'Mon/Thu',
-  TUE_FRI: 'Tue/Fri',
-  WED_SAT: 'Wed/Sat',
-  THU_SUN: 'Thu/Sun',
-  CUSTOM: 'Custom',
+export const WEEKDAY_SHORT: Record<Weekday, string> = {
+  MON: 'Mon',
+  TUE: 'Tue',
+  WED: 'Wed',
+  THU: 'Thu',
+  FRI: 'Fri',
+  SAT: 'Sat',
+  SUN: 'Sun',
 };
+
+/** "Mon, Thu" style summary of a car's weekly wash days, in Mon→Sun order. */
+export function summarizeWeeklyDays(days: Weekday[]): string {
+  if (!days || days.length === 0) return 'No days set';
+  const order: Weekday[] = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+  return order
+    .filter((d) => days.includes(d))
+    .map((d) => WEEKDAY_SHORT[d])
+    .join(', ');
+}
 
 export const LANGUAGE_LABEL: Record<Language, string> = {
   en: 'English',

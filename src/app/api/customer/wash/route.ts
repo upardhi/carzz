@@ -3,9 +3,9 @@ import { z } from 'zod';
 import { HttpError, requireApiSession } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { missWash } from '@/lib/services/visits';
-import { nextSlotAfter, PATTERN_DAYS } from '@/lib/services/schedule';
+import { nextSlotAfter } from '@/lib/services/schedule';
 import { formatDateFull } from '@/lib/util/format';
-import type { DateOnly } from '@/lib/data/types';
+import { WEEKDAY_NUM, type DateOnly } from '@/lib/data/types';
 
 const toIso = (d: Date) => d.toISOString().slice(0, 10);
 const toDate = (d: string) => new Date(`${d}T00:00:00.000Z`);
@@ -38,7 +38,9 @@ export async function GET(request: NextRequest) {
       throw new HttpError(404, 'Car associated with this wash was not found.');
     }
 
-    const patternDays = PATTERN_DAYS[car.schedulePattern] || [1, 4];
+    const patternDays = (car.weeklyDays && car.weeklyDays.length > 0 ? car.weeklyDays : ['MON', 'THU'] as const).map(
+      (d) => WEEKDAY_NUM[d],
+    );
     const nextRegularDate = nextSlotAfter(car, visit.scheduledDate);
 
     // Calculate available candidate dates for the next 14 days

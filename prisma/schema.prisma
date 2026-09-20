@@ -92,12 +92,14 @@ enum CustomerStatus {
   INACTIVE
 }
 
-enum WeekdayPattern {
-  MON_THU
-  TUE_FRI
-  WED_SAT
-  THU_SUN
-  CUSTOM
+enum Weekday {
+  MON
+  TUE
+  WED
+  THU
+  FRI
+  SAT
+  SUN
 }
 
 enum VisitStatus {
@@ -409,7 +411,12 @@ model Car {
   plate               String
   packageId           String
   assignedStaffId     String?
-  schedulePattern     WeekdayPattern
+  /** Which weekdays this car gets washed — a real recurring weekly plan,
+   * not a fixed pair or a hand-picked list of one-off dates. */
+  weeklyDays          Weekday[]
+  /** Optional per-weekday service override, `{"MON": "Interior vacuum"}` —
+   * a day left out gets the package's default (full) service. */
+  dayServices         Json?
   scheduleTime        String
   specialInstructions String?
   active              Boolean        @default(true)
@@ -418,7 +425,6 @@ model Car {
   serviceStartedBeforePayment Boolean @default(false)
   serviceStartedByUserId String?
   serviceStartNote    String?
-  customDates         DateTime[]     @db.Date
 
   customer      Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
   servicePackage ServicePackage @relation(fields: [packageId], references: [id])
@@ -443,6 +449,9 @@ model WashVisit {
   status               VisitStatus @default(PENDING)
   startedAt            DateTime?
   completedAt          DateTime?
+  /** The service this visit was scheduled to deliver, from the car's
+   * per-weekday plan — distinct from `servicesDone`, what staff actually did. */
+  plannedService       String?
   servicesDone         String[]
   beforePhotoUrl       String?
   afterPhotoUrl        String?

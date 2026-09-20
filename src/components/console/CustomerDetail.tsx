@@ -25,8 +25,8 @@ import {
 import {
   LEAD_SOURCE_LABEL,
   MISS_REASON_LABEL,
-  PATTERN_LABEL,
   PAYMENT_MODE_LABEL,
+  summarizeWeeklyDays,
 } from '@/lib/util/labels';
 import { ActionButton } from './ActionButton';
 import { CustomerLoginAction } from './CustomerLoginAction';
@@ -39,6 +39,7 @@ import {
   DeleteCarButton,
   EditCarModalButton,
   EditCustomerModalButton,
+  RescheduleVisitButton,
 } from './EditCustomerActions';
 
 export async function ConsoleCustomerDetail({
@@ -199,6 +200,9 @@ export async function ConsoleCustomerDetail({
             const todaysVisit = visits.find(
               (v) => v.carId === car.id && v.scheduledDate === today
             );
+            const upcomingVisit = visits.find(
+              (v) => v.carId === car.id && v.status === 'PENDING' && v.scheduledDate >= today,
+            );
 
             return (
               <div
@@ -266,8 +270,29 @@ export async function ConsoleCustomerDetail({
                 />
                 <Row
                   label="Slot"
-                  value={`${PATTERN_LABEL[car.schedulePattern]} · ${formatTime(car.scheduleTime)}`}
+                  value={`${summarizeWeeklyDays(car.weeklyDays)} · ${formatTime(car.scheduleTime)}`}
                 />
+                {upcomingVisit ? (
+                  <Row
+                    label="Next wash"
+                    value={
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        <span>
+                          {formatDateFull(upcomingVisit.scheduledDate)} · {formatTime(upcomingVisit.scheduledTime)}
+                          {upcomingVisit.plannedService ? ` · ${upcomingVisit.plannedService}` : ''}
+                        </span>
+                        <RescheduleVisitButton
+                          customerId={customer.id}
+                          visitId={upcomingVisit.id}
+                          currentDate={upcomingVisit.scheduledDate}
+                          currentTime={upcomingVisit.scheduledTime}
+                          currentStaffId={upcomingVisit.staffId}
+                          staffList={staff}
+                        />
+                      </div>
+                    }
+                  />
+                ) : null}
                 <Row
                   label="Wash boy"
                   value={

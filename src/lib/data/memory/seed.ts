@@ -26,8 +26,9 @@ import type {
   User,
   UserCredential,
   WashVisit,
-  WeekdayPattern,
+  Weekday,
 } from '../types';
+import { WEEKDAY_NUM } from '../types';
 
 export interface Db {
   users: User[];
@@ -139,13 +140,7 @@ const dateOnly = (d: Date) => d.toISOString().slice(0, 10);
 const cycleOf = (d: Date) => d.toISOString().slice(0, 7);
 const addDays = (d: Date, n: number) => new Date(d.getTime() + n * 86400000);
 
-const PATTERN_DAYS: Record<WeekdayPattern, number[]> = {
-  MON_THU: [1, 4],
-  TUE_FRI: [2, 5],
-  WED_SAT: [3, 6],
-  THU_SUN: [4, 0],
-  CUSTOM: [],
-};
+const weeklyDayNumbers = (days: Weekday[]): number[] => days.map((d) => WEEKDAY_NUM[d]);
 
 const FIRST_NAMES = [
   'Shyam', 'Kavita', 'Imran', 'Deepak', 'Anjali', 'Nitin', 'Sana', 'Vijay',
@@ -329,7 +324,7 @@ export function buildSeed(today = new Date()): Db {
     return 'OTHER' as const;
   };
 
-  const patterns: WeekdayPattern[] = ['MON_THU', 'TUE_FRI', 'WED_SAT', 'THU_SUN'];
+  const patterns: Weekday[][] = [['MON', 'THU'], ['TUE', 'FRI'], ['WED', 'SAT'], ['THU', 'SUN']];
   const MORNING_SLOTS = ['07:00', '07:30', '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00'];
   // A minority of customers take an evening round after office hours.
   const EVENING_SLOTS = ['17:00', '17:30', '18:00', '18:30', '19:00', '19:30', '20:00'];
@@ -372,7 +367,8 @@ export function buildSeed(today = new Date()): Db {
           plate: `MH31 ${String.fromCharCode(65 + int(0, 25))}${String.fromCharCode(65 + int(0, 25))} ${String(int(1000, 9999))}`,
           packageId: rand() > 0.82 ? 'pkg_detailing' : rand() > 0.45 ? 'pkg_pressure' : 'pkg_bucket',
           assignedStaffId: status === 'INACTIVE' ? null : emp.id,
-          schedulePattern: pattern,
+          weeklyDays: pattern,
+          dayServices: null,
           scheduleTime: slotTimes[Math.min(baseSlot + k, slotTimes.length - 1)],
           specialInstructions: k === 0 ? null : 'Second car — same building',
           active: status !== 'INACTIVE',
@@ -412,7 +408,7 @@ export function buildSeed(today = new Date()): Db {
     if (!car.active) continue;
     const customer = customers.find((c) => c.id === car.customerId)!;
     const pkg = packages.find((p) => p.id === car.packageId)!;
-    const days = PATTERN_DAYS[car.schedulePattern];
+    const days = weeklyDayNumbers(car.weeklyDays);
     // A detailing package visits weekly; anything larger runs on both days.
     const activeDays = pkg.washesPerMonth <= 4 ? [days[0]] : days;
 
@@ -470,6 +466,7 @@ export function buildSeed(today = new Date()): Db {
           status,
           startedAt: status === 'DONE' ? completedAt : null,
           completedAt,
+          plannedService: null,
           servicesDone: status === 'DONE' ? pkg.services.slice(0, int(1, pkg.services.length)) : [],
           beforePhotoUrl: status === 'DONE' ? `/api/photos/${car.id}-${cyc}-${index}-before` : null,
           afterPhotoUrl: status === 'DONE' ? `/api/photos/${car.id}-${cyc}-${index}-after` : null,
@@ -495,7 +492,7 @@ export function buildSeed(today = new Date()): Db {
   // rule the whole product is sold on.
   for (const missed of visits.filter((v) => v.status === 'MISSED')) {
     const car = cars.find((c) => c.id === missed.carId)!;
-    const days = PATTERN_DAYS[car.schedulePattern];
+    const days = weeklyDayNumbers(car.weeklyDays);
 
     const cursor = new Date(`${missed.scheduledDate}T00:00:00.000Z`);
     for (let step = 0; step < 14; step += 1) {

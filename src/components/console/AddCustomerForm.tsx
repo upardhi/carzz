@@ -5,15 +5,17 @@ import { useRef, useState } from 'react';
 import { Note } from '@/components/ui/primitives';
 import {
   LEAD_SOURCES,
+  parsePackageServices,
+  type DayServices,
   type LeadSource,
-  type WeekdayPattern,
+  type Weekday,
 } from '@/lib/data/types';
 import { money } from '@/lib/util/format';
 import { safeOfflineFetch } from '@/lib/util/offlineQueue';
 import { toast } from '@/components/ui/ToastProvider';
 
 import { LocationPickerMap } from '@/components/ui/LocationPickerMap';
-import { WashDatesPicker } from '@/components/ui/WashDatesPicker';
+import { WeeklyScheduleEditor } from '@/components/ui/WeeklyScheduleEditor';
 
 interface CarDraft {
   model: string;
@@ -21,10 +23,10 @@ interface CarDraft {
   colour: string;
   plate: string;
   packageId: string;
-  schedulePattern: WeekdayPattern;
+  weeklyDays: Weekday[];
+  dayServices: DayServices;
   scheduleTime: string;
   specialInstructions: string;
-  customDates: string[];
 }
 
 export interface IntakeOptions {
@@ -195,10 +197,10 @@ export function AddCustomerForm({
       colour: '',
       plate: '',
       packageId: defaultPackageId,
-      schedulePattern: 'CUSTOM',
+      weeklyDays: ['MON', 'THU'] as Weekday[],
+      dayServices: {},
       scheduleTime: '09:00',
       specialInstructions: '',
-      customDates: [],
     }));
   });
 
@@ -236,19 +238,9 @@ export function AddCustomerForm({
       setError('Enter the garage / hub address — the wash boy needs it to find the car.');
       return;
     }
-    if (cars.some((c) => !c.make.trim() || !c.model.trim() || c.plate.trim().length < 4 || !c.schedulePattern)) {
-      setError('Each car needs a company, a model, a number plate and wash days.');
+    if (cars.some((c) => !c.make.trim() || !c.model.trim() || c.plate.trim().length < 4 || c.weeklyDays.length === 0)) {
+      setError('Each car needs a company, a model, a number plate and at least one weekly wash day.');
       return;
-    }
-    
-    for (const car of cars) {
-      if (car.schedulePattern === 'CUSTOM') {
-        const pkg = options.packages.find((p) => p.id === car.packageId);
-        if (pkg && car.customDates.length !== pkg.washesPerMonth) {
-          setError(`For custom dates, you must select exactly ${pkg.washesPerMonth} dates for ${car.make} ${car.model}.`);
-          return;
-        }
-      }
     }
 
     if (!loginEmail.trim() || !/.+@.+\..+/.test(loginEmail)) {
@@ -289,10 +281,10 @@ export function AddCustomerForm({
           colour: car.colour || 'Not noted',
           plate: car.plate,
           packageId: car.packageId,
-          schedulePattern: car.schedulePattern,
+          weeklyDays: car.weeklyDays,
+          dayServices: Object.keys(car.dayServices).length > 0 ? car.dayServices : undefined,
           scheduleTime: car.scheduleTime,
           specialInstructions: car.specialInstructions || undefined,
-          customDates: car.schedulePattern === 'CUSTOM' ? car.customDates : undefined,
         })),
       };
 
@@ -718,16 +710,18 @@ export function AddCustomerForm({
                       </div>
                     </div>
 
-                    {/* Custom Wash Dates */}
+                    {/* Weekly wash days */}
                     {(() => {
                       const pkg = options.packages.find((p) => p.id === car.packageId);
-                      if (!pkg) return null;
+                      const serviceOptions = parsePackageServices(pkg?.services, pkg?.washesPerMonth).map((s) => s.name);
                       return (
                         <div className="sm:col-span-2 mt-2">
-                          <WashDatesPicker
-                            count={pkg.washesPerMonth}
-                            dates={car.customDates}
-                            onChange={(newDates) => updateCar(index, { customDates: newDates })}
+                          <WeeklyScheduleEditor
+                            weeklyDays={car.weeklyDays}
+                            dayServices={car.dayServices}
+                            serviceOptions={serviceOptions}
+                            washesPerMonth={pkg?.washesPerMonth}
+                            onChange={(next) => updateCar(index, { weeklyDays: next.weeklyDays, dayServices: next.dayServices })}
                           />
                         </div>
                       );
@@ -748,7 +742,8 @@ export function AddCustomerForm({
                       colour: '',
                       plate: '',
                       packageId: options.packages[0]?.id ?? '',
-                      schedulePattern: 'CUSTOM',
+                      weeklyDays: ['MON', 'THU'] as Weekday[],
+                      dayServices: {},
                       scheduleTime:
                         SLOTS[
                           Math.min(
@@ -757,7 +752,6 @@ export function AddCustomerForm({
                           )
                         ],
                       specialInstructions: 'Second car — same building',
-                      customDates: [],
                     },
                   ])
                 }

@@ -326,6 +326,7 @@ export async function POST(request: Request) {
         status: 'PENDING',
         startedAt: null,
         completedAt: null,
+        plannedService: null,
         servicesDone: subServices,
         beforePhotoUrl: null,
         afterPhotoUrl: null,

@@ -7,12 +7,12 @@ import { getStore } from '@/lib/data';
 import type { DataStore } from '@/lib/data/ports/store';
 import {
   LEAD_SOURCES,
-  WEEKDAY_PATTERNS,
+  WEEKDAYS,
   type Customer,
   type Car,
 } from '@/lib/data/types';
 import { loadCustomerAccount, recordPayment } from '@/lib/services/accounts';
-import { generateVisitsForCar } from '@/lib/services/schedule';
+import { generateVisitsForCar, plannedServiceFor, rescheduleVisit } from '@/lib/services/schedule';
 import { currentCycle, nextCycle, todayISO } from '@/lib/util/format';
 import { scopeAreaFilter } from '@/lib/auth/rbac';
 import { assertInScope, opsError } from '../_guard';
@@ -41,16 +41,19 @@ function revalidateCustomerPages() {
   }
 }
 
+const weeklyDaysSchema = z.array(z.enum(WEEKDAYS)).min(1, 'Pick at least one wash day.');
+const dayServicesSchema = z.record(z.enum(WEEKDAYS), z.string()).optional().nullable();
+
 const carSchema = z.object({
   model: z.string().trim().min(1),
   make: z.string().trim().min(1),
   colour: z.string().trim().min(1),
   plate: z.string().trim().min(4),
   packageId: z.string().min(1, 'Please select a wash package (or create one first)'),
-  schedulePattern: z.enum(WEEKDAY_PATTERNS).optional().default('CUSTOM'),
+  weeklyDays: weeklyDaysSchema,
+  dayServices: dayServicesSchema,
   scheduleTime: z.string().regex(/^\d{2}:\d{2}$/),
   specialInstructions: z.string().max(300).optional(),
-  customDates: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional(),
 });
 
 const createSchema = z.object({
@@ -67,7 +70,6 @@ const createSchema = z.object({
   note: z.string().max(300).optional(),
   areaId: z.string().min(1),
   cars: z.array(carSchema).min(1, 'Add at least one car'),
-  schedulePattern: z.enum(WEEKDAY_PATTERNS).optional(),
   assignedStaffId: z.string().optional(),
   advance: z.number().int().min(0).optional().default(0),
   paymentMode: z.enum(['CASH', 'MANUAL_UPI', 'GATEWAY']).optional().default('CASH'),
@@ -125,11 +127,11 @@ const updateCarSchema = z.object({
   plate: z.string().trim().min(3).optional(),
   packageId: z.string().min(1).optional(),
   assignedStaffId: z.string().optional().nullable(),
-  schedulePattern: z.enum(WEEKDAY_PATTERNS).optional(),
+  weeklyDays: weeklyDaysSchema.optional(),
+  dayServices: dayServicesSchema,
   scheduleTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
   specialInstructions: z.string().max(300).optional().nullable(),
   active: z.boolean().optional(),
-  customDates: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional(),
 });
 
 const addCarSchema = z.object({
@@ -140,13 +142,13 @@ const addCarSchema = z.object({
   colour: z.string().trim().min(1),
   plate: z.string().trim().min(3),
   packageId: z.string().min(1, 'Please select a wash package'),
-  schedulePattern: z.enum(WEEKDAY_PATTERNS),
+  weeklyDays: weeklyDaysSchema,
+  dayServices: dayServicesSchema,
   scheduleTime: z.string().regex(/^\d{2}:\d{2}$/),
   assignedStaffId: z.string().optional().nullable(),
   specialInstructions: z.string().max(300).optional().nullable(),
   autoStartService: z.boolean().optional(),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
-  customDates: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional(),
 });
 
 const deleteCarSchema = z.object({
@@ -163,6 +165,15 @@ const adhocWashSchema = z.object({
   note: z.string().max(300).optional().nullable(),
 });
 
+const rescheduleVisitSchema = z.object({
+  action: z.literal('rescheduleVisit'),
+  customerId: z.string().min(1),
+  visitId: z.string().min(1),
+  scheduledDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  scheduledTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  staffId: z.string().optional().nullable(),
+});
+
 const schema = z.discriminatedUnion('action', [
   createSchema,
   statusSchema,
@@ -171,6 +182,7 @@ const schema = z.discriminatedUnion('action', [
   updateCustomerSchema,
   updateCarSchema,
   addCarSchema,
+  rescheduleVisitSchema,
   deleteCarSchema,
   adhocWashSchema,
 ]);
@@ -351,6 +363,7 @@ export async function POST(request: Request) {
         status: 'PENDING',
         startedAt: null,
         completedAt: null,
+        plannedService: plannedServiceFor(car, today),
         servicesDone: [],
         beforePhotoUrl: null,
         afterPhotoUrl: null,
@@ -449,11 +462,11 @@ export async function POST(request: Request) {
       if (parsed.data.plate !== undefined) patch.plate = parsed.data.plate.toUpperCase();
       if (parsed.data.packageId !== undefined) patch.packageId = parsed.data.packageId;
       if (parsed.data.assignedStaffId !== undefined) patch.assignedStaffId = parsed.data.assignedStaffId;
-      if (parsed.data.schedulePattern !== undefined) patch.schedulePattern = parsed.data.schedulePattern;
+      if (parsed.data.weeklyDays !== undefined) patch.weeklyDays = parsed.data.weeklyDays;
+      if (parsed.data.dayServices !== undefined) patch.dayServices = parsed.data.dayServices;
       if (parsed.data.scheduleTime !== undefined) patch.scheduleTime = parsed.data.scheduleTime;
       if (parsed.data.specialInstructions !== undefined) patch.specialInstructions = parsed.data.specialInstructions;
       if (parsed.data.active !== undefined) patch.active = parsed.data.active;
-      if (parsed.data.customDates !== undefined) patch.customDates = parsed.data.customDates;
 
       const updatedCar = await store.cars.update(car.id, patch);
 
@@ -491,7 +504,8 @@ export async function POST(request: Request) {
         plate: parsed.data.plate.toUpperCase(),
         packageId: parsed.data.packageId,
         assignedStaffId: parsed.data.assignedStaffId || null,
-        schedulePattern: parsed.data.schedulePattern,
+        weeklyDays: parsed.data.weeklyDays,
+        dayServices: parsed.data.dayServices || null,
         scheduleTime: parsed.data.scheduleTime,
         specialInstructions: parsed.data.specialInstructions || null,
         active: true,
@@ -500,7 +514,6 @@ export async function POST(request: Request) {
         serviceStartedBeforePayment: false,
         serviceStartedByUserId: session.user.id,
         serviceStartNote: 'Added from Customer Management',
-        customDates: parsed.data.customDates || [],
       });
 
       const cycle = currentCycle();
@@ -513,6 +526,39 @@ export async function POST(request: Request) {
         ok: true,
         car,
         message: `Added ${car.make} ${car.model} (${car.plate}). Schedule generated.`,
+      });
+    }
+
+    if (parsed.data.action === 'rescheduleVisit') {
+      const customer = await store.customers.get(parsed.data.customerId);
+      if (!customer) throw new HttpError(404, 'Customer not found.');
+      assertInScope(session, customer.areaId);
+
+      const visit = await store.visits.get(parsed.data.visitId);
+      if (!visit || visit.customerId !== customer.id) {
+        throw new HttpError(404, 'Wash visit not found for this customer.');
+      }
+
+      if (parsed.data.staffId) {
+        const assignee = await store.staff.get(parsed.data.staffId);
+        if (!assignee || !assignee.active) {
+          throw new HttpError(400, 'Selected staff member is not available.');
+        }
+      }
+
+      const updated = await rescheduleVisit(store, visit.id, {
+        scheduledDate: parsed.data.scheduledDate as never,
+        scheduledTime: parsed.data.scheduledTime,
+        staffId: parsed.data.staffId === undefined ? undefined : parsed.data.staffId,
+      }).catch((err: Error) => {
+        throw new HttpError(400, err.message);
+      });
+
+      revalidateCustomerPages();
+      return NextResponse.json({
+        ok: true,
+        visit: updated,
+        message: 'Wash rescheduled — this is a one-off change, next week still follows the usual plan.',
       });
     }
 
@@ -637,7 +683,8 @@ export async function POST(request: Request) {
           plate: input.plate.toUpperCase(),
           packageId: input.packageId,
           assignedStaffId: data.assignedStaffId || null,
-          schedulePattern: input.schedulePattern,
+          weeklyDays: input.weeklyDays,
+          dayServices: input.dayServices || null,
           scheduleTime: input.scheduleTime,
           specialInstructions: input.specialInstructions || null,
           active: true,
@@ -646,7 +693,6 @@ export async function POST(request: Request) {
           serviceStartedBeforePayment: false,
           serviceStartedByUserId: isPrepaidPaid ? session.user.id : null,
           serviceStartNote: null,
-          customDates: input.customDates || [],
         });
 
         if (isPrepaidPaid) {
@@ -851,7 +897,8 @@ export async function GET(request: Request) {
           packageId: car.packageId,
           packageName: packageById.get(car.packageId)?.name,
           packagePrice: packageById.get(car.packageId)?.price,
-          schedulePattern: car.schedulePattern,
+          weeklyDays: car.weeklyDays,
+          dayServices: car.dayServices,
           scheduleTime: car.scheduleTime,
           assignedStaffId: car.assignedStaffId,
           assignedStaffName: car.assignedStaffId ? staffById.get(car.assignedStaffId)?.name : undefined,
@@ -861,7 +908,7 @@ export async function GET(request: Request) {
         monthlyAmount,
         paymentStatus,
         outstandingAmount: owed,
-        schedulePattern: firstCar?.schedulePattern,
+        weeklyDays: firstCar?.weeklyDays,
         scheduleTime: firstCar?.scheduleTime,
         assignedStaffId: firstCar?.assignedStaffId,
         assignedStaffName: assignedStaff?.name,
