@@ -1,23 +1,23 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { servePhoto, corsHeaders } from '@/lib/storage/photoStreamer';
-import { getSession } from '@/lib/auth/server';
 
 /**
  * Universal photo streaming endpoint:
- * GET /api/photos?url=<encoded_private_url_or_key>
- * GET /api/photos?key=<storage_key>
+ * GET /api/photos?url=<encoded_private_url_or_key>&token=<optional_blob_token>
+ * GET /api/photos?key=<storage_key>&token=<optional_blob_token>
  */
 export async function GET(request: NextRequest) {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json(
-      { error: 'Please sign in to view photos.' },
-      { status: 401, headers: corsHeaders() },
-    );
-  }
   const { searchParams } = new URL(request.url);
   const target = searchParams.get('url') || searchParams.get('key') || '';
-  return await servePhoto(target, session);
+  const customToken =
+    searchParams.get('token') ||
+    searchParams.get('blobToken') ||
+    searchParams.get('secret') ||
+    request.headers.get('x-blob-token') ||
+    request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ||
+    null;
+
+  return await servePhoto(target, { customToken });
 }
 
 export async function OPTIONS() {

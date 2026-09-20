@@ -11,9 +11,8 @@ import {
   type LeadSource,
   type ServicePackage,
   type Staff,
-  type WeekdayPattern,
 } from '@/lib/data/types';
-import { LEAD_SOURCE_LABEL, PATTERN_LABEL } from '@/lib/util/labels';
+import { LEAD_SOURCE_LABEL } from '@/lib/util/labels';
 import { WashDatesPicker } from '@/components/ui/WashDatesPicker';
 
 // ==========================================
@@ -272,7 +271,6 @@ export function EditCarModalButton({
   const [plate, setPlate] = useState(car.plate);
   const [packageId, setPackageId] = useState(car.packageId);
   const [assignedStaffId, setAssignedStaffId] = useState(car.assignedStaffId || '');
-  const [schedulePattern, setSchedulePattern] = useState<WeekdayPattern>(car.schedulePattern);
   const [scheduleTime, setScheduleTime] = useState(car.scheduleTime);
   const [specialInstructions, setSpecialInstructions] = useState(car.specialInstructions || '');
   const [customDates, setCustomDates] = useState<string[]>(() => {
@@ -283,12 +281,10 @@ export function EditCarModalButton({
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     
-    if (schedulePattern === 'CUSTOM') {
-      const pkg = packages.find(p => p.id === packageId);
-      if (pkg && customDates.filter(Boolean).length !== pkg.washesPerMonth) {
-        toast.error(`For custom dates, you must select exactly ${pkg.washesPerMonth} dates.`);
-        return;
-      }
+    const pkg = packages.find(p => p.id === packageId);
+    if (pkg && customDates.filter(Boolean).length !== pkg.washesPerMonth) {
+      toast.error(`Please select exactly ${pkg.washesPerMonth} wash dates.`);
+      return;
     }
 
     if (!make.trim() || !model.trim() || !plate.trim()) {
@@ -311,10 +307,10 @@ export function EditCarModalButton({
           plate: plate.trim().toUpperCase(),
           packageId,
           assignedStaffId: assignedStaffId || null,
-          schedulePattern,
+          schedulePattern: 'CUSTOM',
           scheduleTime,
           specialInstructions: specialInstructions.trim() || null,
-          customDates: schedulePattern === 'CUSTOM' ? customDates : undefined,
+          customDates,
           active,
         }),
       });
@@ -445,21 +441,7 @@ export function EditCarModalButton({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Schedule Pattern *</label>
-                  <select
-                    value={schedulePattern}
-                    onChange={(e) => setSchedulePattern(e.target.value as WeekdayPattern)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold bg-white focus:border-blue-500 focus:outline-none"
-                  >
-                    {Array.from(new Set(['CUSTOM', car.schedulePattern])).map((pat) => (
-                      <option key={pat} value={pat}>
-                        {PATTERN_LABEL[pat as WeekdayPattern] || pat}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div className="grid grid-cols-1 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Slot Time (HH:MM) *</label>
                   <input
@@ -472,7 +454,7 @@ export function EditCarModalButton({
                 </div>
               </div>
 
-              {schedulePattern === 'CUSTOM' && (() => {
+              {(() => {
                 const pkg = packages.find((p) => p.id === packageId);
                 if (!pkg) return null;
                 return (
