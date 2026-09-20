@@ -194,6 +194,7 @@ export function PayoutRulesForm({ settings }: { settings: PayoutSettings }) {
   const [values, setValues] = useState({
     onTimeBonus: String(settings.onTimeBonus),
     goodReviewBonus: String(settings.goodReviewBonus),
+    goodReviewMinStars: String(settings.goodReviewMinStars),
     carReferralBonus: String(settings.carReferralBonus),
     staffReferralBonus: String(settings.staffReferralBonus),
     offsAllowedPerMonth: String(settings.offsAllowedPerMonth),
@@ -206,6 +207,7 @@ export function PayoutRulesForm({ settings }: { settings: PayoutSettings }) {
   const fields: [keyof typeof values, string][] = [
     ['onTimeBonus', 'On-time bonus per wash'],
     ['goodReviewBonus', 'Good review bonus per wash'],
+    ['goodReviewMinStars', 'Rating that counts as "good" (1-5 stars)'],
     ['carReferralBonus', 'New car referral'],
     ['staffReferralBonus', 'New wash boy referral'],
     ['offsAllowedPerMonth', 'Offs allowed per month'],
@@ -226,6 +228,8 @@ export function PayoutRulesForm({ settings }: { settings: PayoutSettings }) {
               className="field"
               type="number"
               inputMode="numeric"
+              min={key === 'goodReviewMinStars' ? 1 : undefined}
+              max={key === 'goodReviewMinStars' ? 5 : undefined}
               value={values[key]}
               onChange={(e) =>
                 setValues((v) => ({ ...v, [key]: e.target.value }))
