@@ -5,40 +5,27 @@ import { getSession } from '@/lib/auth/server';
 /**
  * Streams a wash photo by storage key or filename.
  * Supports CORS so mobile apps and external consumers can preview images seamlessly.
- * Accepts optional token in query or Authorization header.
+ *
+ * Authenticated by the caller's own session only. A "server has a storage
+ * token configured" fallback would make login optional for every request —
+ * this app always has a token configured, so that fallback is effectively
+ * "no auth required." There is no caller-supplied-token path either: a
+ * client handing in its own storage credential turns this into an open
+ * proxy onto whatever account that credential belongs to.
  */
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ key: string }> },
 ) {
-  const url = new URL(request.url);
-  const customToken =
-    url.searchParams.get('token') ||
-    url.searchParams.get('blobToken') ||
-    url.searchParams.get('secret') ||
-    request.headers.get('x-blob-token') ||
-    request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ||
-    null;
-
   const session = await getSession();
-  if (!session && !customToken) {
-    // If no session and no explicit token, still allow serving if server has storage credentials configured
-    const serverHasToken =
-      process.env.PRIVATE_BLOB_READ_WRITE_TOKEN ||
-      process.env.BLOB_READ_WRITE_TOKEN ||
-      process.env.VERCEL_BLOB_READ_WRITE_TOKEN ||
-      process.env.PUBLIC_BLOB_READ_WRITE_TOKEN;
-
-    if (!serverHasToken) {
-      return NextResponse.json(
-        { error: 'Please sign in or provide a blob token to view photos.' },
-        { status: 401, headers: corsHeaders() },
-      );
-    }
+  if (!session) {
+    return NextResponse.json(
+      { error: 'Please sign in to view photos.' },
+      { status: 401, headers: corsHeaders() },
+    );
   }
-
   const { key } = await params;
-  return await servePhoto(key, { customToken });
+  return await servePhoto(key, session);
 }
 
 export async function OPTIONS() {
