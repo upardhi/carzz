@@ -15,7 +15,7 @@ export default async function AdminAddCustomer({
   const resolvedParams = searchParams ? await searchParams : {};
   const enquiryId = resolvedParams.enquiryId;
 
-  const [areas, packages, staff, enquiry] = await Promise.all([
+  const [areas, packages, staff, enquiry, rules, pendingReferrals] = await Promise.all([
     store.areas.find({ orderBy: [{ field: 'name' }] }),
     store.packages.find({ where: { active: true } }),
     store.staff.find({
@@ -23,7 +23,12 @@ export default async function AdminAddCustomer({
       orderBy: [{ field: 'name' }],
     }),
     enquiryId ? store.enquiries.get(enquiryId) : null,
+    store.getPayoutSettings(),
+    store.staffReferrals.find({
+      where: { type: 'CUSTOMER', status: 'APPROVED', convertedCustomerId: null } as never,
+    }),
   ]);
+  const staffById = new Map(staff.map((s) => [s.id, s]));
 
   const initialEnquiry = enquiry
     ? {
@@ -61,6 +66,15 @@ export default async function AdminAddCustomer({
           })),
           staff: staff.map((s) => ({ id: s.id, name: s.name, areaId: s.areaId })),
           defaultAreaId: initialEnquiry?.areaId ?? areas[0]?.id ?? '',
+          carReferralBonus: rules.carReferralBonus,
+          approvedReferrals: pendingReferrals.map((r) => ({
+            id: r.id,
+            areaId: r.areaId,
+            name: r.name,
+            phone: r.phone,
+            referredByStaffId: r.referredByStaffId,
+            referredByStaffName: staffById.get(r.referredByStaffId)?.name ?? 'Unknown',
+          })),
         }}
       />
     </>

@@ -56,6 +56,9 @@ function revalidateUserPages() {
       revalidatePath(`${base}/schedule`);
       revalidatePath(`${base}/areas/[areaId]`, 'page');
     }
+    revalidatePath('/admin/referrals');
+    revalidatePath('/area/referrals');
+    revalidatePath('/staff/refer');
     revalidatePath('/area/managers');
   } catch {
     // ignore — running outside a request context
@@ -217,6 +220,9 @@ const schema = z.discriminatedUnion('action', [
     ifscCode: z.string().trim().nullable().optional(),
     bankIfsc: z.string().trim().nullable().optional(),
     upiId: z.string().trim().nullable().optional(),
+    /** The only way a new wash boy can be attributed to a referrer — picked
+     * from an already dual-approved StaffReferral, never typed free-hand. */
+    referralId: z.string().optional(),
   }),
   z.object({
     action: z.literal('setActive'),
@@ -475,6 +481,27 @@ export async function POST(request: Request) {
       throw new HttpError(400, 'An area admin must be given a region.');
     }
 
+    // A new wash boy can only be attributed to a referrer through an already
+    // dual-approved StaffReferral — never a free staff pick — so the bonus
+    // payroll.ts pays always traces back to a real, audited referral.
+    let referredByStaffId: string | null = null;
+    let referral: Awaited<ReturnType<typeof store.staffReferrals.get>> = null;
+    if (data.role === 'EMPLOYEE' && data.referralId) {
+      referral = await store.staffReferrals.get(data.referralId);
+      if (!referral) throw new HttpError(404, 'That referral was not found.');
+      if (referral.type !== 'STAFF') {
+        throw new HttpError(400, 'That referral is for a new customer, not a new wash boy.');
+      }
+      if (referral.status !== 'APPROVED') {
+        throw new HttpError(400, 'That referral has not been approved by both the area admin and the owner yet.');
+      }
+      if (referral.convertedStaffId) {
+        throw new HttpError(409, 'That referral has already been used for another hire.');
+      }
+      assertAreaInScope(session, referral.areaId);
+      referredByStaffId = referral.referredByStaffId;
+    }
+
     // Manager and employee logins are backed by a staff record, so they appear
     // in rosters, payouts and schedules like anyone else.
     let staffId: string | null = null;
@@ -486,7 +513,7 @@ export async function POST(request: Request) {
         areaId: data.areaId!,
         role: data.role,
         joinedOn: todayISO(),
-        referredByStaffId: null,
+        referredByStaffId,
         active: true,
         aadharNumber: data.aadharNumber || null,
         aadharCardUrl: data.aadharCardUrl || null,
@@ -541,6 +568,10 @@ export async function POST(request: Request) {
     }
 
     await store.setCredential(user.id, await hashPassword(data.password));
+
+    if (referral && staffId) {
+      await store.staffReferrals.update(referral.id, { convertedStaffId: staffId });
+    }
 
     revalidateUserPages();
     return NextResponse.json({

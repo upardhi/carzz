@@ -9,6 +9,7 @@ import { DocumentUploadPreview } from '@/components/ui/DocumentUploadPreview';
 import { LocationPickerMap } from '@/components/ui/LocationPickerMap';
 import type { Role, Area, Region } from '@/lib/data/types';
 import { ROLE_LABEL } from '@/lib/util/labels';
+import { money } from '@/lib/util/format';
 import { IconIdCard, IconCreditCard } from '@/components/shell/icons';
 
 const ASSIGNABLE_ROLES: { role: Role; label: string; blurb: string; icon: string }[] = [
@@ -55,6 +56,8 @@ export function AddPersonClient({
   title = 'Add New Team Member',
   description = 'Create account credentials, assign permissions, and attach identity verification documents.',
   allowedRoles,
+  staffReferralBonus = 0,
+  approvedStaffReferrals = [],
 }: {
   regions: Region[];
   areas: Area[];
@@ -64,6 +67,12 @@ export function AddPersonClient({
   title?: string;
   description?: string;
   allowedRoles?: Role[];
+  /** The live payout-settings rate — same number shown in Refer & Earn and
+   * Admin Settings, never a separate hardcoded copy. */
+  staffReferralBonus?: number;
+  /** Approved, not-yet-converted wash-boy referrals — the only source a new
+   * hire can be attributed to. No free staff picker any more. */
+  approvedStaffReferrals?: { id: string; areaId: string; name: string; phone: string; referredByStaffId: string; referredByStaffName: string }[];
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -77,6 +86,7 @@ export function AddPersonClient({
   const [showPassword, setShowPassword] = useState(false);
   const [regionId, setRegionId] = useState(regions[0]?.id ?? '');
   const [areaId, setAreaId] = useState(areas[0]?.id ?? '');
+  const [referralId, setReferralId] = useState('');
 
   // 2. KYC Documents
   const [kycDocType, setKycDocType] = useState<'aadhaar' | 'pan'>('aadhaar');
@@ -138,6 +148,7 @@ export function AddPersonClient({
         password: password.trim(),
         regionId: needsRegion ? regionId : undefined,
         areaId: needsArea ? areaId : undefined,
+        referralId: role === 'EMPLOYEE' ? referralId || undefined : undefined,
         aadharNumber: aadharNumber.trim() || undefined,
         panNumber: panNumber.trim().toUpperCase() || undefined,
         address: address.trim() || undefined,
@@ -421,6 +432,41 @@ export function AddPersonClient({
                     </option>
                   ))}
                 </select>
+              </div>
+            )}
+
+            {role === 'EMPLOYEE' && (
+              <div>
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <label className="block text-xs font-bold text-navy-950" htmlFor="new-staff-referral">
+                    Which referral is this hire?
+                  </label>
+                  <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
+                    Bonus: {money(staffReferralBonus)}
+                  </span>
+                </div>
+                <select
+                  id="new-staff-referral"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs sm:text-sm font-semibold text-navy-950 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600 shadow-xs"
+                  value={referralId}
+                  onChange={(e) => setReferralId(e.target.value)}
+                >
+                  <option value="">Nobody referred them</option>
+                  {approvedStaffReferrals
+                    .filter((r) => r.areaId === areaId)
+                    .map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.name} ({r.phone}) — referred by {r.referredByStaffName}
+                      </option>
+                    ))}
+                </select>
+                {approvedStaffReferrals.filter((r) => r.areaId === areaId).length === 0 ? (
+                  <p className="mt-1 text-[11px] text-slate-500">
+                    No approved wash-boy referrals for this area yet. A wash boy submits one
+                    from Refer &amp; Earn, and it needs the area admin and owner to both
+                    approve it before it shows up here.
+                  </p>
+                ) : null}
               </div>
             )}
           </div>

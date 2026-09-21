@@ -44,6 +44,14 @@ export interface IntakeOptions {
   }[];
   staff: { id: string; name: string; areaId: string }[];
   defaultAreaId: string;
+  /** The live payout-settings rate — the only number ever shown for this
+   * bonus, so it can never drift from what payroll.ts actually pays. */
+  carReferralBonus: number;
+  /** Approved, not-yet-converted customer referrals — the single place a
+   * staff referral can come from. There is no free-text/free-pick staff
+   * dropdown any more: if it isn't in this list, it wasn't submitted and
+   * approved through Refer & Earn, so it can't be attributed here. */
+  approvedReferrals: { id: string; areaId: string; name: string; phone: string; referredByStaffId: string; referredByStaffName: string }[];
 }
 
 export interface InitialEnquiryData {
@@ -165,7 +173,7 @@ export function AddCustomerForm({
   const sourceRef = useRef<HTMLDivElement>(null);
 
   const [source, setSource] = useState<LeadSource | ''>(initialEnquiry ? 'WEBSITE' : 'GUARD_REF');
-  const [referredById, setReferredById] = useState('');
+  const [referralId, setReferralId] = useState('');
   const [name, setName] = useState(initialEnquiry?.name ?? '');
   const [phone, setPhone] = useState(initialEnquiry?.phone ?? '');
   const [altPhone, setAltPhone] = useState('');
@@ -217,7 +225,7 @@ export function AddCustomerForm({
     }));
   });
 
-  const areaStaff = options.staff.filter((s) => s.areaId === areaId);
+  const areaReferrals = options.approvedReferrals.filter((r) => r.areaId === areaId);
   const currentArea = options.areas.find((a) => a.id === areaId);
 
   const monthly = cars.reduce(
@@ -271,7 +279,7 @@ export function AddCustomerForm({
       const payload = {
         action: 'create',
         source,
-        referredById: referredById || undefined,
+        referralId: source === 'STAFF_REF' ? referralId || undefined : undefined,
         name,
         phone,
         altPhone: altPhone || undefined,
@@ -403,21 +411,34 @@ export function AddCustomerForm({
 
             {source === 'STAFF_REF' && (
               <div className="mt-3.5 rounded-xl border border-blue-100 bg-blue-50/50 p-3">
-                <label className="block text-xs font-bold text-blue-950 mb-1.5">
-                  Which wash boy referred them?
-                </label>
+                <div className="mb-1.5 flex items-center justify-between gap-2">
+                  <label className="block text-xs font-bold text-blue-950">
+                    Which referral is this?
+                  </label>
+                  <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
+                    Bonus: {money(options.carReferralBonus)}
+                  </span>
+                </div>
                 <select
                   className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                  value={referredById}
-                  onChange={(e) => setReferredById(e.target.value)}
+                  value={referralId}
+                  onChange={(e) => setReferralId(e.target.value)}
                 >
-                  <option value="">Choose wash boy…</option>
-                  {areaStaff.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
+                  <option value="">Choose an approved referral…</option>
+                  {areaReferrals.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name} ({r.phone}) — referred by {r.referredByStaffName}
                     </option>
                   ))}
                 </select>
+                {areaReferrals.length === 0 ? (
+                  <p className="mt-1.5 text-[11.5px] text-blue-900/70">
+                    No approved referrals for this area yet. A wash boy submits one from
+                    Refer &amp; Earn, and it needs the area admin and owner to both approve it
+                    before it shows up here — that&apos;s the only way a staff referral gets
+                    attributed and paid.
+                  </p>
+                ) : null}
               </div>
             )}
           </div>

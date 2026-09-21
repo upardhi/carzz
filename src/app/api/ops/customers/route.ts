@@ -54,6 +54,9 @@ function revalidateCustomerPages() {
       revalidatePath(`${base}/customers/[customerId]`, 'page');
       revalidatePath(`${base}/schedule`);
     }
+    revalidatePath('/admin/referrals');
+    revalidatePath('/area/referrals');
+    revalidatePath('/staff/refer');
   } catch {
     // ignore — running outside a request context
   }
@@ -77,7 +80,11 @@ const carSchema = z.object({
 const createSchema = z.object({
   action: z.literal('create'),
   source: z.enum(LEAD_SOURCES),
-  referredById: z.string().optional(),
+  /** The only way a customer can be attributed to a wash boy — picked from
+   * that wash boy's own approved StaffReferral, never typed in free-hand,
+   * so the bonus payroll.ts pays always traces back to a real, dual-signed
+   * referral rather than whoever an admin happened to pick from a list. */
+  referralId: z.string().optional(),
   name: z.string().trim().min(2),
   phone: z.string().trim().min(6),
   altPhone: z.string().trim().optional(),
@@ -622,6 +629,28 @@ export async function POST(request: Request) {
     const data = parsed.data;
     assertInScope(session, data.areaId);
 
+    // The bonus lives on Customer.referredById, but the ONLY legitimate way
+    // to populate it is by picking an already dual-approved StaffReferral —
+    // never a free-hand staff pick — so it always matches a real, audited
+    // referral rather than whichever wash boy an admin happened to choose.
+    let referredById: string | null = null;
+    let referral: Awaited<ReturnType<typeof store.staffReferrals.get>> = null;
+    if (data.referralId) {
+      referral = await store.staffReferrals.get(data.referralId);
+      if (!referral) throw new HttpError(404, 'That referral was not found.');
+      if (referral.type !== 'CUSTOMER') {
+        throw new HttpError(400, 'That referral is for a new wash boy, not a new customer.');
+      }
+      if (referral.status !== 'APPROVED') {
+        throw new HttpError(400, 'That referral has not been approved by both the area admin and the owner yet.');
+      }
+      if (referral.convertedCustomerId) {
+        throw new HttpError(409, 'That referral has already been used for another customer.');
+      }
+      assertInScope(session, referral.areaId);
+      referredById = referral.referredByStaffId;
+    }
+
     if (data.createLogin && data.loginEmail) {
       const existing = await store.users.findOne({
         where: { email: data.loginEmail.toLowerCase() },
@@ -661,7 +690,7 @@ export async function POST(request: Request) {
       lat: data.lat ?? null,
       lng: data.lng ?? null,
       source: data.source,
-      referredById: data.referredById || null,
+      referredById,
       status: 'ACTIVE',
       holdUntil: null,
       note: data.note || null,
@@ -768,6 +797,10 @@ export async function POST(request: Request) {
             handledAt: new Date().toISOString(),
           });
         }
+      }
+
+      if (referral) {
+        await store.staffReferrals.update(referral.id, { convertedCustomerId: customer.id });
       }
     } catch (innerError) {
       try {
