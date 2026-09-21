@@ -67,6 +67,7 @@ export default async function AdminAddCustomer({
           staff: staff.map((s) => ({ id: s.id, name: s.name, areaId: s.areaId })),
           defaultAreaId: initialEnquiry?.areaId ?? areas[0]?.id ?? '',
           carReferralBonus: rules.carReferralBonus,
+          allowDirectReferral: true,
           approvedReferrals: pendingReferrals.map((r) => ({
             id: r.id,
             areaId: r.areaId,

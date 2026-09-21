@@ -223,6 +223,7 @@ const schema = z.discriminatedUnion('action', [
     /** The only way a new wash boy can be attributed to a referrer — picked
      * from an already dual-approved StaffReferral, never typed free-hand. */
     referralId: z.string().optional(),
+    directReferredStaffId: z.string().optional(),
   }),
   z.object({
     action: z.literal('setActive'),
@@ -500,6 +501,17 @@ export async function POST(request: Request) {
       }
       assertAreaInScope(session, referral.areaId);
       referredByStaffId = referral.referredByStaffId;
+    } else if (data.role === 'EMPLOYEE' && data.directReferredStaffId) {
+      // Bypasses the approval queue — only the owner can attribute a bonus
+      // without a submitted-and-signed-off StaffReferral behind it.
+      if (session.claims.role !== 'SUPER_ADMIN') {
+        throw new HttpError(403, 'Only the owner can apply a referral directly without approval.');
+      }
+      const directStaff = await store.staff.get(data.directReferredStaffId);
+      if (!directStaff || !directStaff.active) {
+        throw new HttpError(400, 'Selected wash boy is not available.');
+      }
+      referredByStaffId = directStaff.id;
     }
 
     // Manager and employee logins are backed by a staff record, so they appear

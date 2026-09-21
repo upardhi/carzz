@@ -33,6 +33,8 @@ export default async function NewUserPage() {
           referredByStaffId: r.referredByStaffId,
           referredByStaffName: staffById.get(r.referredByStaffId)?.name ?? 'Unknown',
         }))}
+        allowDirectReferral
+        existingStaff={staff.map((s) => ({ id: s.id, name: s.name, areaId: s.areaId }))}
       />
     </div>
   );

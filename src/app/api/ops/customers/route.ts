@@ -85,6 +85,10 @@ const createSchema = z.object({
    * so the bonus payroll.ts pays always traces back to a real, dual-signed
    * referral rather than whoever an admin happened to pick from a list. */
   referralId: z.string().optional(),
+  /** Super Admin only — bypasses the approval queue entirely and attributes
+   * the bonus straight to a wash boy. Re-checked server-side (session.role)
+   * regardless of what the client sends. */
+  directReferredStaffId: z.string().optional(),
   name: z.string().trim().min(2),
   phone: z.string().trim().min(6),
   altPhone: z.string().trim().optional(),
@@ -649,6 +653,17 @@ export async function POST(request: Request) {
       }
       assertInScope(session, referral.areaId);
       referredById = referral.referredByStaffId;
+    } else if (data.directReferredStaffId) {
+      // Bypasses the approval queue — only the owner can attribute a bonus
+      // without a submitted-and-signed-off StaffReferral behind it.
+      if (session.claims.role !== 'SUPER_ADMIN') {
+        throw new HttpError(403, 'Only the owner can apply a referral directly without approval.');
+      }
+      const directStaff = await store.staff.get(data.directReferredStaffId);
+      if (!directStaff || !directStaff.active) {
+        throw new HttpError(400, 'Selected wash boy is not available.');
+      }
+      referredById = directStaff.id;
     }
 
     if (data.createLogin && data.loginEmail) {

@@ -58,6 +58,8 @@ export function AddPersonClient({
   allowedRoles,
   staffReferralBonus = 0,
   approvedStaffReferrals = [],
+  allowDirectReferral = false,
+  existingStaff = [],
 }: {
   regions: Region[];
   areas: Area[];
@@ -73,6 +75,10 @@ export function AddPersonClient({
   /** Approved, not-yet-converted wash-boy referrals — the only source a new
    * hire can be attributed to. No free staff picker any more. */
   approvedStaffReferrals?: { id: string; areaId: string; name: string; phone: string; referredByStaffId: string; referredByStaffName: string }[];
+  /** Super Admin only: skip the approval queue and attribute a new hire's
+   * referral bonus straight to any existing wash boy. */
+  allowDirectReferral?: boolean;
+  existingStaff?: { id: string; name: string; areaId: string }[];
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -87,6 +93,8 @@ export function AddPersonClient({
   const [regionId, setRegionId] = useState(regions[0]?.id ?? '');
   const [areaId, setAreaId] = useState(areas[0]?.id ?? '');
   const [referralId, setReferralId] = useState('');
+  const [directReferralMode, setDirectReferralMode] = useState(false);
+  const [directReferredStaffId, setDirectReferredStaffId] = useState('');
 
   // 2. KYC Documents
   const [kycDocType, setKycDocType] = useState<'aadhaar' | 'pan'>('aadhaar');
@@ -148,7 +156,9 @@ export function AddPersonClient({
         password: password.trim(),
         regionId: needsRegion ? regionId : undefined,
         areaId: needsArea ? areaId : undefined,
-        referralId: role === 'EMPLOYEE' ? referralId || undefined : undefined,
+        referralId: role === 'EMPLOYEE' && !directReferralMode ? referralId || undefined : undefined,
+        directReferredStaffId:
+          role === 'EMPLOYEE' && directReferralMode ? directReferredStaffId || undefined : undefined,
         aadharNumber: aadharNumber.trim() || undefined,
         panNumber: panNumber.trim().toUpperCase() || undefined,
         address: address.trim() || undefined,
@@ -445,28 +455,77 @@ export function AddPersonClient({
                     Bonus: {money(staffReferralBonus)}
                   </span>
                 </div>
-                <select
-                  id="new-staff-referral"
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs sm:text-sm font-semibold text-navy-950 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600 shadow-xs"
-                  value={referralId}
-                  onChange={(e) => setReferralId(e.target.value)}
-                >
-                  <option value="">Nobody referred them</option>
-                  {approvedStaffReferrals
-                    .filter((r) => r.areaId === areaId)
-                    .map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.name} ({r.phone}) — referred by {r.referredByStaffName}
-                      </option>
-                    ))}
-                </select>
-                {approvedStaffReferrals.filter((r) => r.areaId === areaId).length === 0 ? (
-                  <p className="mt-1 text-[11px] text-slate-500">
-                    No approved wash-boy referrals for this area yet. A wash boy submits one
-                    from Refer &amp; Earn, and it needs the area admin and owner to both
-                    approve it before it shows up here.
-                  </p>
+                {allowDirectReferral ? (
+                  <div className="mb-2 flex gap-1.5 rounded-lg border border-slate-200 bg-white p-1">
+                    <button
+                      type="button"
+                      onClick={() => setDirectReferralMode(false)}
+                      className={`flex-1 rounded-md py-1.5 text-[11.5px] font-semibold transition-colors ${
+                        !directReferralMode ? 'bg-blue-600 text-white' : 'text-navy-950 hover:bg-slate-50'
+                      }`}
+                    >
+                      From approved referral
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDirectReferralMode(true)}
+                      className={`flex-1 rounded-md py-1.5 text-[11.5px] font-semibold transition-colors ${
+                        directReferralMode ? 'bg-blue-600 text-white' : 'text-navy-950 hover:bg-slate-50'
+                      }`}
+                    >
+                      Apply directly (Admin)
+                    </button>
+                  </div>
                 ) : null}
+
+                {directReferralMode && allowDirectReferral ? (
+                  <>
+                    <select
+                      id="new-staff-referral"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs sm:text-sm font-semibold text-navy-950 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600 shadow-xs"
+                      value={directReferredStaffId}
+                      onChange={(e) => setDirectReferredStaffId(e.target.value)}
+                    >
+                      <option value="">Choose the wash boy…</option>
+                      {existingStaff
+                        .filter((s) => s.areaId === areaId)
+                        .map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name}
+                          </option>
+                        ))}
+                    </select>
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      Skips the Refer &amp; Earn approval queue — same bonus, attributed by you
+                      directly.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <select
+                      id="new-staff-referral"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs sm:text-sm font-semibold text-navy-950 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600 shadow-xs"
+                      value={referralId}
+                      onChange={(e) => setReferralId(e.target.value)}
+                    >
+                      <option value="">Nobody referred them</option>
+                      {approvedStaffReferrals
+                        .filter((r) => r.areaId === areaId)
+                        .map((r) => (
+                          <option key={r.id} value={r.id}>
+                            {r.name} ({r.phone}) — referred by {r.referredByStaffName}
+                          </option>
+                        ))}
+                    </select>
+                    {approvedStaffReferrals.filter((r) => r.areaId === areaId).length === 0 ? (
+                      <p className="mt-1 text-[11px] text-slate-500">
+                        No approved wash-boy referrals for this area yet. A wash boy submits one
+                        from Refer &amp; Earn, and it needs the area admin and owner to both
+                        approve it before it shows up here.
+                      </p>
+                    ) : null}
+                  </>
+                )}
               </div>
             )}
           </div>
