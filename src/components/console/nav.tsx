@@ -26,8 +26,17 @@ export interface NavCounts {
   pendingReferrals?: number;
 }
 
-/** Manager and Area Admin run the same screens; only the base path differs. */
-export function operationsNav(base: string, counts: NavCounts): NavGroup[] {
+/**
+ * Manager and Area Admin run mostly the same screens; only the base path
+ * differs. Complaints and Inventory are the exception — a plain Manager no
+ * longer gets either (set `hideComplaints`/`hideInventory` from the
+ * Manager layout only; Area Admin and Super Admin keep both).
+ */
+export function operationsNav(
+  base: string,
+  counts: NavCounts,
+  opts: { hideComplaints?: boolean; hideInventory?: boolean } = {},
+): NavGroup[] {
   return [
     {
       heading: 'Today',
@@ -57,12 +66,16 @@ export function operationsNav(base: string, counts: NavCounts): NavGroup[] {
           icon: <IconAlert width={18} height={18} />,
           badge: counts.redAlerts,
         },
-        {
-          href: `${base}/complaints`,
-          label: 'Complaints',
-          icon: <IconChat width={18} height={18} />,
-          badge: counts.openComplaints,
-        },
+        ...(opts.hideComplaints
+          ? []
+          : [
+              {
+                href: `${base}/complaints`,
+                label: 'Complaints',
+                icon: <IconChat width={18} height={18} />,
+                badge: counts.openComplaints,
+              },
+            ]),
       ],
     },
     {
@@ -80,12 +93,16 @@ export function operationsNav(base: string, counts: NavCounts): NavGroup[] {
           icon: <IconCalendar width={18} height={18} />,
           badge: counts.pendingLeaves,
         },
-        {
-          href: `${base}/inventory`,
-          label: 'Inventory',
-          icon: <IconBox width={18} height={18} />,
-          badge: counts.lowStock,
-        },
+        ...(opts.hideInventory
+          ? []
+          : [
+              {
+                href: `${base}/inventory`,
+                label: 'Inventory',
+                icon: <IconBox width={18} height={18} />,
+                badge: counts.lowStock,
+              },
+            ]),
       ],
     },
   ];

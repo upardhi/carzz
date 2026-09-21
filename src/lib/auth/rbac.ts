@@ -142,14 +142,8 @@ const MANAGER_PERMISSIONS: Permission[] = [
   'payment:view',
   'invoice:view',
   'payout:view',
-  'complaint:view',
-  'complaint:resolve',
-  'complaint:escalate',
   'enquiry:view',
   'enquiry:manage',
-  'inventory:view',
-  'inventory:issue',
-  'purchase:request',
   'report:area',
 ];
 
@@ -163,6 +157,15 @@ const AREA_ADMIN_PERMISSIONS: Permission[] = [
   // super admin only, a manager approving their own team's referral would
   // defeat the point of a second check.
   'referral:manage',
+  // Deliberately not on MANAGER_PERMISSIONS any more — the owner asked for
+  // complaints and inventory to be an area-admin-and-up concern, not
+  // something a plain manager can see or act on.
+  'complaint:view',
+  'complaint:resolve',
+  'complaint:escalate',
+  'inventory:view',
+  'inventory:issue',
+  'purchase:request',
 ];
 
 const ALL_PERMISSIONS: Permission[] = [...PERMISSIONS];

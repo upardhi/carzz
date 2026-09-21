@@ -34,7 +34,7 @@ export default async function ManagerLayout({
       roleLabel={ROLE_LABEL[session.user.role]}
       scopeLabel={scopeLabel}
       userName={session.user.name}
-      nav={operationsNav('/manager', counts)}
+      nav={operationsNav('/manager', counts, { hideComplaints: true, hideInventory: true })}
     >
       {children}
     </ConsoleShell>
