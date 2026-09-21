@@ -38,6 +38,7 @@ export async function ConsoleDashboard({
     performance,
     attendance,
     allLeaves,
+    lowRatedCount,
   ] = await Promise.all([
     store.visits.find({ where: { scheduledDate: today, ...areaFilter } as never }),
     loadRedAlerts(store, session.scope.areaIds),
@@ -55,6 +56,13 @@ export async function ConsoleDashboard({
     }),
     store.attendance.find({ where: { date: today } }),
     store.leaves.find({ orderBy: [{ field: 'appliedAt', dir: 'desc' }] }),
+    // A wash boy's quality problem, not a money one — this is what a manager
+    // actually needs to act on day to day, unlike the payment-chasing alerts.
+    store.visits.count({
+      cycle,
+      rating: { ne: null, lt: 3 },
+      ...areaFilter,
+    } as never),
   ]);
 
 
@@ -76,6 +84,10 @@ export async function ConsoleDashboard({
   const staffOnLeaveNames = staffOnLeaveToday.map(
     (l) => staffById.get(l.staffId)?.name ?? 'Staff',
   );
+
+  const uninformedLeavesCount = allLeaves.filter(
+    (l) => staffIds.has(l.staffId) && l.type === 'UNINFORMED',
+  ).length;
 
   const unassigned = visits.filter((v) => !v.staffId && v.status === 'PENDING');
   const assigned = visits.filter((v) => Boolean(v.staffId));
@@ -144,6 +156,8 @@ export async function ConsoleDashboard({
       oldestAlertDays={alerts[0]?.daysOverdue ?? 0}
       complaintsCount={complaintsCount}
       escalatedComplaintsCount={escalatedComplaintsCount}
+      lowRatedCount={lowRatedCount}
+      uninformedLeavesCount={uninformedLeavesCount}
       staffToday={staffTodayFormatted}
       performance={performance}
       cycleLabel={cycleLabel(cycle)}

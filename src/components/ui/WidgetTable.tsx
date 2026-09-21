@@ -1,4 +1,7 @@
+'use client';
+
 import clsx from 'clsx';
+import { useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { TablePagination, EmptyTableRow } from './TableCard';
 
@@ -22,6 +25,9 @@ export interface WidgetTableProps<T> {
   page?: number;
   onPageChange?: (page: number) => void;
   className?: string;
+  /** When given, each row navigates here on click — used for drill-down
+   * tables (e.g. a wash boy's row on the dashboard opens their day). */
+  rowHref?: (item: T) => string | undefined;
 }
 
 /**
@@ -39,7 +45,9 @@ export function WidgetTable<T>({
   page,
   onPageChange,
   className,
+  rowHref,
 }: WidgetTableProps<T>) {
+  const router = useRouter();
   const isControlled = page !== undefined && onPageChange !== undefined;
   const currentPage = page ?? 1;
   const totalItems = data.length;
@@ -88,10 +96,16 @@ export function WidgetTable<T>({
               </tr>
             </thead>
             <tbody className="divide-y divide-line-soft">
-              {displayedData.map((item, rowIdx) => (
+              {displayedData.map((item, rowIdx) => {
+                const href = rowHref?.(item);
+                return (
                 <tr
                   key={keyExtractor(item, startIndex + rowIdx)}
-                  className="transition-colors hover:bg-slate-50/60"
+                  onClick={href ? () => router.push(href) : undefined}
+                  className={clsx(
+                    'transition-colors hover:bg-slate-50/60',
+                    href && 'cursor-pointer',
+                  )}
                 >
                   {columns.map((col) => (
                     <td
@@ -106,7 +120,8 @@ export function WidgetTable<T>({
                     </td>
                   ))}
                 </tr>
-              ))}
+                );
+              })}
               {totalItems === 0 ? (
                 <EmptyTableRow colSpan={columns.length} message={emptyMessage} />
               ) : null}

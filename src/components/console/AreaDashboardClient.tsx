@@ -49,7 +49,6 @@ interface AreaDashboardClientProps {
   pendingToday: number;
   remainingToday: number;
   assignedToday: number;
-  notDoneToday: number;
   unassignedToday: number;
   staffWorkingCount: number;
   staffAbsentCount: number;
@@ -59,6 +58,11 @@ interface AreaDashboardClientProps {
   oldestAlertDays: number;
   complaintsCount: number;
   escalatedComplaintsCount: number;
+  /** Washes that missed today — the manager-facing swap for complaint counts,
+   * since a plain manager no longer has complaint:view. */
+  notDoneToday?: number;
+  lowRatedCount?: number;
+  uninformedLeavesCount?: number;
   staffToday: StaffTodayItem[];
   performance: AreaPerformance[];
   cycleLabel: string;
@@ -77,7 +81,9 @@ export function AreaDashboardClient({
   pendingToday,
   remainingToday,
   assignedToday: _assignedToday,
-  notDoneToday: _notDoneToday,
+  notDoneToday = 0,
+  lowRatedCount = 0,
+  uninformedLeavesCount = 0,
   unassignedToday,
   staffWorkingCount,
   staffAbsentCount,
@@ -95,6 +101,7 @@ export function AreaDashboardClient({
   pendingLeavesCount = 0,
   staffOnLeaveNames = [],
 }: AreaDashboardClientProps) {
+  const isManager = base === '/manager';
   const [staffPage, setStaffPage] = useState(1);
   const staffPerPage = 8;
 
@@ -272,76 +279,106 @@ export function AreaDashboardClient({
       )}
 
 
-      {/* 8 KPI Operational & Financial Summary Metric Cards (4 columns x 2 rows) */}
+      {/* 8 KPI Operational & Financial Summary Metric Cards (4 columns x 2 rows) —
+          every card is a link straight to the screen that explains the number. */}
       <StatGrid columns={4}>
-        <StatCard
-          label="TODAY'S WASHES"
-          value={`${completedToday} / ${carsToday}`}
-          icon={<IconCheckCircle width={20} height={20} strokeWidth={2} />}
-          tone="emerald"
-          subtext={`${completionPct}% completed today`}
-          subtextTone={completionPct >= 80 ? 'success' : 'info'}
-        />
-        <StatCard
-          label="REMAINING WASHES"
-          value={remainingToday}
-          icon={<IconClock width={20} height={20} strokeWidth={2} />}
-          tone="blue"
-          subtext={`${inProgressToday} in progress · ${pendingToday} pending`}
-          subtextTone="info"
-        />
-        <StatCard
-          label="UNASSIGNED QUEUE"
-          value={unassignedToday}
-          icon={<IconUser width={20} height={20} strokeWidth={2} />}
-          tone={unassignedToday > 0 ? 'rose' : 'emerald'}
-          subtext={unassignedToday > 0 ? 'Requires immediate assignment' : 'All visits assigned to staff'}
-          subtextTone={unassignedToday > 0 ? 'danger' : 'success'}
-        />
-        <StatCard
-          label="STAFF ON DUTY"
-          value={`${staffWorkingCount} / ${staffToday.length}`}
-          icon={<IconUsers width={20} height={20} strokeWidth={2} />}
-          tone={staffAbsentCount > 0 ? 'amber' : 'emerald'}
-          subtext={`${staffAttendanceRate}% attendance · ${staffAbsentCount} absent`}
-          subtextTone={staffAbsentCount > 0 ? 'warning' : 'success'}
-        />
-        <StatCard
-          label="ACTIVE CARS"
-          value={activeCars}
-          icon={<IconCar width={20} height={20} strokeWidth={2} />}
-          tone="purple"
-          subtext={`${totals.customers} subscribed accounts`}
-          subtextTone="muted"
-        />
-        <StatCard
-          label="CUSTOMER RATING"
-          value={avgRatingDisplay}
-          icon={<IconStar width={20} height={20} strokeWidth={2} />}
-          tone={avgRatingNumber >= 4 ? 'emerald' : avgRatingNumber > 0 ? 'amber' : 'slate'}
-          subtext={
-            avgRatingNumber > 0
-              ? `${satisfactionPct}% satisfaction rating`
-              : 'No customer ratings recorded yet'
-          }
-          subtextTone={avgRatingNumber >= 4 ? 'success' : avgRatingNumber > 0 ? 'warning' : 'muted'}
-        />
-        <StatCard
-          label="OUTSTANDING DUES"
-          value={moneyShort(outstanding)}
-          icon={<IconRupee width={20} height={20} strokeWidth={2.2} />}
-          tone="amber"
-          subtext={`${alertsCount} overdue customer accounts`}
-          subtextTone="warning"
-        />
-        <StatCard
-          label="OPEN COMPLAINTS"
-          value={complaintsCount}
-          icon={<IconAlert width={20} height={20} strokeWidth={2} />}
-          tone={complaintsCount > 0 ? 'rose' : 'emerald'}
-          subtext={escalatedComplaintsCount > 0 ? `${escalatedComplaintsCount} escalated to owner` : 'All resolved/normal'}
-          subtextTone={escalatedComplaintsCount > 0 ? 'danger' : 'muted'}
-        />
+        <Link href={`${base}/schedule`} className="block">
+          <StatCard
+            label="TODAY'S WASHES"
+            value={`${completedToday} / ${carsToday}`}
+            icon={<IconCheckCircle width={20} height={20} strokeWidth={2} />}
+            tone="emerald"
+            subtext={`${completionPct}% completed today — click to see the whole team's list`}
+            subtextTone={completionPct >= 80 ? 'success' : 'info'}
+          />
+        </Link>
+        <Link href={`${base}/schedule?status=PENDING`} className="block">
+          <StatCard
+            label="REMAINING WASHES"
+            value={remainingToday}
+            icon={<IconClock width={20} height={20} strokeWidth={2} />}
+            tone="blue"
+            subtext={`${inProgressToday} in progress · ${pendingToday} pending`}
+            subtextTone="info"
+          />
+        </Link>
+        <Link href={`${base}/schedule`} className="block">
+          <StatCard
+            label="UNASSIGNED QUEUE"
+            value={unassignedToday}
+            icon={<IconUser width={20} height={20} strokeWidth={2} />}
+            tone={unassignedToday > 0 ? 'rose' : 'emerald'}
+            subtext={unassignedToday > 0 ? 'Requires immediate assignment' : 'All visits assigned to staff'}
+            subtextTone={unassignedToday > 0 ? 'danger' : 'success'}
+          />
+        </Link>
+        <Link href={`${base}/staff`} className="block">
+          <StatCard
+            label="STAFF ON DUTY"
+            value={`${staffWorkingCount} / ${staffToday.length}`}
+            icon={<IconUsers width={20} height={20} strokeWidth={2} />}
+            tone={staffAbsentCount > 0 ? 'amber' : 'emerald'}
+            subtext={`${staffAttendanceRate}% attendance · ${staffAbsentCount} absent`}
+            subtextTone={staffAbsentCount > 0 ? 'warning' : 'success'}
+          />
+        </Link>
+        <Link href={`${base}/customers`} className="block">
+          <StatCard
+            label="ACTIVE CARS"
+            value={activeCars}
+            icon={<IconCar width={20} height={20} strokeWidth={2} />}
+            tone="purple"
+            subtext={`${totals.customers} subscribed accounts`}
+            subtextTone="muted"
+          />
+        </Link>
+        <Link href={isManager ? `${base}/team-alerts` : `${base}/reports`} className="block">
+          <StatCard
+            label="CUSTOMER RATING"
+            value={avgRatingDisplay}
+            icon={<IconStar width={20} height={20} strokeWidth={2} />}
+            tone={avgRatingNumber >= 4 ? 'emerald' : avgRatingNumber > 0 ? 'amber' : 'slate'}
+            subtext={
+              avgRatingNumber > 0
+                ? `${satisfactionPct}% satisfaction rating`
+                : 'No customer ratings recorded yet'
+            }
+            subtextTone={avgRatingNumber >= 4 ? 'success' : avgRatingNumber > 0 ? 'warning' : 'muted'}
+          />
+        </Link>
+        <Link href={`${base}/alerts`} className="block">
+          <StatCard
+            label="OUTSTANDING DUES"
+            value={moneyShort(outstanding)}
+            icon={<IconRupee width={20} height={20} strokeWidth={2.2} />}
+            tone="amber"
+            subtext={`${alertsCount} overdue customer accounts`}
+            subtextTone="warning"
+          />
+        </Link>
+        {isManager ? (
+          <Link href={`${base}/schedule?status=MISSED`} className="block">
+            <StatCard
+              label="MISSED WASHES"
+              value={notDoneToday}
+              icon={<IconAlert width={20} height={20} strokeWidth={2} />}
+              tone={notDoneToday > 0 ? 'rose' : 'emerald'}
+              subtext={notDoneToday > 0 ? 'Not done today — click to see which' : 'All washes done today'}
+              subtextTone={notDoneToday > 0 ? 'danger' : 'muted'}
+            />
+          </Link>
+        ) : (
+          <Link href={`${base}/complaints`} className="block">
+            <StatCard
+              label="OPEN COMPLAINTS"
+              value={complaintsCount}
+              icon={<IconAlert width={20} height={20} strokeWidth={2} />}
+              tone={complaintsCount > 0 ? 'rose' : 'emerald'}
+              subtext={escalatedComplaintsCount > 0 ? `${escalatedComplaintsCount} escalated to owner` : 'All resolved/normal'}
+              subtextTone={escalatedComplaintsCount > 0 ? 'danger' : 'muted'}
+            />
+          </Link>
+        )}
       </StatGrid>
 
       {/* Middle Section: Operations Action Center & Staff Today */}
@@ -438,29 +475,116 @@ export function AreaDashboardClient({
                 </div>
               </Link>
 
-              {/* Alert 2: Open complaints */}
-              <Link href={`${base}/complaints`} className="block group">
-                <div className="flex items-center justify-between rounded-xl border border-line-soft border-l-4 border-l-blue-500 bg-white p-4 shadow-xs transition-all hover:bg-slate-50/70 hover:shadow-sm">
-                  <div className="flex items-center gap-3.5">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-                      <IconAlert width={20} height={20} strokeWidth={2.2} />
+              {isManager ? (
+                <>
+                  {/* Manager's job is wash completion and quality, not complaint
+                      handling — that moved to area admin and up. */}
+                  {notDoneToday > 0 ? (
+                    <Link href={`${base}/schedule?status=MISSED`} className="block group">
+                      <div className="flex items-center justify-between rounded-xl border border-line-soft border-l-4 border-l-rose-500 bg-white p-4 shadow-xs transition-all hover:bg-slate-50/70 hover:shadow-sm">
+                        <div className="flex items-center gap-3.5">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-600">
+                            <IconAlert width={20} height={20} strokeWidth={2.2} />
+                          </div>
+                          <div>
+                            <h3 className="text-sm font-semibold text-navy-950 group-hover:text-rose-600 transition-colors">
+                              {notDoneToday} wash{notDoneToday === 1 ? '' : 'es'} not done today
+                            </h3>
+                            <p className="mt-0.5 text-xs text-ink-mute">
+                              See which cars and which wash boy.
+                            </p>
+                          </div>
+                        </div>
+                        <IconChevronRight
+                          width={18}
+                          height={18}
+                          className="text-slate-400 group-hover:text-rose-600 transition-colors"
+                        />
+                      </div>
+                    </Link>
+                  ) : null}
+
+                  {lowRatedCount > 0 ? (
+                    <Link href={`${base}/team-alerts`} className="block group">
+                      <div className="flex items-center justify-between rounded-xl border border-line-soft border-l-4 border-l-amber-500 bg-white p-4 shadow-xs transition-all hover:bg-slate-50/70 hover:shadow-sm">
+                        <div className="flex items-center gap-3.5">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                            <IconStar width={20} height={20} strokeWidth={2.2} />
+                          </div>
+                          <div>
+                            <h3 className="text-sm font-semibold text-navy-950 group-hover:text-amber-600 transition-colors">
+                              {lowRatedCount} wash{lowRatedCount === 1 ? '' : 'es'} rated below 3★ this cycle
+                            </h3>
+                            <p className="mt-0.5 text-xs text-ink-mute">
+                              Talk to the wash boy behind these.
+                            </p>
+                          </div>
+                        </div>
+                        <IconChevronRight
+                          width={18}
+                          height={18}
+                          className="text-slate-400 group-hover:text-amber-600 transition-colors"
+                        />
+                      </div>
+                    </Link>
+                  ) : null}
+
+                  {uninformedLeavesCount > 0 ? (
+                    <Link href={`${base}/staff/leaves`} className="block group">
+                      <div className="flex items-center justify-between rounded-xl border border-line-soft border-l-4 border-l-purple-500 bg-white p-4 shadow-xs transition-all hover:bg-slate-50/70 hover:shadow-sm">
+                        <div className="flex items-center gap-3.5">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
+                            <IconUsers width={20} height={20} strokeWidth={2.2} />
+                          </div>
+                          <div>
+                            <h3 className="text-sm font-semibold text-navy-950 group-hover:text-purple-600 transition-colors">
+                              {uninformedLeavesCount} unwanted / uninformed leave{uninformedLeavesCount === 1 ? '' : 's'}
+                            </h3>
+                            <p className="mt-0.5 text-xs text-ink-mute">
+                              Staff who took leave without informing anyone first.
+                            </p>
+                          </div>
+                        </div>
+                        <IconChevronRight
+                          width={18}
+                          height={18}
+                          className="text-slate-400 group-hover:text-purple-600 transition-colors"
+                        />
+                      </div>
+                    </Link>
+                  ) : null}
+
+                  {notDoneToday === 0 && lowRatedCount === 0 && uninformedLeavesCount === 0 ? (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 text-xs font-semibold text-emerald-800">
+                      Every wash is on track — no quality or attendance issues right now.
                     </div>
-                    <div>
-                      <h3 className="text-sm font-semibold text-navy-950 group-hover:text-blue-600 transition-colors">
-                        {complaintsCount} open complaints
-                      </h3>
-                      <p className="mt-0.5 text-xs text-ink-mute">
-                        {escalatedComplaintsCount} escalated to the owner.
-                      </p>
+                  ) : null}
+                </>
+              ) : (
+                /* Alert 2: Open complaints (area admin and up) */
+                <Link href={`${base}/complaints`} className="block group">
+                  <div className="flex items-center justify-between rounded-xl border border-line-soft border-l-4 border-l-blue-500 bg-white p-4 shadow-xs transition-all hover:bg-slate-50/70 hover:shadow-sm">
+                    <div className="flex items-center gap-3.5">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                        <IconAlert width={20} height={20} strokeWidth={2.2} />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-semibold text-navy-950 group-hover:text-blue-600 transition-colors">
+                          {complaintsCount} open complaints
+                        </h3>
+                        <p className="mt-0.5 text-xs text-ink-mute">
+                          {escalatedComplaintsCount} escalated to the owner.
+                        </p>
+                      </div>
                     </div>
+                    <IconChevronRight
+                      width={18}
+                      height={18}
+                      className="text-slate-400 group-hover:text-blue-600 transition-colors"
+                    />
                   </div>
-                  <IconChevronRight
-                    width={18}
-                    height={18}
-                    className="text-slate-400 group-hover:text-blue-600 transition-colors"
-                  />
-                </div>
-              </Link>
+                </Link>
+              )}
             </div>
           </div>
         </div>
@@ -479,6 +603,7 @@ export function AreaDashboardClient({
           }
           data={staffToday}
           keyExtractor={(staff) => staff.id}
+          rowHref={(staff) => `${base}/schedule?staff=${staff.id}`}
           pageSize={staffPerPage}
           page={staffPage}
           onPageChange={setStaffPage}

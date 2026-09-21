@@ -48,6 +48,17 @@ export function operationsNav(
           icon: <IconCalendar width={18} height={18} />,
           badge: counts.unassigned,
         },
+        // A manager's version of Complaints — quality and attendance
+        // issues, no money and no customer complaint handling.
+        ...(opts.hideComplaints
+          ? [
+              {
+                href: `${base}/team-alerts`,
+                label: 'Team Alerts',
+                icon: <IconAlert width={18} height={18} />,
+              },
+            ]
+          : []),
       ],
     },
     {
