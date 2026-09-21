@@ -55,6 +55,7 @@ export const DATE_FIELDS = {
   payoutSettings: NO_DATE_FIELDS,
   siteContent: f([], ['updatedAt']),
   enquiry: f([], ['createdAt', 'handledAt']),
+  staffReferral: f([], ['createdAt', 'areaApprovedAt', 'superApprovedAt', 'rejectedAt']),
 } as const satisfies Record<string, DateFields>;
 
 export type PrismaModelName = keyof typeof DATE_FIELDS;

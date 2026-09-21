@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import {
   BarChart,
   Note,
@@ -263,9 +264,16 @@ export default async function StaffEarnings() {
           />
           <div className="mt-4">
             <Note tone="brand">
-              Tell your area manager who you referred when they join — the reward is added to that month’s salary payout automatically.
+              Submit their name and phone in Refer &amp; Earn — once your area admin and the owner both approve it, the reward is added automatically the month they join.
             </Note>
           </div>
+          <Link
+            href="/staff/refer"
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-purple-200 bg-purple-50/80 py-2.5 text-xs font-bold text-purple-700 hover:bg-purple-100 transition-colors"
+          >
+            <IconGift width={14} height={14} />
+            <span>Submit a Referral</span>
+          </Link>
         </div>
       </div>
     </div>

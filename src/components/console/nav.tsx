@@ -6,6 +6,7 @@ import {
   IconChart,
   IconChat,
   IconCog,
+  IconGift,
   IconGrid,
   IconMap,
   IconRupee,
@@ -22,6 +23,7 @@ export interface NavCounts {
   pendingLeaves?: number;
   lowStock?: number;
   pendingPurchases?: number;
+  pendingReferrals?: number;
 }
 
 /** Manager and Area Admin run the same screens; only the base path differs. */
@@ -99,6 +101,12 @@ export function regionNav(counts: NavCounts): NavGroup[] {
         { href: '/area/areas', label: 'Areas', icon: <IconMap width={18} height={18} /> },
         { href: '/area/managers', label: 'Managers', icon: <IconUsers width={18} height={18} /> },
         { href: '/area/reports', label: 'Reports', icon: <IconChart width={18} height={18} /> },
+        {
+          href: '/area/referrals',
+          label: 'Referrals',
+          icon: <IconGift width={18} height={18} />,
+          badge: counts.pendingReferrals,
+        },
       ],
     },
   ];
@@ -122,6 +130,12 @@ export function adminNav(counts: NavCounts): NavGroup[] {
           badge: counts.newEnquiries,
         },
         { href: '/admin/sources', label: 'Lead Sources', icon: <IconChart width={18} height={18} /> },
+        {
+          href: '/admin/referrals',
+          label: 'Referrals',
+          icon: <IconGift width={18} height={18} />,
+          badge: counts.pendingReferrals,
+        },
         { href: '/admin/reports', label: 'Reports', icon: <IconChart width={18} height={18} /> },
       ],
     },

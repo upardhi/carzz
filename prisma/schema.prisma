@@ -86,6 +86,18 @@ enum EnquiryStatus {
   LOST
 }
 
+enum ReferralType {
+  CUSTOMER
+  STAFF
+}
+
+enum ReferralStatus {
+  PENDING
+  AREA_APPROVED
+  APPROVED
+  REJECTED
+}
+
 enum CustomerStatus {
   ACTIVE
   HOLD
@@ -307,6 +319,7 @@ model Staff {
   payouts     StaffPayout[]
   complaints  Complaint[]
   stockIssues StockIssue[]
+  referrals   StaffReferral[]
 
   @@index([areaId, role])
   @@index([active])
@@ -363,6 +376,42 @@ model StaffLeave {
 
   @@index([staffId, status])
   @@index([startDate, endDate])
+}
+
+/**
+ * A wash boy naming a prospective customer or hire before either account
+ * exists. Needs sign-off from BOTH the area admin and the super admin —
+ * either one alone leaves it at AREA_APPROVED — because the eventual bonus
+ * is real money and a wash boy cannot self-certify a referral. The bonus
+ * itself is never paid from this row: once APPROVED, whoever onboards the
+ * person picks this staff member as `referredById` on the real Customer or
+ * Staff record, and payroll.ts already pays the bonus automatically from
+ * that field for whoever joins within the cycle.
+ */
+model StaffReferral {
+  id                    String         @id @default(cuid())
+  referredByStaffId     String
+  areaId                String
+  type                  ReferralType
+  name                  String
+  phone                 String
+  note                  String?
+  status                ReferralStatus @default(PENDING)
+  areaApprovedByUserId  String?
+  areaApprovedAt        DateTime?
+  superApprovedByUserId String?
+  superApprovedAt       DateTime?
+  rejectedByUserId      String?
+  rejectedAt            DateTime?
+  rejectionReason       String?
+  convertedCustomerId   String?
+  convertedStaffId      String?
+  createdAt             DateTime       @default(now())
+
+  staff Staff @relation(fields: [referredByStaffId], references: [id], onDelete: Cascade)
+
+  @@index([areaId, status])
+  @@index([referredByStaffId])
 }
 
 

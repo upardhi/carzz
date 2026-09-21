@@ -21,6 +21,7 @@ import type {
   Staff,
   StaffLeave,
   StaffPayout,
+  StaffReferral,
   StockIssue,
   StockLevel,
   User,
@@ -58,6 +59,7 @@ export interface Db {
   payoutSettings: PayoutSettings;
   siteContent: SiteContent;
   enquiries: Enquiry[];
+  staffReferrals: StaffReferral[];
 }
 
 /** The website copy a new install starts with — real sentences, not lorem. */
@@ -802,6 +804,7 @@ export function buildSeed(today = new Date()): Db {
     appSettings, payoutSettings,
     siteContent: { ...DEFAULT_SITE_CONTENT, updatedAt: now },
     enquiries,
+    staffReferrals: [] as StaffReferral[],
   };
 }
 

@@ -22,6 +22,7 @@ import type {
   Staff,
   StaffLeave,
   StaffPayout,
+  StaffReferral,
   StockIssue,
   StockLevel,
   User,
@@ -59,6 +60,7 @@ export interface DataStore {
   readonly stockIssues: Repository<StockIssue>;
   readonly notifications: Repository<Notification>;
   readonly enquiries: Repository<Enquiry>;
+  readonly staffReferrals: Repository<StaffReferral>;
 
 
   /** Credentials are kept apart so a password hash never rides on a `User`. */

@@ -194,6 +194,39 @@ export interface StaffLeave {
   note: string | null;
 }
 
+export const REFERRAL_TYPES = ['CUSTOMER', 'STAFF'] as const;
+export type ReferralType = (typeof REFERRAL_TYPES)[number];
+
+export const REFERRAL_STATUSES = [
+  'PENDING',
+  'AREA_APPROVED',
+  'APPROVED',
+  'REJECTED',
+] as const;
+export type ReferralStatus = (typeof REFERRAL_STATUSES)[number];
+
+/** A wash boy naming a prospective customer or hire, pending dual sign-off. */
+export interface StaffReferral {
+  id: Id;
+  referredByStaffId: Id;
+  areaId: Id;
+  type: ReferralType;
+  name: string;
+  phone: string;
+  note: string | null;
+  status: ReferralStatus;
+  areaApprovedByUserId: Id | null;
+  areaApprovedAt: Timestamp | null;
+  superApprovedByUserId: Id | null;
+  superApprovedAt: Timestamp | null;
+  rejectedByUserId: Id | null;
+  rejectedAt: Timestamp | null;
+  rejectionReason: string | null;
+  convertedCustomerId: Id | null;
+  convertedStaffId: Id | null;
+  createdAt: Timestamp;
+}
+
 
 /* -------------------------------------------------------------------------- */
 /* Customers, cars, packages                                                  */

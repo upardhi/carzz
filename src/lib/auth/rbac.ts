@@ -84,6 +84,9 @@ export const PERMISSIONS = [
   // Enquiries & Leads
   'enquiry:view',
   'enquiry:manage',
+  // Referrals — a wash boy naming a lead; area admin + super admin both sign off
+  'referral:submit',
+  'referral:manage',
   // Inventory
   'inventory:view',
   'inventory:issue',
@@ -117,6 +120,7 @@ const EMPLOYEE_PERMISSIONS: Permission[] = [
   'pocket:request',
   'leave:request',
   'leave:view',
+  'referral:submit',
 ];
 
 const MANAGER_PERMISSIONS: Permission[] = [
@@ -155,6 +159,10 @@ const AREA_ADMIN_PERMISSIONS: Permission[] = [
   'user:manage',
   'expense:manage',
   'accounting:view',
+  // Deliberately not on MANAGER_PERMISSIONS — dual sign-off is area admin +
+  // super admin only, a manager approving their own team's referral would
+  // defeat the point of a second check.
+  'referral:manage',
 ];
 
 const ALL_PERMISSIONS: Permission[] = [...PERMISSIONS];

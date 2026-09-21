@@ -23,6 +23,7 @@ import type {
   Staff,
   StaffLeave,
   StaffPayout,
+  StaffReferral,
   StockIssue,
   StockLevel,
   User,
@@ -66,6 +67,7 @@ export interface PrismaClientLike {
   stockIssue: PrismaDelegate;
   notification: PrismaDelegate;
   enquiry: PrismaDelegate;
+  staffReferral: PrismaDelegate;
   userCredential: {
     findUnique(args: { where: { userId: string } }): Promise<unknown>;
     upsert(args: {
@@ -112,6 +114,7 @@ export class PrismaStore implements DataStore {
   readonly stockIssues;
   readonly notifications;
   readonly enquiries;
+  readonly staffReferrals;
 
   private readonly fallbackStore: MemoryStore;
 
@@ -144,6 +147,7 @@ export class PrismaStore implements DataStore {
     this.stockIssues = new PrismaRepository<StockIssue>(prisma.stockIssue, DATE_FIELDS.stockIssue, this.fallbackStore.stockIssues);
     this.notifications = new PrismaRepository<Notification>(prisma.notification, DATE_FIELDS.notification, this.fallbackStore.notifications);
     this.enquiries = new PrismaRepository<Enquiry>(prisma.enquiry, DATE_FIELDS.enquiry, this.fallbackStore.enquiries);
+    this.staffReferrals = new PrismaRepository<StaffReferral>(prisma.staffReferral, DATE_FIELDS.staffReferral, this.fallbackStore.staffReferrals);
   }
 
   async getCredential(userId: Id): Promise<UserCredential | null> {

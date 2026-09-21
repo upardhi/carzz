@@ -9,6 +9,7 @@ import {
   IconBell,
   IconCalendar,
   IconChevron,
+  IconGift,
   IconLogout,
   IconRupee,
   IconSearch,
@@ -49,6 +50,7 @@ const DESKTOP_STAFF_NAV: NavSection[] = [
     items: [
       { href: '/staff/earnings', label: 'My Earnings', icon: <IconRupee width={18} height={18} /> },
       { href: '/staff/pocket', label: 'Pocket Money', icon: <IconWallet width={18} height={18} /> },
+      { href: '/staff/refer', label: 'Refer & Earn', icon: <IconGift width={18} height={18} /> },
     ],
   },
   {

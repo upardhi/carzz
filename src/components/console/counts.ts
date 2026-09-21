@@ -54,7 +54,7 @@ async function _computeNavCounts(areaIds: string[] | null): Promise<NavCounts> {
     ? Promise.resolve(areaIds)
     : store.areas.find().then((areas) => areas.map((a) => a.id));
 
-  const [unassigned, alerts, complaints, newEnquiries, purchases, staff, resolvedAreaIds] =
+  const [unassigned, alerts, complaints, newEnquiries, purchases, referrals, staff, resolvedAreaIds] =
     await Promise.all([
       store.visits.count({
         scheduledDate: todayISO(),
@@ -73,6 +73,10 @@ async function _computeNavCounts(areaIds: string[] | null): Promise<NavCounts> {
       } as never),
       store.purchaseRequests.count({
         status: 'PENDING',
+        ...areaFilter,
+      } as never),
+      store.staffReferrals.count({
+        status: { in: ['PENDING', 'AREA_APPROVED'] },
         ...areaFilter,
       } as never),
       areaIds
@@ -113,6 +117,7 @@ async function _computeNavCounts(areaIds: string[] | null): Promise<NavCounts> {
     pendingLeaves,
     lowStock,
     pendingPurchases: purchases,
+    pendingReferrals: referrals,
   };
 }
 
