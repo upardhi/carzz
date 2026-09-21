@@ -1,9 +1,7 @@
-'use client';
-
 import clsx from 'clsx';
-import { useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { TablePagination, EmptyTableRow } from './TableCard';
+import { WidgetTableRow } from './WidgetTableRow';
 
 export interface WidgetTableColumn<T> {
   id: string;
@@ -31,7 +29,7 @@ export interface WidgetTableProps<T> {
 }
 
 /**
- * Reusable Widget Table (Card Table) matching Image 1.
+ * Reusable Widget Table (Card Table).
  * Used for dashboard widgets, summary tables, and compact card listings.
  */
 export function WidgetTable<T>({
@@ -47,7 +45,6 @@ export function WidgetTable<T>({
   className,
   rowHref,
 }: WidgetTableProps<T>) {
-  const router = useRouter();
   const isControlled = page !== undefined && onPageChange !== undefined;
   const currentPage = page ?? 1;
   const totalItems = data.length;
@@ -99,27 +96,23 @@ export function WidgetTable<T>({
               {displayedData.map((item, rowIdx) => {
                 const href = rowHref?.(item);
                 return (
-                <tr
-                  key={keyExtractor(item, startIndex + rowIdx)}
-                  onClick={href ? () => router.push(href) : undefined}
-                  className={clsx(
-                    'transition-colors hover:bg-slate-50/60',
-                    href && 'cursor-pointer',
-                  )}
-                >
-                  {columns.map((col) => (
-                    <td
-                      key={col.id}
-                      className={clsx(
-                        'py-3 pr-4 text-slate-600 whitespace-nowrap',
-                        alignClass(col.align),
-                        col.className,
-                      )}
-                    >
-                      {col.render(item, startIndex + rowIdx)}
-                    </td>
-                  ))}
-                </tr>
+                  <WidgetTableRow
+                    key={keyExtractor(item, startIndex + rowIdx)}
+                    href={href}
+                  >
+                    {columns.map((col) => (
+                      <td
+                        key={col.id}
+                        className={clsx(
+                          'py-3 pr-4 text-slate-600 whitespace-nowrap',
+                          alignClass(col.align),
+                          col.className,
+                        )}
+                      >
+                        {col.render(item, startIndex + rowIdx)}
+                      </td>
+                    ))}
+                  </WidgetTableRow>
                 );
               })}
               {totalItems === 0 ? (
