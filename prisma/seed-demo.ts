@@ -141,7 +141,12 @@ export async function seedDemoData(prisma: PrismaClient): Promise<void> {
   );
 
   await insertMany('cars', db.cars, (batch) =>
-    prisma.car.createMany({ data: batch }),
+    prisma.car.createMany({
+      data: batch.map((c) => ({
+        ...c,
+        dayServices: c.dayServices ? json(c.dayServices) : undefined,
+      })),
+    }),
   );
 
   await insertMany('wash visits', db.visits, (batch) =>

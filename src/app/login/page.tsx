@@ -1,9 +1,7 @@
-import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { BrandLockup } from '@/components/shell/Brand';
 import { homeFor } from '@/lib/auth/rbac';
 import { getSession } from '@/lib/auth/server';
-import { SESSION_COOKIE } from '@/lib/auth/session';
 import { LoginForm } from './LoginForm';
 
 export const metadata = { title: 'Sign in' };
@@ -13,18 +11,19 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<{ next?: string }>;
 }) {
-  const { next } = await searchParams;
+  const { next: rawNext } = await searchParams;
+  const isSafeNext = Boolean(
+    rawNext &&
+      rawNext.startsWith('/') &&
+      !rawNext.startsWith('//') &&
+      !rawNext.startsWith('/login') &&
+      !rawNext.startsWith('/api/'),
+  );
+  const safeNext = isSafeNext ? rawNext : undefined;
+
   const session = await getSession();
-  if (session && !next) {
-    redirect(homeFor(session.user.role));
-  }
-  if (!session) {
-    try {
-      const jar = await cookies();
-      jar.delete(SESSION_COOKIE);
-    } catch {
-      /* ignore */
-    }
+  if (session) {
+    redirect(safeNext || homeFor(session.user.role));
   }
 
   return (
@@ -92,7 +91,7 @@ export default async function LoginPage({
             </p>
 
             <div className="[&_.field-label]:text-navy-300 lg:[&_.field-label]:text-ink-soft">
-              <LoginForm next={next} />
+              <LoginForm next={safeNext} />
             </div>
           </div>
         </div>

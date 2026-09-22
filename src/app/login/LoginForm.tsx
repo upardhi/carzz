@@ -39,7 +39,14 @@ export function LoginForm({ next }: { next?: string }) {
         setError(data.error ?? 'Could not sign you in.');
         return;
       }
-      window.location.href = next || data.redirect || '/';
+
+      const isSafe =
+        Boolean(next &&
+        next.startsWith('/') &&
+        !next.startsWith('//') &&
+        !next.startsWith('/login') &&
+        !next.startsWith('/api/'));
+      window.location.href = (isSafe ? next : undefined) || data.redirect || '/';
     } catch {
       setError('No connection. Check your network and try again.');
     } finally {

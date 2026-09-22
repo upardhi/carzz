@@ -12,27 +12,37 @@ import { SESSION_COOKIE, verifySession } from './lib/auth/session';
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const requiredRoles = rolesForPath(pathname);
-  const claims = await verifySession(request.cookies.get(SESSION_COOKIE)?.value);
+  const rawCookie = request.cookies.get(SESSION_COOKIE)?.value;
+  const claims = await verifySession(rawCookie);
 
-  // The marketing site at `/` is public and stays public even when signed in —
-  // an existing customer following a link to it should see the site, not be
-  // bounced into their console.
-  if (pathname === '/') return NextResponse.next();
-
-  if (pathname === '/login') {
-    if (claims) {
-      const next = request.nextUrl.searchParams.get('next');
-      return NextResponse.redirect(new URL(next || homeFor(claims.role), request.url));
-    }
-    return NextResponse.next();
+  // If a session cookie is present but malformed or unverified, purge it on
+  // public routes so the browser does not send it continuously.
+  if (rawCookie && !claims && (pathname === '/' || pathname === '/login')) {
+    const res = NextResponse.next();
+    res.cookies.delete(SESSION_COOKIE);
+    return res;
   }
+
+  // The marketing site at `/` and the `/login` screen are public.
+  // We deliberately do NOT redirect away from `/login` in middleware:
+  // middleware cannot verify whether the user account is active in the database.
+  // Stale session claims in cookies would cause infinite ping-pong redirect loops
+  // between middleware and requireSession(). LoginPage server component handles
+  // genuine session redirection safely.
+  if (pathname === '/' || pathname === '/login') return NextResponse.next();
 
   if (!requiredRoles) return NextResponse.next();
 
   if (!claims) {
     const url = new URL('/login', request.url);
-    url.searchParams.set('next', pathname);
-    return NextResponse.redirect(url);
+    if (pathname && pathname !== '/login' && !pathname.startsWith('/login')) {
+      url.searchParams.set('next', pathname);
+    }
+    const res = NextResponse.redirect(url);
+    if (rawCookie) {
+      res.cookies.delete(SESSION_COOKIE);
+    }
+    return res;
   }
 
   if (!requiredRoles.includes(claims.role)) {

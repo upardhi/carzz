@@ -83,11 +83,13 @@ export const getSession = cache(async (): Promise<Session | null> => {
 export async function requireSession(): Promise<Session> {
   const session = await getSession();
   if (!session) {
-    try {
-      const jar = await cookies();
-      jar.delete(SESSION_COOKIE);
-    } catch {
-      /* cookies already committed */
+    const jar = await cookies();
+    if (jar.get(SESSION_COOKIE)?.value) {
+      // In Next.js App Router, modifying cookies in a Server Component render
+      // throws an error. If a stale or invalid session cookie is present,
+      // route through /api/auth/logout so the Route Handler can properly emit
+      // the Set-Cookie deletion header before landing on /login.
+      redirect('/api/auth/logout');
     }
     redirect('/login');
   }
