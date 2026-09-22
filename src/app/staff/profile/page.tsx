@@ -8,10 +8,8 @@ import { requirePermission } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import {
   currentCycle,
-  formatClock,
   formatDateFull,
   percent,
-  todayISO,
 } from '@/lib/util/format';
 
 export const metadata = { title: 'Staff Profile' };
@@ -23,10 +21,9 @@ export default async function StaffProfile() {
   const cycle = currentCycle();
   const firstName = session.user.name.split(' ')[0] || 'Staff';
 
-  const [staff, visits, todayAttendance] = await Promise.all([
+  const [staff, visits] = await Promise.all([
     store.staff.get(staffId),
     store.visits.find({ where: { staffId, cycle } }),
-    store.attendance.findOne({ where: { staffId, date: todayISO() } }),
   ]);
 
   const [area, manager] = await Promise.all([
@@ -112,13 +109,9 @@ export default async function StaffProfile() {
           <Row label="Assigned Area" value={area?.name ?? '—'} />
           <Row label="Reporting Manager" value={manager?.name ?? '—'} />
           <Row
-            label="Daily Attendance"
-            value={
-              todayAttendance?.loginAt
-                ? `Clocked in at ${formatClock(todayAttendance.loginAt)}`
-                : 'Pending daily attendance'
-            }
-            tone={todayAttendance?.loginAt ? 'success' : 'gold'}
+            label="Status"
+            value="Active / On Duty"
+            tone="success"
           />
         </div>
       </div>
