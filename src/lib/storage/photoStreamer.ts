@@ -1,15 +1,12 @@
 import { NextResponse } from 'next/server';
+import { get } from '@vercel/blob';
 import type { Session } from '@/lib/auth/server';
 
 /**
- * Serves a private Vercel Blob photo through an authenticated proxy.
+ * Serves a private Vercel Blob photo or document through an authenticated proxy.
  *
- * The only mechanism: fetch the blob URL server-side using the
- * BLOB_READ_WRITE_TOKEN as a Bearer credential, then stream the bytes back.
- * No SDK fallbacks, no URL cache, no DB lookup — just one fetch.
- *
- * The caller must supply a valid `session` — these are pictures of a
- * customer's vehicle outside their home and must never be served without auth.
+ * Uses the official @vercel/blob SDK get() with private access and Bearer auth fallback,
+ * streaming the content with Content-Disposition: inline and strict private cache headers.
  */
 export async function servePhoto(
   url: string,
@@ -41,8 +38,44 @@ export async function servePhoto(
 
   const token =
     process.env.BLOB_READ_WRITE_TOKEN ||
-    process.env.PRIVATE_BLOB_READ_WRITE_TOKEN;
+    process.env.PRIVATE_BLOB_READ_WRITE_TOKEN ||
+    process.env.VERCEL_BLOB_READ_WRITE_TOKEN;
 
+  try {
+    // Try official @vercel/blob get()
+    const blob = await get(decoded, {
+      access: 'private',
+      token: token || undefined,
+    });
+
+    if (blob && blob.body && blob.statusCode === 200) {
+      const ext = decoded.split('?')[0].split('.').pop()?.toLowerCase();
+      const fallbackContentType =
+        ext === 'png'
+          ? 'image/png'
+          : ext === 'webp'
+          ? 'image/webp'
+          : ext === 'pdf'
+          ? 'application/pdf'
+          : 'image/jpeg';
+
+      const contentType = blob.contentType || fallbackContentType;
+
+      return new NextResponse(blob.body as unknown as BodyInit, {
+        status: 200,
+        headers: {
+          'Content-Type': contentType,
+          'Content-Disposition': 'inline',
+          'Cache-Control': 'private, no-cache, no-store, must-revalidate',
+          ...corsHeaders(),
+        },
+      });
+    }
+  } catch (sdkErr) {
+    console.warn('[photoServe] SDK get() attempt failed, trying direct fetch:', sdkErr);
+  }
+
+  // Fallback to direct Bearer fetch
   try {
     const res = await fetch(decoded, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
