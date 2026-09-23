@@ -59,13 +59,13 @@ export function WeeklyScheduleEditor({
         </div>
 
         {pkg && (
-          <div className="inline-flex items-center gap-1.5 self-start sm:self-auto rounded-full bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 border border-blue-200/60 shadow-2xs">
-            <svg className="h-3.5 w-3.5 shrink-0 text-blue-600 animate-spin-reverse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <div className="inline-flex items-center gap-2 self-start sm:self-auto rounded-xl sm:rounded-full bg-blue-50/90 px-3.5 py-1.5 text-xs font-medium text-blue-700 border border-blue-200/80 shadow-2xs shrink-0">
+            <svg className="h-3.5 w-3.5 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-            <span>
+            <span className="leading-snug">
               {isExactWeekly
-                ? `This package is billed ${pkg.washesPerPeriod} washes/week — pick ${pkg.washesPerPeriod} day${maxDays === 1 ? '' : 's'}.`
+                ? `This package is billed ${pkg.washesPerPeriod || 1} wash${(pkg.washesPerPeriod || 1) === 1 ? '' : 'es'}/week — pick ${maxDays} day${maxDays === 1 ? '' : 's'}.`
                 : `This package (${pkg.washesPerMonth}/month) allows up to ${maxDays} day${maxDays === 1 ? '' : 's'} per week.`}
             </span>
           </div>
