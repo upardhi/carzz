@@ -43,12 +43,12 @@ export async function servePhoto(
 
   try {
     // Try official @vercel/blob get()
-    const blob = await get(decoded, {
+    const result = await get(decoded, {
       access: 'private',
       token: token || undefined,
     });
 
-    if (blob && blob.body && blob.statusCode === 200) {
+    if (result && result.statusCode === 200 && 'stream' in result && result.stream) {
       const ext = decoded.split('?')[0].split('.').pop()?.toLowerCase();
       const fallbackContentType =
         ext === 'png'
@@ -59,9 +59,9 @@ export async function servePhoto(
           ? 'application/pdf'
           : 'image/jpeg';
 
-      const contentType = blob.contentType || fallbackContentType;
+      const contentType = result.blob?.contentType || fallbackContentType;
 
-      return new NextResponse(blob.body as unknown as BodyInit, {
+      return new NextResponse(result.stream as unknown as BodyInit, {
         status: 200,
         headers: {
           'Content-Type': contentType,
