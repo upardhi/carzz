@@ -117,6 +117,8 @@ export async function servePhoto(target: string, session: Session | null | undef
     const isPrivate = decoded.includes('.private.blob.vercel-storage.com');
 
     // 1a. Try @vercel/blob get method
+    // Note: @vercel/blob v2 get() returns { statusCode, stream } — there is no .blob property.
+    // Accessing blobResult.blob.contentType would throw a TypeError and silently skip the stream.
     try {
       const blobResult = await vercelBlobGet(decoded, {
         access: isPrivate ? 'private' : 'public',
@@ -124,11 +126,15 @@ export async function servePhoto(target: string, session: Session | null | undef
       });
 
       if (blobResult?.statusCode === 200 && blobResult.stream) {
-        const arrayBuf = await new Response(blobResult.stream as BodyInit).arrayBuffer();
+        const response = new Response(blobResult.stream as BodyInit);
+        const arrayBuf = await response.arrayBuffer();
+        // The SDK v2 get() does not expose contentType on the result object;
+        // read it from the stream response headers or fall back to jpeg.
+        const contentType = response.headers.get('content-type') || 'image/jpeg';
         return new NextResponse(Buffer.from(arrayBuf), {
           status: 200,
           headers: {
-            'Content-Type': blobResult.blob.contentType || 'image/jpeg',
+            'Content-Type': contentType,
             'Cache-Control': 'private, no-store',
             ...corsHeaders(),
           },
