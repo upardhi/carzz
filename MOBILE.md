@@ -4,6 +4,7 @@ Carz is a PWA first. That is a deliberate choice, not a shortcut.
 
 ## The PWA is the app
 
+
 Opening the site on a phone and tapping **Install** (Android/Chrome) or
 **Share → Add to Home Screen** (iOS/Safari) gives a real app icon, a
 full-screen app with no browser chrome, and offline support. The in-app
