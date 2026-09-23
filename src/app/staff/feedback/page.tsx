@@ -3,6 +3,7 @@ import { requirePermission } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { resolvePublicPhotoUrl } from '@/lib/util/photoUrl';
 import { formatClock, formatDateFull } from '@/lib/util/format';
+import { washDurationMinutes, formatDurationMinutes } from '@/lib/util/washTiming';
 
 export const metadata = { title: 'My Feedback' };
 
@@ -22,12 +23,15 @@ export default async function StaffFeedback() {
 
   // Never show who left the feedback — a wash boy identifying the customer
   // behind a low rating is exactly the conflict this list exists to avoid.
-  const feedback = recentVisits
-    .filter((v) => v.rating !== null || v.managerRating !== null)
-    .map((v) => ({
+  const feedback = recentVisits.map((v) => {
+    const duration = washDurationMinutes(v);
+    return {
       id: v.id,
       dateLabel: formatDateFull(v.completedAt || v.scheduledDate),
       timeLabel: v.completedAt ? formatClock(v.completedAt) : v.scheduledTime,
+      startedAtLabel: v.startedAt ? formatClock(v.startedAt) : null,
+      completedAtLabel: v.completedAt ? formatClock(v.completedAt) : null,
+      durationLabel: duration !== null ? formatDurationMinutes(duration) : null,
       servicesDone: v.servicesDone || [],
       beforePhotoUrl: resolvePublicPhotoUrl(v.beforePhotoUrl),
       afterPhotoUrl: resolvePublicPhotoUrl(v.afterPhotoUrl),
@@ -35,7 +39,9 @@ export default async function StaffFeedback() {
       comment: v.ratingComment,
       managerRating: v.managerRating,
       managerComment: v.managerRatingComment,
-    }));
+      onTime: v.onTime,
+    };
+  });
 
   const customerRated = feedback.filter((f) => f.rating !== null);
   const avgRating = customerRated.length
@@ -114,10 +120,31 @@ export default async function StaffFeedback() {
                 key={f.id}
                 className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-3.5 text-xs"
               >
-                <div className="mb-2 flex items-center gap-2">
-                  <span className="font-bold text-slate-900">{f.dateLabel}</span>
-                  <span className="text-slate-400">·</span>
-                  <span className="text-slate-500 font-medium">{f.timeLabel}</span>
+                <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/60 pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-900">{f.dateLabel}</span>
+                    <span className="text-slate-400">·</span>
+                    <span className="text-slate-600 font-medium">Done at {f.completedAtLabel || f.timeLabel}</span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
+                    {f.startedAtLabel && f.completedAtLabel ? (
+                      <span className="inline-flex items-center gap-1 rounded-md bg-white border border-slate-200/80 px-2 py-0.5 text-slate-700 shadow-2xs">
+                        <span>⏱</span> {f.startedAtLabel} → {f.completedAtLabel}
+                        {f.durationLabel ? <span className="font-bold text-slate-900">({f.durationLabel})</span> : null}
+                      </span>
+                    ) : f.durationLabel ? (
+                      <span className="inline-flex items-center gap-1 rounded-md bg-white border border-slate-200/80 px-2 py-0.5 text-slate-700 shadow-2xs">
+                        <span>⏱</span> Took <span className="font-bold text-slate-900">{f.durationLabel}</span>
+                      </span>
+                    ) : null}
+
+                    {f.onTime ? (
+                      <span className="rounded-md bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">
+                        ✓ On-time
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
 
                 {f.servicesDone.length > 0 ? (
@@ -178,7 +205,11 @@ export default async function StaffFeedback() {
                     <span className="font-bold mr-1.5">{'★'.repeat(f.rating)}</span>
                     {f.comment ? <span>&ldquo;{f.comment}&rdquo;</span> : null}
                   </div>
-                ) : null}
+                ) : (
+                  <div className="text-[11px] px-2 py-1.5 rounded-lg border border-dashed border-slate-200 bg-white/60 text-slate-400 font-medium">
+                    No customer rating left yet
+                  </div>
+                )}
 
                 {f.managerRating !== null ? (
                   <div className="mt-1.5 text-[11.5px] text-slate-600 bg-blue-50 p-2 rounded-lg border border-blue-200/60">
