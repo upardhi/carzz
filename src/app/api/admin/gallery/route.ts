@@ -1,8 +1,8 @@
 import { revalidatePath } from 'next/cache';
 import { NextResponse } from 'next/server';
+import { put } from '@vercel/blob';
 import { HttpError, requireApiSession } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
-import { uploadMedia } from '@/lib/storage';
 
 const MAX_BYTES = 8 * 1024 * 1024;
 const ALLOWED = ['image/jpeg', 'image/png', 'image/webp'];
@@ -40,18 +40,22 @@ export async function POST(request: Request) {
     const store = await getStore();
     const id = `gal_${Date.now().toString(36)}`;
 
-    const beforeStored = await uploadMedia(before, {
-      key: `public-${id}-before`,
-      folder: 'gallery',
-      contentType: before.type || 'image/jpeg',
+    const token =
+      process.env.BLOB_READ_WRITE_TOKEN ||
+      process.env.PRIVATE_BLOB_READ_WRITE_TOKEN;
+
+    const beforeStored = await put(`gallery/public-${id}-before`, await before.arrayBuffer(), {
       access: 'public',
+      contentType: before.type || 'image/jpeg',
+      token,
+      addRandomSuffix: false,
     });
 
-    const afterStored = await uploadMedia(after, {
-      key: `public-${id}-after`,
-      folder: 'gallery',
-      contentType: after.type || 'image/jpeg',
+    const afterStored = await put(`gallery/public-${id}-after`, await after.arrayBuffer(), {
       access: 'public',
+      contentType: after.type || 'image/jpeg',
+      token,
+      addRandomSuffix: false,
     });
 
     const content = await store.getSiteContent();

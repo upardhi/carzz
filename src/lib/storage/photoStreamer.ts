@@ -1,41 +1,20 @@
 import { NextResponse } from 'next/server';
-import { get as vercelBlobGet, head as vercelBlobHead } from '@vercel/blob';
-import { getPhotoStorage } from '@/lib/storage';
-import { getStore } from '@/lib/data';
 import type { Session } from '@/lib/auth/server';
 
-/** Only these hosts may ever be fetched server-side, closing off `?url=` as an SSRF proxy. */
-const ALLOWED_PHOTO_HOSTS = [
-  '.blob.vercel-storage.com',
-  '.firebasestorage.googleapis.com',
-  '.s3.amazonaws.com',
-];
-
-function isAllowedPhotoUrl(url: string): boolean {
-  try {
-    const { hostname, protocol } = new URL(url);
-    if (protocol !== 'https:') return false;
-    return ALLOWED_PHOTO_HOSTS.some((suffix) => hostname.endsWith(suffix));
-  } catch {
-    return false;
-  }
-}
-
 /**
- * A wash photo's storage key is always `${visitId}-before` / `${visitId}-after`
- * (see `photoKey`). Every visit belongs to exactly one customer and area, so
- * this is enough to check the caller is allowed to see it — without this, any
- * signed-in account could page through visit ids and view another customer's
- * car photos.
+ * Serves a private Vercel Blob photo through an authenticated proxy.
+ *
+ * The only mechanism: fetch the blob URL server-side using the
+ * BLOB_READ_WRITE_TOKEN as a Bearer credential, then stream the bytes back.
+ * No SDK fallbacks, no URL cache, no DB lookup — just one fetch.
+ *
+ * The caller must supply a valid `session` — these are pictures of a
+ * customer's vehicle outside their home and must never be served without auth.
  */
-async function assertCanViewVisitPhoto(
+export async function servePhoto(
+  url: string,
   session: Session | null | undefined,
-  cleanKey: string,
-): Promise<NextResponse | null> {
-  const isBefore = cleanKey.endsWith('-before');
-  const isAfter = cleanKey.endsWith('-after');
-  if (!isBefore && !isAfter) return null;
-
+): Promise<NextResponse> {
   if (!session) {
     return NextResponse.json(
       { error: 'Please sign in to view photos.' },
@@ -43,62 +22,17 @@ async function assertCanViewVisitPhoto(
     );
   }
 
-  const visitId = cleanKey.replace(/-(before|after)$/, '');
-  const store = await getStore();
-  const visit = await store.visits.get(visitId);
-  if (!visit) return null; // let the normal "not found" path handle it
-
-  const { scope, user } = session;
-  const allowed =
-    scope.areaIds === null ||
-    scope.areaIds.includes(visit.areaId) ||
-    (user.role === 'CUSTOMER' && user.customerId === visit.customerId);
-
-  if (!allowed) {
+  if (!url) {
     return NextResponse.json(
-      { error: 'You do not have access to this photo.' },
-      { status: 403, headers: corsHeaders() },
-    );
-  }
-  return null;
-}
-
-/**
- * Universal photo streaming handler.
- * Fetches and streams photos from private or public cloud storage (Vercel Blob,
- * S3, Firebase, Memory) directly to client apps with CORS and caching enabled.
- *
- * `session` is required for every call: these are pictures of a customer's
- * vehicle outside their home, so the caller must already be signed in and
- * scoped to that visit — see `assertCanViewVisitPhoto`. There is no
- * caller-supplied-token path: a request is authenticated by the app's own
- * session, never by a storage credential the client hands in itself.
- */
-export async function servePhoto(target: string, session: Session | null | undefined) {
-  if (!target) {
-    return NextResponse.json(
-      { error: 'Missing photo target' },
+      { error: 'Missing photo URL.' },
       { status: 400, headers: corsHeaders() },
     );
   }
 
-  let decoded = target;
-  try {
-    decoded = decodeURIComponent(target).trim();
-  } catch {
-    decoded = target.trim();
-  }
+  const decoded = url.trim();
 
-  {
-    const bareKey = decoded.replace(/^washes\//, '').split('/').pop() || decoded;
-    const denied = await assertCanViewVisitPhoto(session, bareKey);
-    if (denied) return denied;
-  }
-
-  if (
-    (decoded.startsWith('http://') || decoded.startsWith('https://')) &&
-    !isAllowedPhotoUrl(decoded)
-  ) {
+  // SSRF guard — only fetch from Vercel Blob storage
+  if (!decoded.includes('.blob.vercel-storage.com')) {
     return NextResponse.json(
       { error: 'That URL is not a recognized photo storage location.' },
       { status: 400, headers: corsHeaders() },
@@ -106,154 +40,39 @@ export async function servePhoto(target: string, session: Session | null | undef
   }
 
   const token =
-    process.env.PRIVATE_BLOB_READ_WRITE_TOKEN ||
     process.env.BLOB_READ_WRITE_TOKEN ||
-    process.env.VERCEL_BLOB_READ_WRITE_TOKEN ||
-    process.env.BLOB_STORE_READ_WRITE_TOKEN ||
-    process.env.PUBLIC_BLOB_READ_WRITE_TOKEN;
+    process.env.PRIVATE_BLOB_READ_WRITE_TOKEN;
 
-  // 1. If it's a Vercel Blob URL, use the official @vercel/blob SDK get/head methods
-  if (decoded.includes('.blob.vercel-storage.com')) {
-    const isPrivate = decoded.includes('.private.blob.vercel-storage.com');
+  try {
+    const res = await fetch(decoded, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
 
-    // 1a. Try @vercel/blob get method
-    // Note: @vercel/blob v2 get() returns { statusCode, stream } — there is no .blob property.
-    // Accessing blobResult.blob.contentType would throw a TypeError and silently skip the stream.
-    try {
-      const blobResult = await vercelBlobGet(decoded, {
-        access: isPrivate ? 'private' : 'public',
-        token,
-      });
-
-      if (blobResult?.statusCode === 200 && blobResult.stream) {
-        const response = new Response(blobResult.stream as BodyInit);
-        const arrayBuf = await response.arrayBuffer();
-        // The SDK v2 get() does not expose contentType on the result object;
-        // read it from the stream response headers or fall back to jpeg.
-        const contentType = response.headers.get('content-type') || 'image/jpeg';
-        return new NextResponse(Buffer.from(arrayBuf), {
-          status: 200,
-          headers: {
-            'Content-Type': contentType,
-            'Cache-Control': 'private, no-store',
-            ...corsHeaders(),
-          },
-        });
-      }
-    } catch (blobErr) {
-      console.warn('[photoStreamer] @vercel/blob SDK get failed, trying head/download fallback:', blobErr);
-    }
-
-    // 1b. Try @vercel/blob head method to obtain a presigned downloadUrl
-    try {
-      const headInfo = await vercelBlobHead(decoded, { token });
-      if (headInfo?.downloadUrl) {
-        const downloadRes = await fetch(headInfo.downloadUrl);
-        if (downloadRes.ok) {
-          const contentType = downloadRes.headers.get('content-type') || headInfo.contentType || 'image/jpeg';
-          const arrayBuf = await downloadRes.arrayBuffer();
-          return new NextResponse(Buffer.from(arrayBuf), {
-            status: 200,
-            headers: {
-              'Content-Type': contentType,
-              'Cache-Control': 'private, no-store',
-              ...corsHeaders(),
-            },
-          });
-        }
-      }
-    } catch (headErr) {
-      console.warn('[photoStreamer] @vercel/blob SDK head fallback failed:', headErr);
-    }
-  }
-
-  // 2. If it's a full URL (Vercel Blob, S3, Firebase — already allowlisted above)
-  if (decoded.startsWith('http://') || decoded.startsWith('https://')) {
-    try {
-      const headers: Record<string, string> = {};
-      if (token && decoded.includes('.private.blob.vercel-storage.com')) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const res = await fetch(decoded, { headers });
-      if (!res.ok) {
-        console.warn(`[photoStreamer] Upstream fetch failed for ${decoded}: ${res.status} ${res.statusText}`);
-        return NextResponse.json(
-          {
-            error: 'Photo not found or inaccessible from storage provider',
-            upstreamStatus: res.status,
-            hint: decoded.includes('.private.blob.vercel-storage.com') && !token
-              ? 'BLOB_READ_WRITE_TOKEN is missing on server for private Vercel Blob access'
-              : undefined,
-          },
-          { status: res.status === 404 ? 404 : 502, headers: corsHeaders() },
-        );
-      }
-
-      const contentType = res.headers.get('content-type') || 'image/jpeg';
-      const arrayBuf = await res.arrayBuffer();
-
-      return new NextResponse(Buffer.from(arrayBuf), {
-        status: 200,
-        headers: {
-          'Content-Type': contentType,
-          'Cache-Control': 'private, no-store',
-          ...corsHeaders(),
-        },
-      });
-    } catch (err) {
-      console.error('[photoStreamer] Error streaming photo by URL:', err);
+    if (!res.ok) {
       return NextResponse.json(
-        { error: 'Failed to fetch photo from storage' },
-        { status: 500, headers: corsHeaders() },
+        { error: 'Photo not found or access denied.' },
+        { status: res.status === 404 ? 404 : 502, headers: corsHeaders() },
       );
     }
-  }
 
-  // 3. If it's a storage key, try the active storage provider first
-  const storage = getPhotoStorage();
-  try {
-    const file = await storage.get(decoded);
-    if (file?.data) {
-      return new NextResponse(Buffer.from(file.data), {
-        status: 200,
-        headers: {
-          'Content-Type': file.contentType || 'image/jpeg',
-          'Cache-Control': 'private, no-store',
-          ...corsHeaders(),
-        },
-      });
-    }
+    const contentType = res.headers.get('content-type') || 'image/jpeg';
+    const arrayBuf = await res.arrayBuffer();
+
+    return new NextResponse(Buffer.from(arrayBuf), {
+      status: 200,
+      headers: {
+        'Content-Type': contentType,
+        'Cache-Control': 'private, max-age=3600, stale-while-revalidate=300',
+        ...corsHeaders(),
+      },
+    });
   } catch (err) {
-    console.warn('Storage provider get failed, falling back to DB lookup:', err);
+    console.error('[photoServe] Failed to fetch blob:', err);
+    return NextResponse.json(
+      { error: 'Failed to retrieve photo.' },
+      { status: 500, headers: corsHeaders() },
+    );
   }
-
-  // 4. Fallback: Lookup in database store by visit key
-  try {
-    const cleanKey = decoded.replace(/^washes\//, '');
-    const isBefore = cleanKey.endsWith('-before');
-    const isAfter = cleanKey.endsWith('-after');
-
-    if (isBefore || isAfter) {
-      const visitId = cleanKey.replace(/-(before|after)$/, '');
-      const store = await getStore();
-      const visit = await store.visits.get(visitId);
-
-      if (visit) {
-        const targetUrl = isBefore ? visit.beforePhotoUrl : visit.afterPhotoUrl;
-        if (targetUrl && (targetUrl.startsWith('http://') || targetUrl.startsWith('https://'))) {
-          return await servePhoto(targetUrl, session);
-        }
-      }
-    }
-  } catch (err) {
-    console.error('Error resolving photo key from DB:', err);
-  }
-
-  return NextResponse.json(
-    { error: 'Photo not found' },
-    { status: 404, headers: corsHeaders() },
-  );
 }
 
 export function corsHeaders(): Record<string, string> {

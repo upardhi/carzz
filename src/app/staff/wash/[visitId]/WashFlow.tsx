@@ -690,7 +690,7 @@ function PhotoTile({
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={resolvePublicPhotoUrl(url) || url}
+              src={url}
               alt={`${label} photo`}
               className="h-full w-full object-cover"
             />

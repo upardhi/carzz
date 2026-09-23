@@ -19,7 +19,7 @@ try {
 import { createPrismaClient } from '../prisma/client';
 
 async function runTests() {
-  const { uploadMedia, getPhotoStorage } = await import('../src/lib/storage');
+  const { uploadMedia, deleteMedia } = await import('../src/lib/storage');
   console.log('====================================================');
   console.log('🚀 RUNNING COMPREHENSIVE END-TO-END TEST SUITE');
   console.log('====================================================\n');
@@ -52,7 +52,6 @@ async function runTests() {
     key: `test-wash-photo-${Date.now()}`,
     contentType: 'image/jpeg',
     folder: 'washes',
-    access: 'public',
   });
 
   assert(
@@ -65,7 +64,6 @@ async function runTests() {
     key: `staff-aadhaar-${Date.now()}`,
     contentType: 'image/jpeg',
     folder: 'staff-docs',
-    access: 'private',
   });
 
   assert(
@@ -421,14 +419,11 @@ async function runTests() {
   // TEST 6: Photo Retention & Storage Deletion Verification
   // -------------------------------------------------------------
   console.log('\n▶ [TEST 6] Testing Photo Deletion & Retention Logic...');
-  const storage = getPhotoStorage();
-  
-  // Test deletion of uploaded test wash photo
-  await storage.delete(uploadedPhoto.url);
+  await deleteMedia(uploadedPhoto.url);
   assert(true, 'Storage provider deleted uploaded wash photo without error');
 
   // Test deletion of uploaded private staff document
-  await storage.delete(uploadedDoc.url);
+  await deleteMedia(uploadedDoc.url);
   assert(true, 'Storage provider deleted private staff document without error');
 
   // -------------------------------------------------------------

@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { resolvePublicPhotoUrl } from '@/lib/util/photoUrl';
 
 interface PhotoPreviewModalProps {
   kind: 'before' | 'after';
@@ -12,17 +11,12 @@ interface PhotoPreviewModalProps {
 
 export function PhotoPreviewModal({ kind, url, onClose, onRetake }: PhotoPreviewModalProps) {
   const title = kind === 'before' ? 'Before-Wash Photo' : 'After-Wash Photo';
-  const initialResolved = resolvePublicPhotoUrl(url) || url;
-  const [currentSrc, setCurrentSrc] = useState<string>(initialResolved);
+  // url is already a resolved /api/photos?url= path — use directly
+  const [currentSrc] = useState<string>(url);
   const [hasError, setHasError] = useState(false);
 
   function handleError() {
-    // If direct load failed and it's a private blob URL, retry via proxy
-    if (url.includes('.private.blob.vercel-storage.com') && !currentSrc.startsWith('/api/photos')) {
-      setCurrentSrc(`/api/photos?url=${encodeURIComponent(url)}`);
-    } else {
-      setHasError(true);
-    }
+    setHasError(true);
   }
 
   return (

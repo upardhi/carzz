@@ -40,9 +40,6 @@ export async function POST(request: Request) {
       key,
       folder: 'staff-docs',
       contentType: file.type || 'application/octet-stream',
-      // Aadhaar/PAN/license scans are government ID — stored private,
-      // viewable only through the authenticated doc-preview proxy.
-      access: 'private',
     });
 
     return NextResponse.json({

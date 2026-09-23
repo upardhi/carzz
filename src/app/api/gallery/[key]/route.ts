@@ -1,12 +1,16 @@
 import { NextResponse } from 'next/server';
-import { getPhotoStorage } from '@/lib/storage';
+import { getStore } from '@/lib/data';
 
 /**
  * Serves a public gallery image.
  *
- * Unlike /api/photos, this needs no session — these are marketing images the
- * owner uploaded deliberately. The `public-` prefix is enforced here so this
- * route can never be pointed at a customer's wash photo.
+ * Gallery images are uploaded with public access to Vercel Blob and their
+ * full CDN URLs are stored in the database. This route finds the URL and
+ * redirects directly — no auth required, these are marketing images the
+ * owner uploaded deliberately.
+ *
+ * The `public-` prefix check ensures this route can never be pointed at a
+ * customer's private wash photo.
  */
 export async function GET(
   _request: Request,
@@ -19,27 +23,26 @@ export async function GET(
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
-  const storage = getPhotoStorage();
-  const file = await storage.get(decoded);
+  try {
+    const store = await getStore();
+    const content = await store.getSiteContent();
+    const item = content.gallery.find(
+      (g) =>
+        g.beforeUrl?.includes(decoded) || g.afterUrl?.includes(decoded),
+    );
 
-  if (file?.url) {
-    return NextResponse.redirect(file.url, { status: 307 });
-  }
+    if (item) {
+      const targetUrl = item.beforeUrl?.includes(decoded)
+        ? item.beforeUrl
+        : item.afterUrl;
 
-  if (file?.data) {
-    return new NextResponse(Buffer.from(file.data), {
-      headers: {
-        'Content-Type': file.contentType,
-        'Cache-Control': 'public, max-age=31536000, immutable',
-      },
-    });
-  }
-
-  const externalUrl = storage.urlFor(decoded);
-  if (externalUrl.startsWith('http://') || externalUrl.startsWith('https://')) {
-    return NextResponse.redirect(externalUrl, { status: 307 });
+      if (targetUrl && targetUrl.startsWith('http')) {
+        return NextResponse.redirect(targetUrl, { status: 307 });
+      }
+    }
+  } catch {
+    // Fall through to 404
   }
 
   return NextResponse.json({ error: 'Not found' }, { status: 404 });
 }
-

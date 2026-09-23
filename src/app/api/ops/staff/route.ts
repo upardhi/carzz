@@ -100,9 +100,6 @@ export async function POST(request: Request) {
         key,
         folder: 'staff-docs',
         contentType: file.type || 'application/octet-stream',
-        // Aadhaar/PAN scans are government ID — stored private, viewable only
-        // through the authenticated doc-preview proxy (getSafeDocumentUrl).
-        access: 'private',
       });
       return stored.url;
     }

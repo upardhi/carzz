@@ -1,17 +1,16 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { servePhoto, corsHeaders } from '@/lib/storage/photoStreamer';
 import { getSession } from '@/lib/auth/server';
+import { getStore } from '@/lib/data';
 
 /**
- * Streams a wash photo by storage key or filename.
- * Supports CORS so mobile apps and external consumers can preview images seamlessly.
+ * Resolves a bare storage key to its blob URL via DB lookup, then serves it.
  *
- * Authenticated by the caller's own session only. A "server has a storage
- * token configured" fallback would make login optional for every request —
- * this app always has a token configured, so that fallback is effectively
- * "no auth required." There is no caller-supplied-token path either: a
- * client handing in its own storage credential turns this into an open
- * proxy onto whatever account that credential belongs to.
+ * GET /api/photos/visit-123-before
+ * GET /api/photos/visit-123-after
+ *
+ * Used when a URL stored in the DB is already a /api/photos/<key> path
+ * (e.g. from seed data or older uploads).
  */
 export async function GET(
   _request: NextRequest,
@@ -24,8 +23,35 @@ export async function GET(
       { status: 401, headers: corsHeaders() },
     );
   }
+
   const { key } = await params;
-  return await servePhoto(key, session);
+  const decoded = decodeURIComponent(key);
+
+  // Try to resolve the key to a blob URL via DB lookup
+  const isBefore = decoded.endsWith('-before');
+  const isAfter = decoded.endsWith('-after');
+
+  if (isBefore || isAfter) {
+    try {
+      const visitId = decoded.replace(/-(before|after)$/, '');
+      const store = await getStore();
+      const visit = await store.visits.get(visitId);
+
+      if (visit) {
+        const blobUrl = isBefore ? visit.beforePhotoUrl : visit.afterPhotoUrl;
+        if (blobUrl && blobUrl.includes('.blob.vercel-storage.com')) {
+          return servePhoto(blobUrl, session);
+        }
+      }
+    } catch {
+      // Fall through to 404
+    }
+  }
+
+  return NextResponse.json(
+    { error: 'Photo not found.' },
+    { status: 404, headers: corsHeaders() },
+  );
 }
 
 export async function OPTIONS() {

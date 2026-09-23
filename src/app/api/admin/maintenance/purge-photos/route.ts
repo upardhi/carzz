@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { HttpError, requireApiSession } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
-import { getPhotoStorage, photoKey } from '@/lib/storage';
+import { deleteMedia, photoKey } from '@/lib/storage';
 
 /**
  * Maintenance endpoint to purge wash photos older than the retention period.
@@ -39,20 +39,21 @@ async function handlePurge(request: Request) {
         (Boolean(v.beforePhotoUrl) || Boolean(v.afterPhotoUrl)),
     );
 
-    const storage = getPhotoStorage();
     let purgedPhotos = 0;
     let freedBytes = 0;
 
     for (const visit of expiredVisitsWithPhotos) {
       if (visit.beforePhotoUrl) {
-        await storage.delete(visit.beforePhotoUrl);
-        await storage.delete(photoKey(visit.id, 'before'));
+        // Delete by the stored blob URL
+        await deleteMedia(visit.beforePhotoUrl);
+        // Also attempt deletion by key (in case DB stored a key path, not a URL)
+        await deleteMedia(photoKey(visit.id, 'before'));
         purgedPhotos += 1;
         freedBytes += visit.beforePhotoBytes ?? 250000;
       }
       if (visit.afterPhotoUrl) {
-        await storage.delete(visit.afterPhotoUrl);
-        await storage.delete(photoKey(visit.id, 'after'));
+        await deleteMedia(visit.afterPhotoUrl);
+        await deleteMedia(photoKey(visit.id, 'after'));
         purgedPhotos += 1;
         freedBytes += visit.afterPhotoBytes ?? 250000;
       }
@@ -92,4 +93,3 @@ export async function POST(request: Request) {
 export async function GET(request: Request) {
   return handlePurge(request);
 }
-

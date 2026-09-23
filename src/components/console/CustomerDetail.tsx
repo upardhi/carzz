@@ -619,28 +619,34 @@ export async function ConsoleCustomerDetail({
 
         <Card className="p-4 min-w-0">
           <CardHeading>Invoices</CardHeading>
-          {invoices.slice(0, 6).map((invoice) => (
-            <Row
-              key={invoice.id}
-              label={`${invoice.cycle} · due ${formatDateFull(invoice.dueOn)}`}
-              value={
-                <span className="inline-flex items-center gap-2">
-                  {money(invoice.amount)}
-                  <Tag
-                    tone={
-                      invoice.status === 'PAID'
-                        ? 'ok'
-                        : invoice.status === 'PARTIAL'
-                          ? 'warn'
-                          : 'bad'
-                    }
-                  >
-                    {invoice.status}
-                  </Tag>
-                </span>
-              }
-            />
-          ))}
+          {invoices.length === 0 ? (
+            <p className="py-4 text-center text-xs font-medium text-slate-400">
+              No invoices generated for this account yet.
+            </p>
+          ) : (
+            invoices.slice(0, 6).map((invoice) => (
+              <Row
+                key={invoice.id}
+                label={`${invoice.cycle} · due ${formatDateFull(invoice.dueOn)}`}
+                value={
+                  <span className="inline-flex items-center gap-2">
+                    {money(invoice.amount)}
+                    <Tag
+                      tone={
+                        invoice.status === 'PAID'
+                          ? 'ok'
+                          : invoice.status === 'PARTIAL'
+                            ? 'warn'
+                            : 'bad'
+                      }
+                    >
+                      {invoice.status}
+                    </Tag>
+                  </span>
+                }
+              />
+            ))
+          )}
         </Card>
       </div>
     </>
