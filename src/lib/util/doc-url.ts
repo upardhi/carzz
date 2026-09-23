@@ -1,16 +1,14 @@
+import { resolvePublicPhotoUrl } from './photoUrl';
+
 /**
- * Resolves a safe, viewable URL for staff documents and uploaded KYC files.
- * If the URL is hosted on a private Vercel Blob store, routes it through our
- * authenticated preview proxy so browsers can render thumbnails and images without 403 Forbidden errors.
+ * Resolves a safe, viewable URL for staff documents, Aadhaar cards, PAN cards,
+ * and uploaded KYC files.
+ *
+ * If the URL is hosted on Vercel Blob store (private or public), routes it through
+ * the authenticated /api/photos proxy so browsers can render previews without 403 Forbidden errors.
  */
 export function getSafeDocumentUrl(url: string | null | undefined): string {
   if (!url) return '';
-  const trimmed = url.trim();
-  if (!trimmed) return '';
-
-  if (trimmed.includes('.private.blob.vercel-storage.com')) {
-    return `/api/ops/staff/doc/preview?url=${encodeURIComponent(trimmed)}`;
-  }
-
-  return trimmed;
+  const resolved = resolvePublicPhotoUrl(url);
+  return resolved || '';
 }
