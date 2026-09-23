@@ -62,7 +62,8 @@ export async function servePhoto(
       status: 200,
       headers: {
         'Content-Type': contentType,
-        'Cache-Control': 'private, max-age=3600, stale-while-revalidate=300',
+        'Content-Disposition': 'inline',
+        'Cache-Control': 'private, no-cache, no-store, must-revalidate',
         ...corsHeaders(),
       },
     });
