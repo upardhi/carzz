@@ -10,7 +10,6 @@ import { LiveCameraModal } from '@/components/staff/LiveCameraModal';
 import { PhotoPreviewModal } from '@/components/staff/PhotoPreviewModal';
 import { safeOfflineFetch } from '@/lib/util/offlineQueue';
 import { toast } from '@/components/ui/ToastProvider';
-import { resolvePublicPhotoUrl } from '@/lib/util/photoUrl';
 import { formatDate } from '@/lib/util/format';
 import { formatDurationMinutes } from '@/lib/util/washTiming';
 import type { PastWashRecord, ServiceUsageStat } from './page';
