@@ -256,187 +256,192 @@ export function UserDetailClient({
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Aadhaar Section */}
-              <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-900">Aadhaar Card (UID)</span>
-                  {hasAadhar ? (
-                    <span className="rounded bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">
-                      ✓ Attached
-                    </span>
-                  ) : (
-                    <span className="text-[10px] text-slate-400 font-medium">Not provided</span>
-                  )}
-                </div>
+            {!hasAadhar && !hasPan ? (
+              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 p-6 text-center">
+                <p className="text-xs font-bold text-slate-700">No KYC documents attached</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Neither Aadhaar nor PAN card has been provided for this member yet.
+                </p>
+              </div>
+            ) : (
+              <div className={`grid grid-cols-1 ${hasAadhar && hasPan ? 'sm:grid-cols-2' : ''} gap-4`}>
+                {/* Aadhaar Section */}
+                {hasAadhar && (
+                  <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-900">Aadhaar Card (UID)</span>
+                      <span className="rounded bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">
+                        ✓ Attached
+                      </span>
+                    </div>
 
-                <div>
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                    Aadhaar Number
-                  </span>
-                  <p className="font-mono text-xs font-bold text-slate-800">
-                    {aadharNumber ? aadharNumber : '—'}
-                  </p>
-                </div>
+                    <div>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                        Aadhaar Number
+                      </span>
+                      <p className="font-mono text-xs font-bold text-slate-800">
+                        {aadharNumber ? aadharNumber : '—'}
+                      </p>
+                    </div>
 
-                {aadharCardUrl ? (
-                  <div className="space-y-2 pt-1 border-t border-slate-100">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 block">
-                      Document Copy
-                    </span>
-                    <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white p-2.5">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        {aadharCardUrl.toLowerCase().endsWith('.pdf') ? (
-                          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-rose-50 text-lg border border-rose-200">
-                            📕
-                          </div>
-                        ) : (
-                          <div
-                            onClick={() => {
-                              setLightboxUrl(getSafeDocumentUrl(aadharCardUrl));
-                              setLightboxTitle('Aadhaar Card Document');
-                            }}
-                            className="group relative h-10 w-10 shrink-0 overflow-hidden rounded-md border border-slate-200 bg-slate-100 cursor-pointer"
-                            title="Click to view full preview"
-                          >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={getSafeDocumentUrl(aadharCardUrl)}
-                              alt="Aadhaar Document"
-                              className="h-full w-full object-cover group-hover:scale-105 transition-transform"
-                            />
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <span className="text-white text-[10px]">🔍</span>
+                    {aadharCardUrl ? (
+                      <div className="space-y-2 pt-1 border-t border-slate-100">
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 block">
+                          Document Copy
+                        </span>
+                        <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white p-2.5">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            {aadharCardUrl.toLowerCase().endsWith('.pdf') ? (
+                              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-rose-50 text-lg border border-rose-200">
+                                📕
+                              </div>
+                            ) : (
+                              <div
+                                onClick={() => {
+                                  setLightboxUrl(getSafeDocumentUrl(aadharCardUrl));
+                                  setLightboxTitle('Aadhaar Card Document');
+                                }}
+                                className="group relative h-10 w-10 shrink-0 overflow-hidden rounded-md border border-slate-200 bg-slate-100 cursor-pointer"
+                                title="Click to view full preview"
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={getSafeDocumentUrl(aadharCardUrl)}
+                                  alt="Aadhaar Document"
+                                  className="h-full w-full object-cover group-hover:scale-105 transition-transform"
+                                />
+                                <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <span className="text-white text-[10px]">🔍</span>
+                                </div>
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-slate-800 truncate">Aadhaar Card Copy</p>
+                              <p className="text-[10px] text-slate-500">
+                                {aadharCardUrl.toLowerCase().endsWith('.pdf') ? 'PDF Document' : 'Image (PNG/JPG)'}
+                              </p>
                             </div>
                           </div>
-                        )}
-                        <div className="min-w-0">
-                          <p className="text-xs font-bold text-slate-800 truncate">Aadhaar Card Copy</p>
-                          <p className="text-[10px] text-slate-500">
-                            {aadharCardUrl.toLowerCase().endsWith('.pdf') ? 'PDF Document' : 'Image (PNG/JPG)'}
-                          </p>
+
+                          <div className="flex items-center gap-1 shrink-0">
+                            {!aadharCardUrl.toLowerCase().endsWith('.pdf') && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setLightboxUrl(getSafeDocumentUrl(aadharCardUrl));
+                                  setLightboxTitle('Aadhaar Card Document');
+                                }}
+                                className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                              >
+                                Preview
+                              </button>
+                            )}
+                            <a
+                              href={getSafeDocumentUrl(aadharCardUrl)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-bold text-blue-600 hover:bg-blue-50 transition-colors"
+                            >
+                              View ↗
+                            </a>
+                          </div>
                         </div>
                       </div>
-
-                      <div className="flex items-center gap-1 shrink-0">
-                        {!aadharCardUrl.toLowerCase().endsWith('.pdf') && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setLightboxUrl(getSafeDocumentUrl(aadharCardUrl));
-                              setLightboxTitle('Aadhaar Card Document');
-                            }}
-                            className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
-                          >
-                            Preview
-                          </button>
-                        )}
-                        <a
-                          href={getSafeDocumentUrl(aadharCardUrl)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-bold text-blue-600 hover:bg-blue-50 transition-colors"
-                        >
-                          View ↗
-                        </a>
-                      </div>
-                    </div>
+                    ) : (
+                      <p className="text-[11px] text-slate-400 italic">No document file attached.</p>
+                    )}
                   </div>
-                ) : (
-                  <p className="text-[11px] text-slate-400 italic">No document file attached.</p>
                 )}
-              </div>
 
-              {/* PAN Section */}
-              <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-900">PAN Card</span>
-                  {hasPan ? (
-                    <span className="rounded bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">
-                      ✓ Attached
-                    </span>
-                  ) : (
-                    <span className="text-[10px] text-slate-400 font-medium">Not provided</span>
-                  )}
-                </div>
+                {/* PAN Section */}
+                {hasPan && (
+                  <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-900">PAN Card</span>
+                      <span className="rounded bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">
+                        ✓ Attached
+                      </span>
+                    </div>
 
-                <div>
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                    PAN Number
-                  </span>
-                  <p className="font-mono text-xs font-bold text-slate-800 uppercase">
-                    {panNumber ? panNumber : '—'}
-                  </p>
-                </div>
+                    <div>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                        PAN Number
+                      </span>
+                      <p className="font-mono text-xs font-bold text-slate-800 uppercase">
+                        {panNumber ? panNumber : '—'}
+                      </p>
+                    </div>
 
-                {panCardUrl ? (
-                  <div className="space-y-2 pt-1 border-t border-slate-100">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 block">
-                      Document Copy
-                    </span>
-                    <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white p-2.5">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        {panCardUrl.toLowerCase().endsWith('.pdf') ? (
-                          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-rose-50 text-lg border border-rose-200">
-                            📕
-                          </div>
-                        ) : (
-                          <div
-                            onClick={() => {
-                              setLightboxUrl(getSafeDocumentUrl(panCardUrl));
-                              setLightboxTitle('PAN Card Document');
-                            }}
-                            className="group relative h-10 w-10 shrink-0 overflow-hidden rounded-md border border-slate-200 bg-slate-100 cursor-pointer"
-                            title="Click to view full preview"
-                          >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={getSafeDocumentUrl(panCardUrl)}
-                              alt="PAN Document"
-                              className="h-full w-full object-cover group-hover:scale-105 transition-transform"
-                            />
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <span className="text-white text-[10px]">🔍</span>
+                    {panCardUrl ? (
+                      <div className="space-y-2 pt-1 border-t border-slate-100">
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 block">
+                          Document Copy
+                        </span>
+                        <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white p-2.5">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            {panCardUrl.toLowerCase().endsWith('.pdf') ? (
+                              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-rose-50 text-lg border border-rose-200">
+                                📕
+                              </div>
+                            ) : (
+                              <div
+                                onClick={() => {
+                                  setLightboxUrl(getSafeDocumentUrl(panCardUrl));
+                                  setLightboxTitle('PAN Card Document');
+                                }}
+                                className="group relative h-10 w-10 shrink-0 overflow-hidden rounded-md border border-slate-200 bg-slate-100 cursor-pointer"
+                                title="Click to view full preview"
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={getSafeDocumentUrl(panCardUrl)}
+                                  alt="PAN Document"
+                                  className="h-full w-full object-cover group-hover:scale-105 transition-transform"
+                                />
+                                <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <span className="text-white text-[10px]">🔍</span>
+                                </div>
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-slate-800 truncate">PAN Card Copy</p>
+                              <p className="text-[10px] text-slate-500">
+                                {panCardUrl.toLowerCase().endsWith('.pdf') ? 'PDF Document' : 'Image (PNG/JPG)'}
+                              </p>
                             </div>
                           </div>
-                        )}
-                        <div className="min-w-0">
-                          <p className="text-xs font-bold text-slate-800 truncate">PAN Card Copy</p>
-                          <p className="text-[10px] text-slate-500">
-                            {panCardUrl.toLowerCase().endsWith('.pdf') ? 'PDF Document' : 'Image (PNG/JPG)'}
-                          </p>
+
+                          <div className="flex items-center gap-1 shrink-0">
+                            {!panCardUrl.toLowerCase().endsWith('.pdf') && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setLightboxUrl(getSafeDocumentUrl(panCardUrl));
+                                  setLightboxTitle('PAN Card Document');
+                                }}
+                                className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                              >
+                                Preview
+                              </button>
+                            )}
+                            <a
+                              href={getSafeDocumentUrl(panCardUrl)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-bold text-blue-600 hover:bg-blue-50 transition-colors"
+                            >
+                              View ↗
+                            </a>
+                          </div>
                         </div>
                       </div>
-
-                      <div className="flex items-center gap-1 shrink-0">
-                        {!panCardUrl.toLowerCase().endsWith('.pdf') && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setLightboxUrl(getSafeDocumentUrl(panCardUrl));
-                              setLightboxTitle('PAN Card Document');
-                            }}
-                            className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
-                          >
-                            Preview
-                          </button>
-                        )}
-                        <a
-                          href={getSafeDocumentUrl(panCardUrl)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-bold text-blue-600 hover:bg-blue-50 transition-colors"
-                        >
-                          View ↗
-                        </a>
-                      </div>
-                    </div>
+                    ) : (
+                      <p className="text-[11px] text-slate-400 italic">No document file attached.</p>
+                    )}
                   </div>
-                ) : (
-                  <p className="text-[11px] text-slate-400 italic">No document file attached.</p>
                 )}
               </div>
-            </div>
+            )}
           </div>
 
           {/* Card 3: Personal & Emergency Contact */}
@@ -603,26 +608,36 @@ export function UserDetailClient({
                   Verification Checklist
                 </span>
                 <div className="space-y-1.5 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-600">Aadhaar Card:</span>
-                    <span
-                      className={`font-bold ${
-                        aadharCardUrl ? 'text-emerald-600' : aadharNumber ? 'text-blue-600' : 'text-slate-400'
-                      }`}
-                    >
-                      {aadharCardUrl ? '✓ Attached' : aadharNumber ? 'UID Only' : 'Missing'}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-600">PAN Card:</span>
-                    <span
-                      className={`font-bold ${
-                        panCardUrl ? 'text-emerald-600' : panNumber ? 'text-blue-600' : 'text-slate-400'
-                      }`}
-                    >
-                      {panCardUrl ? '✓ Attached' : panNumber ? 'PAN Only' : 'Missing'}
-                    </span>
-                  </div>
+                  {hasAadhar && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-600">Aadhaar Card:</span>
+                      <span
+                        className={`font-bold ${
+                          aadharCardUrl ? 'text-emerald-600' : 'text-blue-600'
+                        }`}
+                      >
+                        {aadharCardUrl ? '✓ Attached' : 'UID Only'}
+                      </span>
+                    </div>
+                  )}
+                  {hasPan && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-600">PAN Card:</span>
+                      <span
+                        className={`font-bold ${
+                          panCardUrl ? 'text-emerald-600' : 'text-blue-600'
+                        }`}
+                      >
+                        {panCardUrl ? '✓ Attached' : 'PAN Only'}
+                      </span>
+                    </div>
+                  )}
+                  {!hasAadhar && !hasPan && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-600">Identity Proof:</span>
+                      <span className="font-bold text-rose-500">Missing</span>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between">
                     <span className="text-slate-600">Bank Details:</span>
                     <span
