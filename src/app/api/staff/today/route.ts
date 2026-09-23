@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { HttpError, requireApiSession } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { visitsForDate } from '@/lib/services/schedule';
-import { computePayout } from '@/lib/services/payroll';
+import { computeDailyVisitsEarnings, computePayout } from '@/lib/services/payroll';
 import { currentCycle, todayISO } from '@/lib/util/format';
 import { resolvePublicPhotoUrl } from '@/lib/util/photoUrl';
 
@@ -18,11 +18,12 @@ export async function GET() {
     const today = todayISO();
     const cycle = currentCycle();
 
-    const [visits, attendance, payout] = await Promise.all([
+    const [visits, attendance, rules] = await Promise.all([
       visitsForDate(store, today, { staffId }),
       store.attendance.findOne({ where: { staffId, date: today } }),
-      computePayout(store, staffId, cycle),
+      store.getPayoutSettings(),
     ]);
+    const payout = await computePayout(store, staffId, cycle, rules);
 
     const customerIds = [...new Set(visits.map((v) => v.customerId))];
     const carIds = [...new Set(visits.map((v) => v.carId))];
@@ -52,13 +53,8 @@ export async function GET() {
       (v) => v.status === 'PENDING' || v.status === 'IN_PROGRESS',
     ).length;
 
-    // Calculate today's incremental earnings
-    const earnedToday = visits
-      .filter((v) => v.status === 'DONE')
-      .reduce((sum, _v, index) => {
-        const slab = [300, 350, 400];
-        return sum + (slab[index] ?? 400);
-      }, 0);
+    // Calculate today's incremental earnings dynamically based on active payout rules
+    const earnedToday = computeDailyVisitsEarnings(visits, rules);
 
     return NextResponse.json({
       ok: true,

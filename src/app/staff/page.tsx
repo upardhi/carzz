@@ -10,7 +10,7 @@ import {
 } from '@/components/shell/icons';
 import { requirePermission } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
-import { computePayout } from '@/lib/services/payroll';
+import { computeDailyVisitsEarnings, computePayout } from '@/lib/services/payroll';
 import { visitsForDate } from '@/lib/services/schedule';
 import {
   currentCycle,
@@ -34,15 +34,16 @@ export default async function StaffToday() {
 
   const customerIds = [...new Set(visits.map((v) => v.customerId))];
   const carIds = [...new Set(visits.map((v) => v.carId))];
-  const [customers, cars, payout] = await Promise.all([
+  const [customers, cars, rules] = await Promise.all([
     customerIds.length
       ? store.customers.find({ where: { id: { in: customerIds } } as never })
       : [],
     carIds.length
       ? store.cars.find({ where: { id: { in: carIds } } as never })
       : [],
-    computePayout(store, staffId, currentCycle()),
+    store.getPayoutSettings(),
   ]);
+  const payout = await computePayout(store, staffId, currentCycle(), rules);
 
   const customerById = new Map(customers.map((c) => [c.id, c]));
   const carById = new Map(cars.map((c) => [c.id, c]));
@@ -52,12 +53,7 @@ export default async function StaffToday() {
     (v) => v.status === 'PENDING' || v.status === 'IN_PROGRESS',
   ).length;
 
-  const earnedToday = visits
-    .filter((v) => v.status === 'DONE')
-    .reduce((sum, _v, index) => {
-      const slab = [300, 350, 400];
-      return sum + (slab[index] ?? 400);
-    }, 0);
+  const earnedToday = computeDailyVisitsEarnings(visits, rules);
 
   return (
     <div className="space-y-5">

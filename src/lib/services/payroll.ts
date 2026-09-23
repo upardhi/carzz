@@ -474,3 +474,37 @@ export async function pocketAllowance(
 
   return { earnedThisCycle: earned, takenThisWeek, weeklyCap, inAccount, available };
 }
+
+/**
+ * Calculate earnings (base + performance bonuses) for a given set of completed visits,
+ * respecting the company's active payout rules (DAY_SLAB or flat PER_WASH).
+ */
+export function computeDailyVisitsEarnings(
+  visits: WashVisit[],
+  rules: PayoutSettings,
+): Rupees {
+  const completed = visits.filter((v) => v.status === 'DONE');
+  let base = 0;
+  if (rules.baseMode === 'DAY_SLAB') {
+    const byDate = new Map<string, number>();
+    for (const visit of [...completed].sort(
+      (a, b) =>
+        a.scheduledDate.localeCompare(b.scheduledDate) ||
+        a.scheduledTime.localeCompare(b.scheduledTime),
+    )) {
+      const index = byDate.get(visit.scheduledDate) ?? 0;
+      byDate.set(visit.scheduledDate, index + 1);
+      base += rules.slabByCarIndex[index] ?? rules.slabBeyond;
+    }
+  } else {
+    base = completed.length * rules.perWashRate;
+  }
+
+  const onTime = completed.filter((v) => v.onTime).length;
+  const goodReviews = completed.filter(
+    (v) => (v.rating ?? 0) >= rules.goodReviewMinStars,
+  ).length;
+
+  const bonuses = onTime * rules.onTimeBonus + goodReviews * rules.goodReviewBonus;
+  return base + bonuses;
+}
