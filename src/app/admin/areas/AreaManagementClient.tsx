@@ -127,6 +127,18 @@ export function AreaManagementClient({
     }
   }
 
+  function openAddAreaForRegion(regionId: string) {
+    setAreaName('');
+    setAreaCity('Nagpur');
+    setAreaAddress('');
+    setAreaLat(null);
+    setAreaLng(null);
+    setAreaRegionId(regionId);
+    setAreaManagerId('');
+    setAreaError('');
+    setShowAddArea(true);
+  }
+
   function openAddRegionModal() {
     setEditingRegion(null);
     setRegionName('');
@@ -721,8 +733,17 @@ export function AreaManagementClient({
                           <div className="flex items-center justify-end gap-1.5">
                             <button
                               type="button"
+                              onClick={() => openAddAreaForRegion(region.id)}
+                              className="inline-flex items-center gap-1 rounded-md border border-blue-300 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 hover:bg-blue-100 hover:text-blue-900 transition-colors shadow-2xs cursor-pointer"
+                              title={`Add Area under ${region.name}`}
+                            >
+                              <IconPlus width={12} height={12} />
+                              <span>Add Area</span>
+                            </button>
+                            <button
+                              type="button"
                               onClick={() => openEditRegionModal(region)}
-                              className="inline-flex items-center gap-1 rounded-md border border-line bg-surface-elevated px-2.5 py-1 text-xs font-semibold text-ink hover:bg-slate-100 hover:text-blue-600 transition-colors"
+                              className="inline-flex items-center gap-1 rounded-md border border-line bg-surface-elevated px-2.5 py-1 text-xs font-semibold text-ink hover:bg-slate-100 hover:text-blue-600 transition-colors cursor-pointer"
                               title="Edit Region"
                             >
                               <svg

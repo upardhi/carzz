@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { requirePermission } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
+import type { Complaint, Customer } from '@/lib/data/types';
 import { UserDetailClient } from './UserDetailClient';
 
 export const metadata = { title: 'User Profile & Details — Admin' };
@@ -24,10 +25,19 @@ export default async function UserDetailPage({
     notFound();
   }
 
-  // If user has a staffId, fetch their staff record to get any additional payout info
   let staff = null;
+  let complaints: Complaint[] = [];
+  let customers: Customer[] = [];
+
   if (user.staffId) {
-    staff = await store.staff.get(user.staffId);
+    [staff, complaints, customers] = await Promise.all([
+      store.staff.get(user.staffId),
+      store.complaints.find({
+        where: { staffId: user.staffId } as never,
+        orderBy: [{ field: 'createdAt', dir: 'desc' }],
+      }),
+      store.customers.find(),
+    ]);
   }
 
   return (
@@ -37,6 +47,8 @@ export default async function UserDetailPage({
         staff={staff}
         areas={areas}
         regions={regions}
+        complaints={complaints}
+        customers={customers}
       />
     </div>
   );

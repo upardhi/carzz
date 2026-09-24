@@ -6,6 +6,7 @@ import type {
   Car,
   Complaint,
   Customer,
+  CustomerRequest,
   Enquiry,
   Expense,
   Id,
@@ -62,6 +63,7 @@ export const COLLECTIONS = {
   notifications: 'notifications',
   enquiries: 'enquiries',
   staffReferrals: 'staffReferrals',
+  customerRequests: 'customerRequests',
   settings: 'settings',
 } as const;
 
@@ -89,6 +91,7 @@ export class FirestoreStore implements DataStore {
   readonly notifications;
   readonly enquiries;
   readonly staffReferrals;
+  readonly customerRequests;
 
   constructor(private readonly db: FirestoreLike) {
     const c = (name: string) => db.collection(name);
@@ -116,6 +119,7 @@ export class FirestoreStore implements DataStore {
     this.notifications = new FirestoreRepository<Notification>(c(COLLECTIONS.notifications));
     this.enquiries = new FirestoreRepository<Enquiry>(c(COLLECTIONS.enquiries));
     this.staffReferrals = new FirestoreRepository<StaffReferral>(c(COLLECTIONS.staffReferrals));
+    this.customerRequests = new FirestoreRepository<CustomerRequest>(c(COLLECTIONS.customerRequests));
   }
 
   async getCredential(userId: Id): Promise<UserCredential | null> {

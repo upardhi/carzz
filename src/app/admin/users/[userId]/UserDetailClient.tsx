@@ -5,10 +5,13 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useToast } from '@/components/ui/ToastProvider';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
+import { IconTrash } from '@/components/shell/icons';
+import { WashBoyReviewsModal } from '@/components/console/WashBoyReviewsModal';
 import { getSafeDocumentUrl } from '@/lib/util/doc-url';
 import { formatDateFull } from '@/lib/util/format';
-import { ROLE_LABEL, ROLE_BLURB } from '@/lib/util/labels';
-import type { User, Staff, Area, Region } from '@/lib/data/types';
+import { ROLE_LABEL, ROLE_BLURB, COMPLAINT_TYPE_LABEL } from '@/lib/util/labels';
+import type { User, Staff, Area, Region, Complaint, Customer } from '@/lib/data/types';
+import { todayISO } from '@/lib/util/format';
 
 function getInitials(name: string) {
   const parts = name.trim().split(/\s+/);
@@ -23,18 +26,29 @@ export function UserDetailClient({
   staff,
   areas,
   regions,
+  complaints = [],
+  customers = [],
 }: {
   user: User;
   staff: Staff | null;
   areas: Area[];
   regions: Region[];
+  complaints?: Complaint[];
+  customers?: Customer[];
 }) {
   const router = useRouter();
   const { toast } = useToast();
   const confirm = useConfirm();
 
+  const [showReviewsModal, setShowReviewsModal] = useState(false);
+  const [complaintsPage, setComplaintsPage] = useState(1);
+  const complaintsPageSize = 5;
+
   const [active, setActive] = useState(user.active);
   const [updating, setUpdating] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [showDeactivateModal, setShowDeactivateModal] = useState(false);
+  const [inactivationReason, setInactivationReason] = useState('');
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [lightboxTitle, setLightboxTitle] = useState('');
 
@@ -71,15 +85,31 @@ export function UserDetailClient({
           ? `${area.name} (${area.city})`
           : 'No area assigned';
 
+  const customerById = new Map(customers.map((c) => [c.id, c]));
+
+  // Complaint stats
+  const currentMonthCycle = todayISO().slice(0, 7);
+  const totalComplaintsCount = complaints.length;
+  const openComplaintsCount = complaints.filter(
+    (c) => c.status === 'OPEN' || c.status === 'ESCALATED'
+  ).length;
+  const resolvedComplaintsCount = complaints.filter((c) => c.status === 'RESOLVED').length;
+  const complaintsThisMonthCount = complaints.filter(
+    (c) => c.createdAt && c.createdAt.startsWith(currentMonthCycle)
+  ).length;
+
   async function handleToggleStatus() {
-    const nextState = !active;
+    if (active) {
+      // Prompt for inactivation reason
+      setShowDeactivateModal(true);
+      return;
+    }
+
     const ok = await confirm({
-      title: nextState ? 'Reactivate Account?' : 'Deactivate Team Member?',
-      message: nextState
-        ? `Are you sure you want to reactivate ${user.name}'s account? They will be able to sign in again immediately.`
-        : `Are you sure you want to deactivate ${user.name}? Their login will be disabled and they will no longer have access to the system.`,
-      confirmText: nextState ? 'Reactivate' : 'Deactivate Account',
-      tone: nextState ? 'primary' : 'danger',
+      title: 'Reactivate Account?',
+      message: `Are you sure you want to reactivate ${user.name}'s account? They will be able to sign in again immediately.`,
+      confirmText: 'Reactivate Account',
+      tone: 'primary',
     });
 
     if (!ok) return;
@@ -92,22 +122,89 @@ export function UserDetailClient({
         body: JSON.stringify({
           action: 'setActive',
           userId: user.id,
-          active: nextState,
+          active: true,
         }),
       });
 
       const data = await res.json();
       if (!res.ok || !data.ok) {
-        throw new Error(data.error || 'Failed to update account status.');
+        throw new Error(data.error || 'Failed to reactivate account.');
       }
 
-      setActive(nextState);
-      toast.success(data.message || (nextState ? 'Account reactivated.' : 'Account deactivated.'));
+      setActive(true);
+      toast.success('Account reactivated successfully.');
       router.refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Action failed.');
     } finally {
       setUpdating(false);
+    }
+  }
+
+  async function confirmInactivation(e: React.FormEvent) {
+    e.preventDefault();
+    if (!inactivationReason.trim()) {
+      toast.error('Please provide an inactivation reason.');
+      return;
+    }
+
+    setUpdating(true);
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'setActive',
+          userId: user.id,
+          active: false,
+          reason: inactivationReason.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || 'Failed to deactivate account.');
+      }
+
+      setActive(false);
+      setShowDeactivateModal(false);
+      toast.success('Account deactivated and reason recorded.');
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Action failed.');
+    } finally {
+      setUpdating(false);
+    }
+  }
+
+  async function handleDeleteUser() {
+    const ok = await confirm({
+      title: 'Delete Staff Member?',
+      message: `Are you sure you want to completely delete ${user.name}? This will safely remove their login credentials and reassign any pending work. This action cannot be undone.`,
+      confirmText: 'Yes, Delete Staff',
+      tone: 'danger',
+    });
+
+    if (!ok) return;
+
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/admin/users?userId=${user.id}`, {
+        method: 'DELETE',
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || 'Failed to delete staff member.');
+      }
+
+      toast.success(data.message || 'Staff member deleted.');
+      router.push('/admin/users');
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Deletion failed.');
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -149,6 +246,16 @@ export function UserDetailClient({
             {updating ? 'Updating...' : active ? 'Deactivate Account' : 'Reactivate Account'}
           </button>
 
+          <button
+            type="button"
+            onClick={handleDeleteUser}
+            disabled={deleting}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 hover:border-rose-300 transition-all cursor-pointer shadow-2xs disabled:opacity-50"
+          >
+            <IconTrash width={14} height={14} />
+            <span>{deleting ? 'Deleting...' : 'Delete Staff'}</span>
+          </button>
+
           <Link
             href={`/admin/users/${user.id}/edit`}
             className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-blue-700 active:scale-95 transition-all"
@@ -158,6 +265,76 @@ export function UserDetailClient({
           </Link>
         </div>
       </div>
+
+      {/* Inactivation Reason Banner if Inactive */}
+      {!active && (
+        <div className="rounded-2xl border-2 border-rose-300 bg-rose-50/80 p-4 shadow-sm">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl">⚠️</span>
+            <div>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-rose-900">
+                Account Inactive / Disabled
+              </h4>
+              <p className="text-xs font-semibold text-rose-800 mt-0.5">
+                Inactivation Reason: <span className="font-bold text-rose-950">{user.inactivationReason || staff?.inactivationReason || 'No reason specified'}</span>
+              </p>
+              {(user.inactivatedAt || staff?.inactivatedAt) && (
+                <p className="text-[11px] text-rose-600 mt-0.5">
+                  Inactivated on: {formatDateFull((user.inactivatedAt || staff?.inactivatedAt) as string)}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Inactivation Prompt Modal */}
+      {showDeactivateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-slate-200">
+            <div className="flex items-center gap-2.5 text-rose-600 mb-3">
+              <span className="text-xl">⚠️</span>
+              <h3 className="text-base font-bold text-slate-900">Deactivate Staff Member</h3>
+            </div>
+            <p className="text-xs text-slate-600 mb-4">
+              Please provide a mandatory <strong>Inactivation Reason</strong> for deactivating <strong>{user.name}</strong>.
+            </p>
+
+            <form onSubmit={confirmInactivation} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Inactivation Reason <span className="text-rose-500">*</span>
+                </label>
+                <textarea
+                  required
+                  rows={3}
+                  placeholder="e.g. Absconded without notice / Disciplinary violation / Resigned / Relocated"
+                  value={inactivationReason}
+                  onChange={(e) => setInactivationReason(e.target.value)}
+                  className="w-full rounded-xl border border-slate-300 p-3 text-xs focus:border-blue-600 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowDeactivateModal(false)}
+                  className="rounded-xl px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={updating || !inactivationReason.trim()}
+                  className="rounded-xl bg-rose-600 px-5 py-2 text-xs font-bold text-white shadow-md hover:bg-rose-700 disabled:opacity-50 cursor-pointer"
+                >
+                  {updating ? 'Saving...' : 'Confirm Inactivation'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Main Grid: Left Details & Right Sticky Sidebar */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -548,6 +725,161 @@ export function UserDetailClient({
               </div>
             </div>
           </div>
+
+          {/* Card 5: Wash Boy Complaints */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xs space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-base">
+                  🚨
+                </span>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    5. Wash Boy Complaints &amp; Resolution History
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    Quality issues, customer grievances, and action taken
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowReviewsModal(true)}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50/80 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100 transition-colors shadow-2xs"
+                >
+                  <span>⭐</span>
+                  <span>View Reviews &amp; Ratings</span>
+                </button>
+                <Link
+                  href={`/admin/complaints?staffId=${staff?.id || user.staffId || user.id}`}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-100 transition-colors shadow-2xs"
+                >
+                  <span>🚨</span>
+                  <span>View Full Complaints Page →</span>
+                </Link>
+                <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-700">
+                  {totalComplaintsCount} Total
+                </span>
+              </div>
+            </div>
+
+            {/* Complaint KPI Statistics */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-center">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Complaints</span>
+                <p className="text-xl font-extrabold text-slate-900 mt-0.5">{totalComplaintsCount}</p>
+              </div>
+              <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-center">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-rose-700">Open Complaints</span>
+                <p className="text-xl font-extrabold text-rose-700 mt-0.5">{openComplaintsCount}</p>
+              </div>
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-center">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Resolved</span>
+                <p className="text-xl font-extrabold text-emerald-700 mt-0.5">{resolvedComplaintsCount}</p>
+              </div>
+              <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-center">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700">This Month</span>
+                <p className="text-xl font-extrabold text-blue-700 mt-0.5">{complaintsThisMonthCount}</p>
+              </div>
+            </div>
+
+            {/* Complaints List Table */}
+            {complaints.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-200 py-8 text-center bg-slate-50/50">
+                <p className="text-xs font-bold text-emerald-700">✨ Clean Track Record!</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">No customer complaints recorded against this staff member.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="overflow-x-auto rounded-xl border border-slate-200">
+                  <table className="w-full text-left text-xs">
+                    <thead className="border-b border-slate-200 bg-slate-50 text-[10px] uppercase font-bold text-slate-500">
+                      <tr>
+                        <th className="py-2.5 px-3">Date</th>
+                        <th className="py-2.5 px-3">Type</th>
+                        <th className="py-2.5 px-3">Customer</th>
+                        <th className="py-2.5 px-3">Issue Details</th>
+                        <th className="py-2.5 px-3">Status</th>
+                        <th className="py-2.5 px-3">Resolution / Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {complaints
+                        .slice((complaintsPage - 1) * complaintsPageSize, complaintsPage * complaintsPageSize)
+                        .map((c) => {
+                          const cust = customerById.get(c.customerId);
+                          return (
+                            <tr key={c.id} className="hover:bg-slate-50/70 transition-colors">
+                              <td className="py-2.5 px-3 font-semibold text-slate-800 whitespace-nowrap">
+                                {formatDateFull(c.createdAt)}
+                              </td>
+                              <td className="py-2.5 px-3 font-bold text-slate-900 whitespace-nowrap">
+                                {COMPLAINT_TYPE_LABEL[c.type] || c.type}
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <span className="font-bold text-slate-800 block">{cust?.name || 'Customer'}</span>
+                                <span className="text-[10px] text-slate-500">{cust?.phone || ''}</span>
+                              </td>
+                              <td className="py-2.5 px-3 max-w-xs truncate text-slate-600">
+                                {c.body}
+                              </td>
+                              <td className="py-2.5 px-3 whitespace-nowrap">
+                                <span
+                                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                    c.status === 'RESOLVED'
+                                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                      : c.status === 'ESCALATED'
+                                        ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                        : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                  }`}
+                                >
+                                  {c.status}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3 text-slate-600 italic">
+                                {c.resolution || 'Pending review'}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination Controls when complaints increase */}
+                {complaints.length > complaintsPageSize && (
+                  <div className="flex items-center justify-between pt-1">
+                    <div className="text-[11px] text-slate-500 font-medium">
+                      Showing {(complaintsPage - 1) * complaintsPageSize + 1} to{' '}
+                      {Math.min(complaintsPage * complaintsPageSize, complaints.length)} of {complaints.length} complaints
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        disabled={complaintsPage === 1}
+                        onClick={() => setComplaintsPage((p) => Math.max(1, p - 1))}
+                        className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      >
+                        ← Prev
+                      </button>
+                      <span className="text-xs font-bold text-slate-800 px-1">
+                        Page {complaintsPage} of {Math.ceil(complaints.length / complaintsPageSize)}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={complaintsPage * complaintsPageSize >= complaints.length}
+                        onClick={() => setComplaintsPage((p) => p + 1)}
+                        className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Next →
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Right 1 Column: Sticky Summary & Fast Actions */}
@@ -649,13 +981,24 @@ export function UserDetailClient({
                 </div>
               </div>
 
-              <div className="pt-2">
+              <div className="pt-2 space-y-2">
                 <Link
                   href={`/admin/users/${user.id}/edit`}
                   className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-blue-700 active:scale-95 transition-all shadow-xs text-center"
                 >
                   <span>✏️ Edit Member Details</span>
                 </Link>
+
+                {(user.role === 'EMPLOYEE' || user.staffId || staff) && (
+                  <button
+                    type="button"
+                    onClick={() => setShowReviewsModal(true)}
+                    className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50/90 px-4 py-2.5 text-xs font-bold text-amber-900 hover:bg-amber-100 active:scale-95 transition-all shadow-2xs text-center cursor-pointer"
+                  >
+                    <span>⭐</span>
+                    <span>View Reviews &amp; Ratings</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -672,6 +1015,15 @@ export function UserDetailClient({
           </div>
         </div>
       </div>
+
+      {/* Wash Boy Reviews Modal */}
+      {showReviewsModal && (
+        <WashBoyReviewsModal
+          staffId={staff?.id || user.staffId || user.id}
+          staffName={user.name}
+          onClose={() => setShowReviewsModal(false)}
+        />
+      )}
 
       {/* Fullscreen Lightbox Modal */}
       {lightboxUrl && (

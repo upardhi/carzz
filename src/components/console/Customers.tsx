@@ -4,7 +4,7 @@ import { scopeAreaFilter } from '@/lib/auth/rbac';
 import type { Session } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { LEAD_SOURCES, type Car, type Customer, type CustomerStatus } from '@/lib/data/types';
-import { currentCycle, formatTime, money } from '@/lib/util/format';
+import { currentCycle, formatDateFull, formatTime, money } from '@/lib/util/format';
 import { LEAD_SOURCE_LABEL, WEEKDAY_SHORT, summarizeWeeklyDays } from '@/lib/util/labels';
 import {
   IconCalendar,
@@ -503,22 +503,54 @@ export async function ConsoleCustomers({
             header: 'Status',
             className: 'whitespace-nowrap',
             render: (customer) => (
-              <span
-                className={clsx(
-                  'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold',
-                  customer.status === 'ACTIVE'
-                    ? 'bg-[#ECFDF5] text-[#059669]'
+              customer.status === 'INACTIVE' && customer.inactivationReason ? (
+                <div className="relative group inline-flex items-center gap-1.5">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#F1F5F9] text-[#475569]">
+                    Inactive
+                  </span>
+                  <span
+                    className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-slate-200 text-[10px] font-bold text-slate-700 cursor-help transition-transform group-hover:scale-110 shadow-2xs"
+                    title={`Reason: ${customer.inactivationReason}`}
+                  >
+                    ℹ
+                  </span>
+                  {/* Modern Glassy Tooltip Card */}
+                  <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2.5 hidden group-hover:block z-50 w-72 sm:w-80 rounded-2xl bg-slate-950/95 backdrop-blur-md p-3.5 text-left text-xs shadow-2xl border border-slate-800 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
+                      <div className="flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-wider text-rose-400">
+                        <span>⚠️</span>
+                        <span>Inactivation Reason</span>
+                      </div>
+                      {customer.inactivatedAt && (
+                        <span className="text-[10px] text-slate-400 font-medium">
+                          {formatDateFull(customer.inactivatedAt)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="pt-2 text-slate-200 text-xs font-normal leading-relaxed whitespace-pre-wrap break-words max-h-48 overflow-y-auto">
+                      {customer.inactivationReason}
+                    </div>
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-950" />
+                  </div>
+                </div>
+              ) : (
+                <span
+                  className={clsx(
+                    'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold',
+                    customer.status === 'ACTIVE'
+                      ? 'bg-[#ECFDF5] text-[#059669]'
+                      : customer.status === 'HOLD'
+                        ? 'bg-[#FFF7ED] text-[#D97706]'
+                        : 'bg-[#F1F5F9] text-[#475569]',
+                  )}
+                >
+                  {customer.status === 'ACTIVE'
+                    ? 'Active'
                     : customer.status === 'HOLD'
-                      ? 'bg-[#FFF7ED] text-[#D97706]'
-                      : 'bg-[#F1F5F9] text-[#475569]',
-                )}
-              >
-                {customer.status === 'ACTIVE'
-                  ? 'Active'
-                  : customer.status === 'HOLD'
-                    ? 'Hold'
-                    : 'Inactive'}
-              </span>
+                      ? 'Hold'
+                      : 'Inactive'}
+                </span>
+              )
             ),
           },
           {

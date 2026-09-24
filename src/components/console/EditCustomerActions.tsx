@@ -42,11 +42,17 @@ export function EditCustomerModalButton({
   const [source, setSource] = useState<LeadSource>(customer.source);
   const [note, setNote] = useState(customer.note || '');
   const [status, setStatus] = useState(customer.status);
+  const [inactivationReason, setInactivationReason] = useState(customer.inactivationReason || '');
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim() || !phone.trim() || !address.trim()) {
       toast.error('Name, Phone and Address are required.');
+      return;
+    }
+
+    if (status === 'INACTIVE' && !inactivationReason.trim()) {
+      toast.error('Please specify a reason for deactivating this customer.');
       return;
     }
 
@@ -67,6 +73,7 @@ export function EditCustomerModalButton({
           source,
           note: note.trim() || null,
           status,
+          inactivationReason: status === 'INACTIVE' ? inactivationReason.trim() : null,
         }),
       });
 
@@ -178,6 +185,20 @@ export function EditCustomerModalButton({
                 </div>
               </div>
 
+              {status === 'INACTIVE' && (
+                <div className="rounded-lg border border-rose-200 bg-rose-50/50 p-3">
+                  <label className="block font-bold text-rose-800 mb-1">Inactivation Reason *</label>
+                  <textarea
+                    rows={2}
+                    required
+                    value={inactivationReason}
+                    onChange={(e) => setInactivationReason(e.target.value)}
+                    placeholder="Reason for deactivation (e.g. Relocated, Sold car, Dissatisfied with service, etc.)"
+                    className="w-full rounded-lg border border-rose-300 bg-white px-3 py-2 text-xs font-semibold focus:border-rose-500 focus:outline-none"
+                  />
+                </div>
+              )}
+
               <div>
                 <label className="block font-bold text-slate-700 mb-1">Full Address *</label>
                 <input
@@ -231,16 +252,135 @@ export function EditCustomerModalButton({
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
-                  className="rounded-lg border border-slate-300 px-4 py-2 font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+                  className="rounded-lg border border-slate-300 px-4 py-2 font-bold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={pending}
-                  className="rounded-lg bg-blue-600 px-5 py-2 font-bold text-white hover:bg-blue-700 transition-colors disabled:opacity-50"
+                  className="rounded-lg bg-blue-600 px-5 py-2 font-bold text-white hover:bg-blue-700 transition-colors disabled:opacity-50 cursor-pointer"
                 >
                   {pending ? 'Saving…' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+export function InactivateCustomerButton({
+  customerId,
+  customerName,
+}: {
+  customerId: string;
+  customerName: string;
+}) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState('');
+  const [pending, setPending] = useState(false);
+
+  async function handleInactivate(e: React.FormEvent) {
+    e.preventDefault();
+    if (!reason.trim()) {
+      toast.error('Please provide a reason for inactiving this customer.');
+      return;
+    }
+    setPending(true);
+    try {
+      const res = await fetch('/api/ops/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'setStatus',
+          customerId,
+          status: 'INACTIVE',
+          reason: reason.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || 'Failed to inactivate customer.');
+        return;
+      }
+      toast.success('Customer set to inactive.');
+      setOpen(false);
+      setReason('');
+      router.refresh();
+    } catch {
+      toast.error('Network error. Please try again.');
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="inline-flex items-center gap-1 rounded-md border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 transition-colors cursor-pointer"
+      >
+        Set inactive
+      </button>
+
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Inactivate Customer</h3>
+                <p className="text-xs text-slate-500 mt-0.5">{customerName}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="text-slate-400 hover:text-slate-600 text-lg font-bold p-1 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleInactivate} className="space-y-4 text-xs">
+              <div className="rounded-lg bg-amber-50 p-3 border border-amber-200 text-amber-800">
+                <p className="font-semibold">⚠️ Warning</p>
+                <p className="mt-0.5">
+                  Making this customer inactive will unassign all their upcoming wash visits.
+                </p>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  Reason for Inactivation *
+                </label>
+                <textarea
+                  rows={3}
+                  required
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="e.g. Relocated to another city, Dissatisfied with service, Shifted apartment, Sold vehicle..."
+                  className="w-full rounded-lg border border-slate-300 p-2.5 text-xs font-semibold focus:border-rose-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  className="rounded-lg border border-slate-300 px-4 py-2 font-bold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={pending}
+                  className="rounded-lg bg-rose-600 px-5 py-2 font-bold text-white hover:bg-rose-700 transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  {pending ? 'Inactivating…' : 'Confirm Inactivation'}
                 </button>
               </div>
             </form>

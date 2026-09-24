@@ -27,7 +27,11 @@ export async function GET(request: Request) {
     const status = url.searchParams.get('status') || 'ALL';
     const staffId = url.searchParams.get('staffId');
     const areaId = url.searchParams.get('areaId');
+    const timeframe = url.searchParams.get('timeframe') || 'ALL_TIME';
     const q = (url.searchParams.get('q') || '').trim().toLowerCase();
+
+    const now = new Date();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
     const store = await getStore();
     const cycle = currentCycle();
@@ -84,6 +88,9 @@ export async function GET(request: Request) {
           approvedCount: 0,
           approvedAmount: 0,
           rejectedCount: 0,
+          totalWithdrawals: 0,
+          monthlyWithdrawals: 0,
+          availableBalance: 0,
         },
       });
     }
@@ -98,15 +105,16 @@ export async function GET(request: Request) {
         : status;
     }
 
+    if (timeframe === 'CURRENT_MONTH') {
+      requestWhere.requestedAt = { gte: currentMonthStart };
+    } else if (timeframe === 'PREVIOUS_MONTHS') {
+      requestWhere.requestedAt = { lt: currentMonthStart };
+    }
+
     const staffIdIn = { in: matchedStaffIds } as const;
     const weekAgo = new Date(Date.now() - 7 * 86400_000).toISOString();
 
     // Step 4: Execute database queries in parallel:
-    //   - DB count queries for stats cards (no full list fetched!)
-    //   - DB find for only pending/approved amount calculation
-    //   - DB count for total matching pagination
-    //   - DB find with limit & offset for the current page rows
-    //   - computePayoutRun for allowance limits (60s cached)
     const [
       totalCount,
       pendingCount,
@@ -114,15 +122,19 @@ export async function GET(request: Request) {
       rejectedCount,
       pendingRequests,
       approvedRequests,
+      currentMonthApproved,
+      allApproved,
       total,
       paginated,
       payoutRun,
     ] = await Promise.all([
-      store.pocketRequests.count({ staffId: staffIdIn } as never),
-      store.pocketRequests.count({ staffId: staffIdIn, status: 'PENDING' } as never),
-      store.pocketRequests.count({ staffId: staffIdIn, status: { in: ['APPROVED', 'PAID'] } } as never),
-      store.pocketRequests.count({ staffId: staffIdIn, status: 'REJECTED' } as never),
-      store.pocketRequests.find({ where: { staffId: staffIdIn, status: 'PENDING' } as never }),
+      store.pocketRequests.count({ staffId: staffIdIn, ...(requestWhere.requestedAt ? { requestedAt: requestWhere.requestedAt } : {}) } as never),
+      store.pocketRequests.count({ staffId: staffIdIn, status: 'PENDING', ...(requestWhere.requestedAt ? { requestedAt: requestWhere.requestedAt } : {}) } as never),
+      store.pocketRequests.count({ staffId: staffIdIn, status: { in: ['APPROVED', 'PAID'] }, ...(requestWhere.requestedAt ? { requestedAt: requestWhere.requestedAt } : {}) } as never),
+      store.pocketRequests.count({ staffId: staffIdIn, status: 'REJECTED', ...(requestWhere.requestedAt ? { requestedAt: requestWhere.requestedAt } : {}) } as never),
+      store.pocketRequests.find({ where: { staffId: staffIdIn, status: 'PENDING', ...(requestWhere.requestedAt ? { requestedAt: requestWhere.requestedAt } : {}) } as never }),
+      store.pocketRequests.find({ where: { staffId: staffIdIn, status: { in: ['APPROVED', 'PAID'] }, ...(requestWhere.requestedAt ? { requestedAt: requestWhere.requestedAt } : {}) } as never }),
+      store.pocketRequests.find({ where: { staffId: staffIdIn, status: { in: ['APPROVED', 'PAID'] }, requestedAt: { gte: currentMonthStart } } as never }),
       store.pocketRequests.find({ where: { staffId: staffIdIn, status: { in: ['APPROVED', 'PAID'] } } as never }),
       store.pocketRequests.count(requestWhere as never),
       store.pocketRequests.find({
@@ -141,6 +153,9 @@ export async function GET(request: Request) {
       approvedCount,
       approvedAmount: approvedRequests.reduce((sum, r) => sum + r.amount, 0),
       rejectedCount,
+      totalWithdrawals: allApproved.reduce((sum, r) => sum + r.amount, 0),
+      monthlyWithdrawals: currentMonthApproved.reduce((sum, r) => sum + r.amount, 0),
+      availableBalance: payoutRun.reduce((sum, p) => sum + Math.max(0, p.net - rules.pocketMinimumBalance), 0),
     };
 
     const totalPages = Math.ceil(total / limit) || 1;

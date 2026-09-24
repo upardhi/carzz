@@ -229,6 +229,7 @@ const schema = z.discriminatedUnion('action', [
     action: z.literal('setActive'),
     userId: z.string().min(1),
     active: z.boolean(),
+    reason: z.string().trim().optional(),
   }),
   z.object({
     action: z.literal('update'),
@@ -315,11 +316,20 @@ export async function POST(request: Request) {
       assertCanActOnRole(session, user.role);
       assertAreaInScope(session, user.areaId);
 
-      await store.users.update(user.id, { active: parsed.data.active });
+      const nowIso = new Date().toISOString();
+      await store.users.update(user.id, {
+        active: parsed.data.active,
+        inactivationReason: parsed.data.active ? null : (parsed.data.reason || 'Deactivated by Admin'),
+        inactivatedAt: parsed.data.active ? null : nowIso,
+      } as never);
       // Keep the staff record in step, or a deactivated manager still shows as
       // running an area.
       if (user.staffId) {
-        await store.staff.update(user.staffId, { active: parsed.data.active });
+        await store.staff.update(user.staffId, {
+          active: parsed.data.active,
+          inactivationReason: parsed.data.active ? null : (parsed.data.reason || 'Deactivated by Admin'),
+          inactivatedAt: parsed.data.active ? null : nowIso,
+        } as never);
       }
 
       // A dismissed wash boy must not keep collecting work: clear him off any
@@ -598,3 +608,61 @@ export async function POST(request: Request) {
     );
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const session = await requireApiSession('user:manage');
+    const url = new URL(request.url);
+    const userId = url.searchParams.get('userId');
+    if (!userId) {
+      return NextResponse.json({ error: 'User ID is required.' }, { status: 400 });
+    }
+
+    if (userId === session.user.id) {
+      throw new HttpError(400, 'You cannot delete your own account.');
+    }
+
+    const store = await getStore();
+    const user = await store.users.get(userId);
+    if (!user) {
+      throw new HttpError(404, 'User not found.');
+    }
+
+    assertCanActOnRole(session, user.role);
+    assertAreaInScope(session, user.areaId);
+
+    // Safe deletion: clean assignments and references
+    if (user.staffId) {
+      await store.visits.updateMany(
+        { staffId: user.staffId, status: 'PENDING' } as never,
+        { staffId: null }
+      );
+      await store.cars.updateMany(
+        { assignedStaffId: user.staffId } as never,
+        { assignedStaffId: null }
+      );
+      if (user.role === 'MANAGER' && user.areaId) {
+        await store.areas.update(user.areaId, { managerId: null });
+      }
+      await store.staff.delete(user.staffId).catch(() => {});
+    }
+
+    if (user.role === 'AREA_ADMIN' && user.regionId) {
+      await store.regions.update(user.regionId, { areaAdminId: null });
+    }
+
+    await store.users.delete(user.id);
+    revalidateUserPages();
+
+    return NextResponse.json({
+      ok: true,
+      message: `${user.name}'s account has been safely deleted.`,
+    });
+  } catch (error) {
+    if (error instanceof HttpError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    return NextResponse.json({ error: 'Could not delete that user.' }, { status: 500 });
+  }
+}
+

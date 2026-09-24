@@ -28,15 +28,15 @@ const f = (dateOnly: string[], timestamp: string[]): DateFields => ({
 
 /** Keyed by the Prisma delegate name (the model name, camel-cased). */
 export const DATE_FIELDS = {
-  user: f(['dob'], ['createdAt']),
+  user: f(['dob'], ['createdAt', 'inactivatedAt']),
   userCredential: NO_DATE_FIELDS,
   region: f([], ['createdAt']),
   area: f([], ['createdAt']),
-  staff: f(['joinedOn', 'dob'], []),
+  staff: f(['joinedOn', 'dob'], ['inactivatedAt']),
   attendance: f(['date'], ['loginAt']),
   pocketMoneyRequest: f([], ['requestedAt', 'decidedAt']),
   staffLeave: f(['startDate', 'endDate'], ['appliedAt', 'decidedAt']),
-  customer: f(['holdUntil', 'joinedOn'], []),
+  customer: f(['holdUntil', 'joinedOn'], ['inactivatedAt']),
 
   servicePackage: NO_DATE_FIELDS,
   car: f([], ['serviceStartedAt']),
@@ -56,6 +56,7 @@ export const DATE_FIELDS = {
   siteContent: f([], ['updatedAt']),
   enquiry: f([], ['createdAt', 'handledAt']),
   staffReferral: f([], ['createdAt', 'areaApprovedAt', 'superApprovedAt', 'rejectedAt']),
+  customerRequest: f(['preferredDate'], ['createdAt', 'decidedAt']),
 } as const satisfies Record<string, DateFields>;
 
 export type PrismaModelName = keyof typeof DATE_FIELDS;

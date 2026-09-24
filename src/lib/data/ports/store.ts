@@ -6,6 +6,7 @@ import type {
   Car,
   Complaint,
   Customer,
+  CustomerRequest,
   Enquiry,
   Expense,
   Id,
@@ -61,6 +62,7 @@ export interface DataStore {
   readonly notifications: Repository<Notification>;
   readonly enquiries: Repository<Enquiry>;
   readonly staffReferrals: Repository<StaffReferral>;
+  readonly customerRequests: Repository<CustomerRequest>;
 
 
   /** Credentials are kept apart so a password hash never rides on a `User`. */

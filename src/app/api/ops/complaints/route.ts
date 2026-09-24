@@ -27,6 +27,7 @@ const querySchema = z.object({
   sortBy: z.enum(['LATEST', 'OLDEST']).default('LATEST'),
   areaId: z.string().optional(),
   regionId: z.string().optional(),
+  staffId: z.string().optional(),
 });
 
 export async function GET(request: Request) {
@@ -42,13 +43,14 @@ export async function GET(request: Request) {
       sortBy: url.searchParams.get('sortBy') ?? undefined,
       areaId: url.searchParams.get('areaId') ?? undefined,
       regionId: url.searchParams.get('regionId') ?? undefined,
+      staffId: url.searchParams.get('staffId') ?? undefined,
     });
 
     if (!parseResult.success) {
       return NextResponse.json({ error: 'Invalid query parameters' }, { status: 400 });
     }
 
-    const { page, pageSize, status, time, sortBy, areaId, regionId } = parseResult.data;
+    const { page, pageSize, status, time, sortBy, areaId, regionId, staffId } = parseResult.data;
     const store = await getStore();
 
     // Base scope filter from user role / session
@@ -73,6 +75,8 @@ export async function GET(request: Request) {
       areaClause.areaId = areaId;
     }
 
+    const staffClause: Where<Complaint> = staffId ? { staffId } : {};
+
     // Time filter bounds (computed in UTC / ISO)
     const timeClause: Where<Complaint> = {};
     const now = new Date();
@@ -87,10 +91,11 @@ export async function GET(request: Request) {
       timeClause.createdAt = { gte: monthStart.toISOString() };
     }
 
-    // Base WHERE for current time horizon + area scope
+    // Base WHERE for current time horizon + area scope + staff filter
     const timeAndAreaWhere: Where<Complaint> = {
       ...baseScope,
       ...areaClause,
+      ...staffClause,
       ...timeClause,
     };
 
@@ -116,6 +121,7 @@ export async function GET(request: Request) {
       recentResolvedSample,
       areasList,
       regionsList,
+      allStaffList,
     ] = await Promise.all([
       // 1. Paginated records with DB LIMIT & OFFSET
       store.complaints.find({
@@ -148,6 +154,8 @@ export async function GET(request: Request) {
       store.areas.find(),
       // 8. Region reference list
       store.regions.find({ orderBy: [{ field: 'name' }] }),
+      // 9. All staff list for filter dropdown
+      store.staff.find({ where: { role: 'EMPLOYEE' } as never, orderBy: [{ field: 'name' }] }),
     ]);
 
     // Batch fetch only the customers and staff present on this page
@@ -207,6 +215,7 @@ export async function GET(request: Request) {
       complaints: paginatedComplaints,
       customers: pageCustomers,
       staff: pageStaff,
+      allStaff: allStaffList,
       areas: areasList,
       regions: regionsList,
       visits: pageVisits,

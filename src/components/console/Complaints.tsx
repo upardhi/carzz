@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { PageHeader } from '@/components/shell/ConsoleShell';
 import { WidgetTable } from '@/components/ui/WidgetTable';
 import type { Complaint } from '@/lib/data/types';
@@ -127,15 +128,17 @@ export async function ConsoleComplaints({
         description={`${countOpen} open · ${countResolved} resolved`}
       />
 
-      <ComplaintsClient
-        complaints={complaints}
-        areas={areas}
-        regions={regions}
-        staff={staff}
-        customers={customers}
-        visits={visits}
-        canEscalate={canEscalate}
-      />
+      <Suspense fallback={<div className="h-64 rounded-2xl bg-white p-6 border border-slate-200 animate-pulse" />}>
+        <ComplaintsClient
+          complaints={complaints}
+          areas={areas}
+          regions={regions}
+          staff={staff}
+          customers={customers}
+          visits={visits}
+          canEscalate={canEscalate}
+        />
+      </Suspense>
 
       <div className="mt-4 grid gap-3 lg:grid-cols-2">
         <WidgetTable<[string, number]>

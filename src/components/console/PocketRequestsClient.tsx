@@ -46,6 +46,9 @@ interface PocketStats {
   approvedCount: number;
   approvedAmount: number;
   rejectedCount: number;
+  totalWithdrawals?: number;
+  monthlyWithdrawals?: number;
+  availableBalance?: number;
 }
 
 const AVATAR_COLORS = [
@@ -80,6 +83,9 @@ export function PocketRequestsClient({ base, backHref }: PocketRequestsClientPro
     approvedCount: 0,
     approvedAmount: 0,
     rejectedCount: 0,
+    totalWithdrawals: 0,
+    monthlyWithdrawals: 0,
+    availableBalance: 0,
   });
 
   const [page, setPage] = useState(1);
@@ -87,14 +93,15 @@ export function PocketRequestsClient({ base, backHref }: PocketRequestsClientPro
   const [total, setTotal] = useState(0);
 
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [timeframeFilter, setTimeframeFilter] = useState<string>('ALL_TIME');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const debouncedSearch = useDebounce(searchQuery, 300);
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
 
-  // Reset to page 1 on debounced search update
+  // Reset to page 1 on debounced search or timeframe update
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch]);
+  }, [debouncedSearch, timeframeFilter]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -103,6 +110,7 @@ export function PocketRequestsClient({ base, backHref }: PocketRequestsClientPro
         page: String(page),
         limit: String(pageSize),
         status: statusFilter,
+        timeframe: timeframeFilter,
         q: debouncedSearch,
       });
 
@@ -126,7 +134,7 @@ export function PocketRequestsClient({ base, backHref }: PocketRequestsClientPro
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, statusFilter, debouncedSearch]);
+  }, [page, pageSize, statusFilter, timeframeFilter, debouncedSearch]);
 
   useEffect(() => {
     fetchData();
@@ -347,6 +355,24 @@ export function PocketRequestsClient({ base, backHref }: PocketRequestsClientPro
       {/* 4 Top KPI Summary Cards */}
       <StatGrid columns={4}>
         <StatCard
+          label="TOTAL WITHDRAWALS"
+          value={money(stats.totalWithdrawals ?? 0)}
+          tone="purple"
+          subtext="Total disbursed all-time"
+        />
+        <StatCard
+          label="MONTHLY WITHDRAWALS"
+          value={money(stats.monthlyWithdrawals ?? 0)}
+          tone="emerald"
+          subtext="Approved this month"
+        />
+        <StatCard
+          label="AVAILABLE BALANCE"
+          value={money(stats.availableBalance ?? 0)}
+          tone="navy"
+          subtext="Cumulative buffer available"
+        />
+        <StatCard
           label="PENDING REQUESTS"
           value={stats.pendingCount}
           tone={stats.pendingCount > 0 ? 'rose' : 'emerald'}
@@ -355,24 +381,6 @@ export function PocketRequestsClient({ base, backHref }: PocketRequestsClientPro
               ? `${money(stats.pendingAmount)} awaiting approval`
               : 'All caught up'
           }
-        />
-        <StatCard
-          label="APPROVED"
-          value={stats.approvedCount}
-          tone="emerald"
-          subtext={`${money(stats.approvedAmount)} disbursed this month`}
-        />
-        <StatCard
-          label="REJECTED"
-          value={stats.rejectedCount}
-          tone="slate"
-          subtext="Breached weekly caps or declined"
-        />
-        <StatCard
-          label="TOTAL REQUESTS"
-          value={stats.totalCount}
-          tone="purple"
-          subtext="Recorded this billing cycle"
         />
       </StatGrid>
 
@@ -394,27 +402,54 @@ export function PocketRequestsClient({ base, backHref }: PocketRequestsClientPro
             />
           </div>
 
-          {/* Status Tabs */}
-          <div className="flex items-center gap-1.5 rounded-xl border border-line bg-surface-sunken p-1">
-            {(['ALL', 'PENDING', 'APPROVED', 'REJECTED'] as const).map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => {
-                  setStatusFilter(s);
-                  setPage(1);
-                }}
-                className={`rounded-lg px-3 py-1 text-xs font-semibold transition-all ${
-                  statusFilter === s
-                    ? 'bg-surface text-navy-950 shadow-2xs'
-                    : 'text-ink-mute hover:text-navy-950'
-                }`}
-              >
-                {s === 'ALL'
-                  ? 'All requests'
-                  : s.charAt(0) + s.slice(1).toLowerCase()}
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Timeframe Filter */}
+            <div className="flex items-center gap-1 rounded-xl border border-line bg-surface-sunken p-1">
+              {[
+                { id: 'ALL_TIME', label: 'All Time' },
+                { id: 'CURRENT_MONTH', label: 'Current Month' },
+                { id: 'PREVIOUS_MONTHS', label: 'Previous Months' },
+              ].map((tf) => (
+                <button
+                  key={tf.id}
+                  type="button"
+                  onClick={() => {
+                    setTimeframeFilter(tf.id);
+                    setPage(1);
+                  }}
+                  className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
+                    timeframeFilter === tf.id
+                      ? 'bg-surface text-navy-950 shadow-2xs font-bold'
+                      : 'text-ink-mute hover:text-navy-950'
+                  }`}
+                >
+                  {tf.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Status Tabs */}
+            <div className="flex items-center gap-1 rounded-xl border border-line bg-surface-sunken p-1">
+              {(['ALL', 'PENDING', 'APPROVED', 'REJECTED'] as const).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => {
+                    setStatusFilter(s);
+                    setPage(1);
+                  }}
+                  className={`rounded-lg px-3 py-1 text-xs font-semibold transition-all ${
+                    statusFilter === s
+                      ? 'bg-surface text-navy-950 shadow-2xs'
+                      : 'text-ink-mute hover:text-navy-950'
+                  }`}
+                >
+                  {s === 'ALL'
+                    ? 'All'
+                    : s.charAt(0) + s.slice(1).toLowerCase()}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 

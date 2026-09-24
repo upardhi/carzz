@@ -9,7 +9,6 @@ import {
   IconClock,
   IconDroplet,
   IconRupee,
-  IconStar,
   IconUsers,
   IconWallet,
 } from '@/components/shell/icons';
@@ -34,6 +33,8 @@ import {
   areaPerformance,
   businessSummary,
   leadSourceReport,
+  dailyOperationsReport,
+  customerStaffGrowthReport,
 } from '@/lib/services/reports';
 import {
   currentCycle,
@@ -42,7 +43,6 @@ import {
   moneyShort,
   percent,
 } from '@/lib/util/format';
-import { LEAD_SOURCE_LABEL } from '@/lib/util/labels';
 
 export const metadata = { title: 'Business overview' };
 
@@ -51,28 +51,23 @@ export const metadata = { title: 'Business overview' };
 /* -------------------------------------------------------------------------- */
 
 async function AdminDashboardContent() {
-  // requirePermission is memoised by React cache() so this is free — the
-  // layout already resolved the session for this request.
   await requirePermission('report:business');
   const store = await getStore();
   const cycle = currentCycle();
 
-  // The payout run is the most expensive step. areaPerformance re-uses it so
-  // we avoid computing it twice.
   const payouts = await computePayoutRun(store, cycle, null);
   const areas = await areaPerformance(store, cycle, null, payouts);
 
-  // Everything that can run in parallel after areas are known.
-  const [summary, sources, purchases, escalatedComplaints] = await Promise.all([
+  // Parallel data fetching for all enhanced dashboards
+  const [summary, sources, purchases, escalatedComplaints, dailyOps, growth] = await Promise.all([
     businessSummary(store, cycle, null, areas),
     leadSourceReport(store, null),
     store.purchaseRequests.count({ status: 'PENDING' }),
     store.complaints.count({ status: 'ESCALATED' }),
+    dailyOperationsReport(store, null),
+    customerStaffGrowthReport(store, cycle, null),
   ]);
 
-  // A DRAFT payout with nothing earned yet isn't an action for the owner —
-  // it's just staff who haven't done a billable wash this cycle. Only flag
-  // the ones that actually have money riding on the approval.
   const unapproved = payouts.filter((p) => p.status === 'DRAFT' && p.net > 0);
   const worstSource = [...sources]
     .filter((s) => s.cost > 0)
@@ -82,87 +77,140 @@ async function AdminDashboardContent() {
     summary.staff > 0 ? (summary.washesDone / summary.staff).toFixed(0) : '0';
   const collectionRate =
     summary.billed > 0 ? Math.round((summary.collected / summary.billed) * 100) : 100;
-  const completionRate =
-    summary.washesDone + summary.washesMissed > 0
-      ? Math.round(
-          (summary.washesDone / (summary.washesDone + summary.washesMissed)) * 100,
-        )
-      : 100;
+  const totalExpenses = summary.expenses + summary.payoutCost;
 
   return (
     <>
-      {/* 8 Comprehensive Executive KPI Cards (4 columns x 2 rows) */}
-      <StatGrid columns={4}>
+      {/* ===================================================================== */}
+      {/* 2.1 KEY STATISTICS (6 KPIs)                                           */}
+      {/* ===================================================================== */}
+      <StatGrid columns={3}>
         <StatCard
-          label="COLLECTED REVENUE"
-          value={moneyShort(summary.collected)}
-          icon={<IconWallet width={20} height={20} strokeWidth={2} />}
+          label="TOTAL ACTIVE CUSTOMERS"
+          value={dailyOps.totalActiveCustomers}
+          icon={<IconUsers width={20} height={20} strokeWidth={2} />}
           tone="emerald"
-          subtext={`${collectionRate}% of ${moneyShort(summary.billed)} billed`}
+          subtext={`Active subscriptions out of ${dailyOps.totalCustomers} total`}
           subtextTone="success"
         />
         <StatCard
-          label="NET PROFIT"
-          value={moneyShort(summary.profit)}
-          icon={<IconRupee width={20} height={20} strokeWidth={2.2} />}
-          tone={summary.profit > 0 ? 'emerald' : 'rose'}
-          subtext="Collected minus staff pay & expenses"
-          subtextTone={summary.profit > 0 ? 'success' : 'danger'}
-        />
-        <StatCard
-          label="ACTIVE SUBSCRIBERS"
-          value={summary.customers}
-          icon={<IconUsers width={20} height={20} strokeWidth={2} />}
-          tone="purple"
-          subtext={`${summary.activeCars} vehicles under subscription`}
-          subtextTone="muted"
-        />
-        <StatCard
-          label="OUTSTANDING DUES"
-          value={moneyShort(summary.outstanding)}
-          icon={<IconClock width={20} height={20} strokeWidth={2} />}
-          tone="amber"
-          subtext="Pending payment collection"
-          subtextTone="warning"
-        />
-        <StatCard
-          label="WASHES DELIVERED"
-          value={summary.washesDone}
+          label="TODAY'S WASHES"
+          value={dailyOps.washesToday}
           icon={<IconDroplet width={20} height={20} strokeWidth={2} />}
           tone="blue"
-          subtext={`${completionRate}% completion · ${summary.washesMissed} missed`}
-          subtextTone={completionRate >= 90 ? 'success' : 'warning'}
+          subtext={`${dailyOps.todayRemainingWashes} remaining washes today`}
+          subtextTone={dailyOps.todayRemainingWashes === 0 ? 'success' : 'warning'}
         />
         <StatCard
-          label="AVG REVENUE / CAR (ARPU)"
-          value={money(summary.revenuePerCar)}
-          icon={<IconCar width={20} height={20} strokeWidth={2} />}
-          tone="blue"
-          subtext={`${money(summary.costPerWash)} delivery cost/wash`}
-          subtextTone="muted"
-        />
-        <StatCard
-          label="STAFF PRODUCTIVITY"
-          value={`${staffUtilization} washes`}
+          label="TODAY'S WASHED CUSTOMERS"
+          value={dailyOps.todayWashedCustomers}
           icon={<IconCheckCircle width={20} height={20} strokeWidth={2} />}
-          tone="purple"
-          subtext={`Avg per staff · ${summary.staff} active staff`}
-          subtextTone="muted"
+          tone="emerald"
+          subtext="Unique subscribers serviced today"
+          subtextTone="success"
         />
         <StatCard
-          label="CUSTOMER SATISFACTION"
-          value={summary.averageRating > 0 ? `${summary.averageRating.toFixed(1)} ★` : '—'}
-          icon={<IconStar width={20} height={20} strokeWidth={2} />}
-          tone={summary.averageRating >= 4 ? 'emerald' : summary.averageRating > 0 ? 'amber' : 'slate'}
-          subtext={
-            summary.averageRating > 0
-              ? `${Math.round((summary.averageRating / 5) * 100)}% satisfaction · ${summary.openComplaints} open issues`
-              : 'No customer ratings recorded yet'
-          }
-          subtextTone={summary.averageRating >= 4 ? 'success' : summary.averageRating > 0 ? 'warning' : 'muted'}
+          label="REMAINING WASHES"
+          value={dailyOps.todayRemainingWashes}
+          icon={<IconClock width={20} height={20} strokeWidth={2} />}
+          tone={dailyOps.todayRemainingWashes > 0 ? 'amber' : 'slate'}
+          subtext="Scheduled washes remaining today"
+          subtextTone={dailyOps.todayRemainingWashes > 0 ? 'warning' : 'muted'}
+        />
+        <StatCard
+          label="MONTHLY REVENUE"
+          value={moneyShort(summary.collected)}
+          icon={<IconWallet width={20} height={20} strokeWidth={2} />}
+          tone="emerald"
+          subtext={`${collectionRate}% collected of ${moneyShort(summary.billed)} billed`}
+          subtextTone="success"
+        />
+        <StatCard
+          label="TOTAL CUSTOMERS"
+          value={dailyOps.totalCustomers}
+          icon={<IconCar width={20} height={20} strokeWidth={2} />}
+          tone="purple"
+          subtext={`${growth.newCustomersThisMonth} new joined this month`}
+          subtextTone="muted"
         />
       </StatGrid>
 
+      {/* ===================================================================== */}
+      {/* 2.2 DAILY WORK & 2.3 PAYMENT & 2.4 CUSTOMER DASHBOARDS               */}
+      {/* ===================================================================== */}
+      <div className="mt-5 grid gap-4 lg:grid-cols-3">
+        {/* 2.2 Dedicated Daily Work Dashboard */}
+        <Card className="p-5 min-w-0 border-l-4 border-l-blue-500">
+          <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+            <CardHeading>Daily Work Operations</CardHeading>
+            <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-bold text-blue-700">
+              Today &amp; Tomorrow
+            </span>
+          </div>
+          <div className="space-y-1.5">
+            <Row label="Washed Today" value={`${dailyOps.washesToday} washes`} tone="success" />
+            <Row label="Today's Washed Customers" value={`${dailyOps.todayWashedCustomers} customers`} />
+            <Row
+              label="Remaining Washes Today"
+              value={`${dailyOps.todayRemainingWashes} pending`}
+              tone={dailyOps.todayRemainingWashes > 0 ? 'gold' : undefined}
+            />
+            <Row
+              label="Next Day Remaining Washes"
+              value={`${dailyOps.nextDayRemainingWashes} scheduled`}
+            />
+          </div>
+        </Card>
+
+        {/* 2.3 Payment Dashboard */}
+        <Card className="p-5 min-w-0 border-l-4 border-l-emerald-500">
+          <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+            <CardHeading>Payment Overview</CardHeading>
+            <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700">
+              {cycleLabel(cycle)}
+            </span>
+          </div>
+          <div className="space-y-1.5">
+            <Row label="Monthly Revenue (Billed)" value={money(summary.billed)} />
+            <Row label="Monthly Collected Revenue" value={money(summary.collected)} tone="success" />
+            <Row
+              label="Monthly Pending Amount"
+              value={money(summary.outstanding)}
+              tone={summary.outstanding > 0 ? 'danger' : undefined}
+            />
+            <Row label="Collection Efficiency" value={percent(summary.billed ? summary.collected / summary.billed : 0)} />
+          </div>
+        </Card>
+
+        {/* 2.4 Customer & Staff Dashboard */}
+        <Card className="p-5 min-w-0 border-l-4 border-l-purple-500">
+          <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+            <CardHeading>Customer &amp; Staff Growth</CardHeading>
+            <span className="rounded-full bg-purple-50 px-2.5 py-0.5 text-[11px] font-bold text-purple-700">
+              This Month
+            </span>
+          </div>
+          <div className="space-y-1.5">
+            <Row label="Total Customers" value={growth.totalCustomers} />
+            <Row label="New Customers This Month" value={`+${growth.newCustomersThisMonth}`} tone="success" />
+            <Row
+              label="Inactive Customers This Month"
+              value={`${growth.inactiveCustomersThisMonth}`}
+              tone={growth.inactiveCustomersThisMonth > 0 ? 'danger' : undefined}
+            />
+            <Row label="New Wash Boys Joined" value={`+${growth.newWashBoysJoinedThisMonth}`} tone="success" />
+            <Row
+              label="Inactive Wash Boys"
+              value={`${growth.inactiveWashBoysThisMonth}`}
+              tone={growth.inactiveWashBoysThisMonth > 0 ? 'danger' : undefined}
+            />
+          </div>
+        </Card>
+      </div>
+
+      {/* ===================================================================== */}
+      {/* 2.1 MONTHLY FINANCIAL P&L BREAKDOWN & AREA PERFORMANCE               */}
+      {/* ===================================================================== */}
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
         {/* Left Column: Area Performance Table */}
         <div className="flex flex-col justify-between min-w-0">
@@ -316,76 +364,56 @@ async function AdminDashboardContent() {
                     </div>
                   </Link>
                 ) : null}
-
-                {worstSource && worstSource.costPerActiveCar > 1000 ? (
-                  <Link href="/admin/sources" className="block group">
-                    <div className="flex items-center justify-between rounded-xl border border-line-soft border-l-4 border-l-navy-800 bg-white p-3.5 shadow-xs transition-all hover:bg-slate-50/70 hover:shadow-sm">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
-                          <IconUsers width={18} height={18} strokeWidth={2.2} />
-                        </div>
-                        <div className="min-w-0 flex-1 pr-2">
-                          <b className="block truncate text-sm font-semibold text-navy-950 group-hover:text-blue-600 transition-colors">
-                            {LEAD_SOURCE_LABEL[worstSource.source]} marketing high CAC
-                          </b>
-                          <p className="truncate mt-0.5 text-xs text-ink-mute">
-                            {money(worstSource.cost)} spent, {worstSource.joined} joined —{' '}
-                            {money(worstSource.costPerActiveCar)} per active subscriber.
-                          </p>
-                        </div>
-                      </div>
-                      <IconChevronRight width={16} height={16} className="shrink-0 text-slate-400 group-hover:text-blue-600 transition-colors" />
-                    </div>
-                  </Link>
-                ) : null}
               </>
             )}
           </div>
         </Card>
 
-        {/* Operational Performance Summary Card */}
+        {/* 2.1 Monthly Financial P&L Breakdown Card */}
         <Card className="p-5 min-w-0">
-          <CardHeading>Operations & Service Execution</CardHeading>
-          <div className="mt-2 space-y-1">
-            <Row label="Washes completed" value={summary.washesDone} />
+          <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+            <CardHeading>Monthly Financial P&amp;L Breakdown</CardHeading>
+            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-bold text-slate-700">
+              Profit &amp; Loss
+            </span>
+          </div>
+          <div className="space-y-1.5">
+            <Row label="Monthly Collected Revenue" value={money(summary.collected)} tone="success" />
+            <Row label="Pending Revenue (Outstanding)" value={money(summary.outstanding)} tone={summary.outstanding > 0 ? 'gold' : undefined} />
+            <Row label="Remaining Payments" value={money(summary.outstanding)} />
+            <Row label="Total Revenue (Gross Billed)" value={money(summary.billed)} />
+            <Row label="Total Expenses (Staff &amp; Goods)" value={money(totalExpenses)} tone="danger" />
+            <div className="border-t border-slate-200/80 pt-2 mt-2">
+              <Row
+                label="Net Profit"
+                value={money(summary.profit)}
+                tone={summary.profit > 0 ? 'success' : 'danger'}
+              />
+            </div>
+          </div>
+        </Card>
+
+        {/* Operational Quality Card */}
+        <Card className="p-5 min-w-0">
+          <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+            <CardHeading>Service Quality &amp; Efficiency</CardHeading>
+            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-bold text-slate-700">
+              Metrics
+            </span>
+          </div>
+          <div className="space-y-1.5">
+            <Row label="Staff Productivity" value={`${staffUtilization} washes / staff`} />
+            <Row label="Open Complaints" value={summary.openComplaints} tone={summary.openComplaints > 0 ? 'gold' : undefined} />
             <Row
-              label="Washes missed"
-              value={`${summary.washesMissed} (${percent(
-                summary.washesDone + summary.washesMissed > 0
-                  ? summary.washesMissed / (summary.washesDone + summary.washesMissed)
-                  : 0,
-              )})`}
-              tone="gold"
-            />
-            <Row label="Active cleaner staff" value={summary.staff} />
-            <Row label="Staff productivity" value={`${staffUtilization} washes / staff`} />
-            <Row label="Open complaints" value={summary.openComplaints} />
-            <Row
-              label="Customer CSAT rating"
+              label="Customer CSAT Rating"
               value={
                 summary.averageRating > 0
                   ? `${summary.averageRating.toFixed(1)} ★ (${Math.round((summary.averageRating / 5) * 100)}%)`
                   : '—'
               }
             />
-            <Row label="Revenue per car (ARPU)" value={money(summary.revenuePerCar)} />
-            <Row label="Direct cost per wash" value={money(summary.costPerWash)} />
-          </div>
-        </Card>
-
-        {/* Monthly P&L Financial Summary Card */}
-        <Card className="p-5 min-w-0">
-          <CardHeading>Monthly Financial P&L Breakdown</CardHeading>
-          <div className="mt-2 space-y-1">
-            <Row label="Total Billed" value={money(summary.billed)} />
-            <Row label="Total Collected" value={money(summary.collected)} tone="success" />
-            <Row
-              label="Collection Rate"
-              value={percent(summary.billed ? summary.collected / summary.billed : 0)}
-            />
-            <Row label="Staff Payout Cost" value={money(summary.payoutCost)} />
-            <Row label="Consumables & Operating Expenses" value={money(summary.expenses)} />
-
+            <Row label="Direct Cost Per Wash" value={money(summary.costPerWash)} />
+            <Row label="Revenue Per Car (ARPU)" value={money(summary.revenuePerCar)} />
           </div>
         </Card>
       </div>

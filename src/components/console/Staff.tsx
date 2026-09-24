@@ -19,6 +19,7 @@ import {
   todayISO,
 } from '@/lib/util/format';
 import { ActionButton } from './ActionButton';
+import { StaffRowActions } from './StaffRowActions';
 import { getSafeDocumentUrl } from '@/lib/util/doc-url';
 
 function getInitials(name: string) {
@@ -340,24 +341,7 @@ export async function ConsoleStaff({
             {
               id: 'action',
               header: 'ACTION',
-              render: (member) => (
-                <ActionButton
-                  endpoint="/api/ops/staff"
-                  variant={member.active ? 'secondary' : 'primary'}
-                  payload={{
-                    action: 'setActive',
-                    staffId: member.id,
-                    active: !member.active,
-                  }}
-                  confirm={
-                    member.active
-                      ? `Deactivate ${member.name}? Their upcoming cars become unassigned and their login stops working.`
-                      : undefined
-                  }
-                >
-                  {member.active ? 'Deactivate' : 'Reactivate'}
-                </ActionButton>
-              ),
+              render: (member) => <StaffRowActions member={member} base={base} />,
             },
           ]}
         />

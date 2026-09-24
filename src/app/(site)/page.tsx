@@ -269,6 +269,171 @@ export default async function HomePage() {
       </section>
 
       {/* ===================================================================== */}
+      {/* 2.5. OUR SERVICES                                                     */}
+      {/* ===================================================================== */}
+      <section id="services" className="scroll-mt-16 bg-slate-50/60 px-4 sm:px-6 lg:px-8 py-20 border-t border-slate-200/70">
+        <div className="mx-auto max-w-7xl">
+          <div className="text-center mb-14">
+            <span className="inline-block rounded-full bg-blue-600/10 px-4 py-1 text-[11px] font-semibold uppercase tracking-wider text-blue-700">
+              TAILORED CAR CARE
+            </span>
+            <h2 className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight text-slate-900">
+              Our Signature Services
+            </h2>
+            <p className="mt-2 text-sm text-slate-500 max-w-xl mx-auto">
+              From daily exterior maintenance to showroom-grade detailing, pick the service level tailored to your vehicle.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* 1. Basic Service */}
+            <div className="flex flex-col rounded-3xl border border-slate-200 bg-white p-7 shadow-xs hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+              <div className="flex items-center justify-between">
+                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-2xl">
+                  🚗
+                </span>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                  Daily Essential
+                </span>
+              </div>
+              <h3 className="mt-5 text-xl font-black tracking-tight text-slate-900">1. Basic Service</h3>
+              <p className="mt-2 text-xs font-medium leading-relaxed text-slate-500">
+                Quick, safe, and reliable doorstep exterior wash keeping your car dust-free and presentable every day.
+              </p>
+
+              <div className="mt-6 flex-1 border-t border-slate-100 pt-5">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-3">Key Benefits:</p>
+                <ul className="space-y-2.5 text-xs font-medium text-slate-700">
+                  {[
+                    'Doorstep microfiber exterior wash',
+                    'Windshield & side windows clean',
+                    'Tyre wipe & rim degreasing',
+                    'Before & after photo verification',
+                  ].map((b) => (
+                    <li key={b} className="flex items-start gap-2.5">
+                      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600 mt-0.5">
+                        <IconCheck width={10} height={10} strokeWidth={3.5} />
+                      </span>
+                      <span>{b}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="mt-7 pt-4 border-t border-slate-100">
+                <a
+                  href="#book"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-100 py-3 text-xs font-bold text-slate-900 hover:bg-slate-200 transition-colors"
+                >
+                  <span>Select Basic Service</span>
+                  <span>→</span>
+                </a>
+              </div>
+            </div>
+
+            {/* 2. Premium Service (Highlighted) */}
+            <div className="relative flex flex-col rounded-3xl border-2 border-amber-400 bg-gradient-to-b from-amber-50/50 via-white to-white p-7 shadow-xl shadow-amber-500/10 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
+              <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#f59e0b] px-4 py-1 text-[11px] font-bold uppercase tracking-wider text-[#071739] shadow-md">
+                  ⭐ Most Popular
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-2xl">
+                  ✨
+                </span>
+                <span className="rounded-full bg-amber-100 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-amber-800">
+                  Full Care
+                </span>
+              </div>
+              <h3 className="mt-5 text-xl font-black tracking-tight text-slate-900">2. Premium Service</h3>
+              <p className="mt-2 text-xs font-medium leading-relaxed text-slate-500">
+                Comprehensive interior & exterior wash package designed for car owners who love a spotless cabin.
+              </p>
+
+              <div className="mt-6 flex-1 border-t border-amber-100/80 pt-5">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-amber-800 mb-3">Key Benefits:</p>
+                <ul className="space-y-2.5 text-xs font-medium text-slate-700">
+                  {[
+                    'Everything in Basic Service',
+                    'High-foam exterior shampoo wash',
+                    'Complete interior cabin vacuuming',
+                    'Dashboard, console & trim dressing',
+                    'Door jambs & boot cleaning',
+                  ].map((b) => (
+                    <li key={b} className="flex items-start gap-2.5">
+                      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-amber-200 text-amber-800 mt-0.5">
+                        <IconCheck width={10} height={10} strokeWidth={3.5} />
+                      </span>
+                      <span className="font-semibold text-slate-900">{b}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="mt-7 pt-4 border-t border-amber-100/80">
+                <a
+                  href="#book"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#071739] py-3 text-xs font-bold text-white hover:bg-[#0c2454] shadow-md transition-colors"
+                >
+                  <span>Select Premium Service</span>
+                  <span>→</span>
+                </a>
+              </div>
+            </div>
+
+            {/* 3. Extra Premium Service */}
+            <div className="flex flex-col rounded-3xl border border-slate-200 bg-white p-7 shadow-xs hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+              <div className="flex items-center justify-between">
+                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-50 text-2xl">
+                  💎
+                </span>
+                <span className="rounded-full bg-purple-100 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-purple-700">
+                  Showroom Finish
+                </span>
+              </div>
+              <h3 className="mt-5 text-xl font-black tracking-tight text-slate-900">3. Extra Premium Service</h3>
+              <p className="mt-2 text-xs font-medium leading-relaxed text-slate-500">
+                The ultimate deep detailing, high-gloss shine protection, and cabin sanitization for peak vehicle luxury.
+              </p>
+
+              <div className="mt-6 flex-1 border-t border-slate-100 pt-5">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-3">Key Benefits:</p>
+                <ul className="space-y-2.5 text-xs font-medium text-slate-700">
+                  {[
+                    'Everything in Premium Service',
+                    'Pressure wash & deep rim restoration',
+                    'Upholstery shampoo & stain extraction',
+                    'High-gloss hydrophobic wax coat',
+                    'Anti-bacterial AC & cabin sanitization',
+                    'Engine bay wipe & protectant',
+                  ].map((b) => (
+                    <li key={b} className="flex items-start gap-2.5">
+                      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-purple-100 text-purple-700 mt-0.5">
+                        <IconCheck width={10} height={10} strokeWidth={3.5} />
+                      </span>
+                      <span>{b}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="mt-7 pt-4 border-t border-slate-100">
+                <a
+                  href="#book"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-100 py-3 text-xs font-bold text-slate-900 hover:bg-slate-200 transition-colors"
+                >
+                  <span>Select Extra Premium</span>
+                  <span>→</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ===================================================================== */}
       {/* 3. PACKAGES & SERVICE AREAS                                           */}
       {/* ===================================================================== */}
       <section id="packages" className="scroll-mt-16 bg-white px-4 sm:px-6 lg:px-8 py-20 border-t border-slate-100">

@@ -13,6 +13,7 @@ import { requirePermission } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { loadCustomerAccount } from '@/lib/services/accounts';
 import { WashActionControls } from './WashActionControls';
+import { CustomerSpecialRequestsModal } from './CustomerSpecialRequestsModal';
 import {
   currentCycle,
   formatDate,
@@ -27,11 +28,14 @@ export const metadata = { title: 'Customer Dashboard' };
 export default async function CustomerHome() {
   const session = await requirePermission('self:cars');
   const store = await getStore();
-  const account = await loadCustomerAccount(
-    store,
-    session.user.customerId!,
-    currentCycle(),
-  );
+  const [account, packages] = await Promise.all([
+    loadCustomerAccount(
+      store,
+      session.user.customerId!,
+      currentCycle(),
+    ),
+    store.packages.find(),
+  ]);
   if (!account) notFound();
 
   const staff = account.nextVisit?.staffId
@@ -110,6 +114,9 @@ export default async function CustomerHome() {
           <p className="mt-1.5 text-xs md:text-sm text-slate-300 font-normal">
             Manage your cars, bookings, wash proofs and payments — all in one place.
           </p>
+          <div className="mt-4">
+            <CustomerSpecialRequestsModal cars={account.cars} packages={packages} />
+          </div>
         </div>
 
         {/* Center/Right Car Image Blend */}

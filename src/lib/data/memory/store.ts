@@ -40,6 +40,7 @@ export class MemoryStore implements DataStore {
   readonly notifications;
   readonly enquiries;
   readonly staffReferrals;
+  readonly customerRequests;
 
   private credentials: UserCredential[];
   private appSettings: AppSettings;
@@ -71,6 +72,7 @@ export class MemoryStore implements DataStore {
     this.notifications = new MemoryRepository(db.notifications, 'ntf');
     this.enquiries = new MemoryRepository(db.enquiries, 'enq');
     this.staffReferrals = new MemoryRepository(db.staffReferrals, 'ref');
+    this.customerRequests = new MemoryRepository(db.customerRequests, 'creq');
 
     this.credentials = db.credentials;
     this.appSettings = db.appSettings;

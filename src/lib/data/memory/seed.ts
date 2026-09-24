@@ -6,6 +6,7 @@ import type {
   Car,
   Complaint,
   Customer,
+  CustomerRequest,
   Expense,
   InventoryItem,
   Invoice,
@@ -60,6 +61,7 @@ export interface Db {
   siteContent: SiteContent;
   enquiries: Enquiry[];
   staffReferrals: StaffReferral[];
+  customerRequests: CustomerRequest[];
 }
 
 /** The website copy a new install starts with — real sentences, not lorem. */
@@ -805,6 +807,7 @@ export function buildSeed(today = new Date()): Db {
     siteContent: { ...DEFAULT_SITE_CONTENT, updatedAt: now },
     enquiries,
     staffReferrals: [] as StaffReferral[],
+    customerRequests: [] as CustomerRequest[],
   };
 }
 

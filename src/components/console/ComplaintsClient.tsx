@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   IconArrowUp,
   IconCalendar,
@@ -39,6 +39,7 @@ interface ComplaintsClientProps {
   customers: Customer[];
   visits: WashVisit[];
   canEscalate: boolean;
+  initialStaffId?: string;
 }
 
 export function ComplaintsClient({
@@ -49,16 +50,21 @@ export function ComplaintsClient({
   customers: initialCustomers,
   visits: initialVisits,
   canEscalate,
+  initialStaffId,
 }: ComplaintsClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const showConfirm = useConfirm();
+
+  const urlStaffId = searchParams.get('staffId');
 
   // Filters & Pagination State
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'OPEN' | 'ESCALATED' | 'RESOLVED'>('ALL');
   const [timeFilter, setTimeFilter] = useState<'ALL' | 'TODAY' | 'WEEK' | 'MONTH'>('ALL');
   const [selectedRegionId, setSelectedRegionId] = useState<string>('');
   const [selectedAreaId, setSelectedAreaId] = useState<string>('');
+  const [selectedStaffId, setSelectedStaffId] = useState<string>(initialStaffId || urlStaffId || '');
   const [sortBy, setSortBy] = useState<'LATEST' | 'OLDEST'>('LATEST');
   const [viewMode, setViewMode] = useState<'GRID' | 'LIST'>('GRID');
 
@@ -126,6 +132,7 @@ export function ComplaintsClient({
           sortBy,
           ...(selectedRegionId ? { regionId: selectedRegionId } : {}),
           ...(selectedAreaId ? { areaId: selectedAreaId } : {}),
+          ...(selectedStaffId ? { staffId: selectedStaffId } : {}),
         });
 
         const res = await fetch(`/api/ops/complaints?${params.toString()}`);
@@ -137,7 +144,8 @@ export function ComplaintsClient({
         if (data.ok) {
           setComplaints(data.complaints || []);
           if (data.customers) setCustomers(data.customers);
-          if (data.staff) setStaff(data.staff);
+          if (data.allStaff) setStaff(data.allStaff);
+          else if (data.staff) setStaff(data.staff);
           if (data.areas) setAreas(data.areas);
           if (data.regions) setRegions(data.regions);
           if (data.visits) setVisits(data.visits);
@@ -152,7 +160,7 @@ export function ComplaintsClient({
         setIsLoading(false);
       }
     },
-    [page, pageSize, statusFilter, timeFilter, sortBy, selectedRegionId, selectedAreaId, toast],
+    [page, pageSize, statusFilter, timeFilter, sortBy, selectedRegionId, selectedAreaId, selectedStaffId, toast],
   );
 
   // Trigger query on filter or pagination changes
@@ -163,7 +171,7 @@ export function ComplaintsClient({
       return;
     }
     fetchComplaints(page, pageSize);
-  }, [page, pageSize, statusFilter, timeFilter, sortBy, selectedRegionId, selectedAreaId, fetchComplaints]);
+  }, [page, pageSize, statusFilter, timeFilter, sortBy, selectedRegionId, selectedAreaId, selectedStaffId, fetchComplaints]);
 
   // Handle filter changes (resets page to 1)
   const handleStatusChange = (newStatus: 'ALL' | 'OPEN' | 'ESCALATED' | 'RESOLVED') => {
@@ -480,6 +488,24 @@ export function ComplaintsClient({
               </option>
             ))}
           </select>
+
+          {/* Wash Boy Filter */}
+          <select
+            value={selectedStaffId}
+            onChange={(e) => {
+              setSelectedStaffId(e.target.value);
+              setPage(1);
+            }}
+            aria-label="Filter by wash boy"
+            className="rounded-lg border border-line-strong bg-white px-3 py-1.5 text-xs font-semibold text-ink shadow-sm hover:border-navy-400 focus:border-navy-600 focus:outline-none"
+          >
+            <option value="">All Wash Boys ({staff.length})</option>
+            {staff.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* Right: Sort & View Toggle */}
@@ -522,6 +548,33 @@ export function ComplaintsClient({
           </div>
         </div>
       </div>
+
+      {/* Active Wash Boy Filter Alert Banner */}
+      {selectedStaffId && (
+        <div className="flex items-center justify-between rounded-xl bg-amber-50/90 border border-amber-200 px-4 py-3 text-xs shadow-2xs">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-200 text-amber-900 text-xs font-bold">
+              👤
+            </span>
+            <span className="font-semibold text-amber-900">
+              Showing complaints for Wash Boy:{' '}
+              <strong className="font-bold text-amber-950 text-sm">
+                {staffById.get(selectedStaffId)?.name || 'Selected Wash Boy'}
+              </strong>
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedStaffId('');
+              setPage(1);
+            }}
+            className="rounded-lg bg-white px-3 py-1.5 text-xs font-bold text-amber-900 border border-amber-300 hover:bg-amber-100 transition-colors shadow-2xs"
+          >
+            ✕ Clear Wash Boy Filter
+          </button>
+        </div>
+      )}
 
       {/* Complaints Cards Display */}
       {complaints.length === 0 && !isLoading ? (

@@ -235,6 +235,8 @@ model User {
   ifscCode             String?
   upiId                String?
   dob                  DateTime? @db.Date
+  inactivationReason   String?
+  inactivatedAt        DateTime?
 
   credential UserCredential?
 
@@ -309,6 +311,8 @@ model Staff {
   bankIfsc             String?
   upiId                String?
   dob                  DateTime? @db.Date
+  inactivationReason   String?
+  inactivatedAt        DateTime?
 
   area        Area                 @relation(fields: [areaId], references: [id])
   attendance  Attendance[]
@@ -320,6 +324,7 @@ model Staff {
   complaints  Complaint[]
   stockIssues StockIssue[]
   referrals   StaffReferral[]
+  assignedCustomerRequests CustomerRequest[]
 
   @@index([areaId, role])
   @@index([active])
@@ -432,6 +437,8 @@ model Customer {
   holdUntil    DateTime?      @db.Date
   note         String?
   joinedOn     DateTime       @db.Date
+  inactivationReason String?
+  inactivatedAt      DateTime?
 
   area       Area        @relation(fields: [areaId], references: [id])
   cars       Car[]
@@ -439,6 +446,7 @@ model Customer {
   payments   Payment[]
   invoices   Invoice[]
   complaints Complaint[]
+  requests   CustomerRequest[]
 
   @@index([areaId, status])
   @@index([phone])
@@ -457,6 +465,8 @@ model ServicePackage {
   active          Boolean        @default(true)
 
   cars Car[]
+  requestedInCustomerRequests CustomerRequest[] @relation("RequestedPackage")
+  currentInCustomerRequests   CustomerRequest[] @relation("CurrentPackage")
 }
 
 model Car {
@@ -483,10 +493,11 @@ model Car {
   serviceStartedByUserId String?
   serviceStartNote    String?
 
-  customer      Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  servicePackage ServicePackage @relation(fields: [packageId], references: [id])
-  assignedStaff Staff?         @relation(fields: [assignedStaffId], references: [id])
-  visits        WashVisit[]
+  customer         Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  servicePackage   ServicePackage  @relation(fields: [packageId], references: [id])
+  assignedStaff    Staff?          @relation(fields: [assignedStaffId], references: [id])
+  visits           WashVisit[]
+  customerRequests CustomerRequest[]
 
   @@index([customerId])
   @@index([customerId, active])
@@ -839,3 +850,49 @@ model Enquiry {
   @@index([status, createdAt])
   @@index([areaId])
 }
+
+enum CustomerRequestType {
+  PACKAGE_CHANGE
+  ONE_WASH
+  OTHER_SERVICE
+}
+
+enum CustomerRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model CustomerRequest {
+  id                  String                @id @default(cuid())
+  customerId          String
+  carId               String?
+  type                CustomerRequestType
+  status              CustomerRequestStatus @default(PENDING)
+  currentPackageId    String?
+  requestedPackageId  String?
+  washType            String?
+  preferredDate       DateTime?             @db.Date
+  preferredTime       String?
+  serviceDetails      String?
+  assignedStaffId     String?
+  notes               String?
+  adminRemarks        String?
+  paymentStatus       String?               @default("PENDING")
+  paymentAmount       Int?                  @default(0)
+  createdAt           DateTime              @default(now())
+  decidedAt           DateTime?
+  decidedByUserId     String?
+
+  customer            Customer              @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  car                 Car?                  @relation(fields: [carId], references: [id], onDelete: Cascade)
+  currentPackage      ServicePackage?       @relation("CurrentPackage", fields: [currentPackageId], references: [id])
+  requestedPackage    ServicePackage?       @relation("RequestedPackage", fields: [requestedPackageId], references: [id])
+  assignedStaff       Staff?                @relation(fields: [assignedStaffId], references: [id])
+
+  @@index([customerId, status])
+  @@index([status, createdAt])
+  @@index([type, status])
+}
+

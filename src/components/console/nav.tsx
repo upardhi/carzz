@@ -66,6 +66,11 @@ export function operationsNav(
       items: [
         { href: `${base}/customers`, label: 'All customers', icon: <IconUsers width={18} height={18} /> },
         {
+          href: `${base}/requests`,
+          label: 'Special Requests',
+          icon: <IconBox width={18} height={18} />,
+        },
+        {
           href: `${base}/enquiries`,
           label: 'Enquiries',
           icon: <IconChat width={18} height={18} />,
@@ -178,6 +183,11 @@ export function adminNav(counts: NavCounts): NavGroup[] {
     {
       heading: 'Day to Day',
       items: [
+        {
+          href: '/admin/requests',
+          label: 'Customer Requests',
+          icon: <IconBox width={18} height={18} />,
+        },
         {
           href: '/admin/staff/leaves',
           label: 'Staff Leave Requests',

@@ -39,6 +39,7 @@ import {
   DeleteCarButton,
   EditCarModalButton,
   EditCustomerModalButton,
+  InactivateCustomerButton,
   RescheduleVisitButton,
 } from './EditCustomerActions';
 
@@ -134,6 +135,17 @@ export async function ConsoleCustomerDetail({
               </Tag>
             }
           />
+          {customer.status === 'INACTIVE' && customer.inactivationReason ? (
+            <div className="my-2 rounded-lg border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-800">
+              <span className="font-bold">Inactivation Reason:</span>{' '}
+              <span>{customer.inactivationReason}</span>
+              {customer.inactivatedAt && (
+                <span className="block mt-0.5 text-[10px] text-rose-600">
+                  Deactivated on {formatDateFull(customer.inactivatedAt)}
+                </span>
+              )}
+            </div>
+          ) : null}
           <Row
             label="App Login"
             value={
@@ -173,14 +185,10 @@ export async function ConsoleCustomerDetail({
               </ActionButton>
             )}
             {customer.status !== 'INACTIVE' ? (
-              <ActionButton
-                endpoint="/api/ops/customers"
-                variant="danger"
-                payload={{ action: 'setStatus', customerId, status: 'INACTIVE' }}
-                confirm="Make this customer inactive? Their upcoming washes will be unassigned."
-              >
-                Set inactive
-              </ActionButton>
+              <InactivateCustomerButton
+                customerId={customer.id}
+                customerName={customer.name}
+              />
             ) : null}
           </div>
         </Card>

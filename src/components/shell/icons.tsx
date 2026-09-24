@@ -173,6 +173,14 @@ export const IconMenu = (p: SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+export const IconDotsHorizontal = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <circle cx="12" cy="12" r="1.75" fill="currentColor" stroke="none" />
+    <circle cx="19" cy="12" r="1.75" fill="currentColor" stroke="none" />
+    <circle cx="5" cy="12" r="1.75" fill="currentColor" stroke="none" />
+  </svg>
+);
+
 export const IconStar = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p)}>
     <path d="m12 3.5 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17.5 6.6 20.4l1-6.1-4.4-4.3 6.1-.9z" />
@@ -348,6 +356,14 @@ export const IconHelp = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p)}>
     <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
     <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
+  </svg>
+);
+
+export const IconTrash = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    <line x1="10" y1="11" x2="10" y2="17" />
+    <line x1="14" y1="11" x2="14" y2="17" />
   </svg>
 );
 

@@ -114,6 +114,8 @@ const statusSchema = z.object({
   customerId: z.string().min(1),
   status: z.enum(['ACTIVE', 'HOLD', 'INACTIVE']),
   holdUntil: z.string().optional().nullable(),
+  reason: z.string().optional().nullable(),
+  inactivationReason: z.string().optional().nullable(),
 });
 
 const createLoginSchema = z.object({
@@ -144,6 +146,8 @@ const updateCustomerSchema = z.object({
   source: z.enum(LEAD_SOURCES).optional(),
   note: z.string().max(500).optional().nullable(),
   status: z.enum(['ACTIVE', 'HOLD', 'INACTIVE']).optional(),
+  inactivationReason: z.string().optional().nullable(),
+  reason: z.string().optional().nullable(),
 });
 
 const updateCarSchema = z.object({
@@ -233,11 +237,21 @@ export async function POST(request: Request) {
       if (!customer) throw new HttpError(404, 'Customer not found.');
       assertInScope(session, customer.areaId);
 
-      const updated = await store.customers.update(customer.id, {
+      const patch: Partial<Customer> = {
         status: parsed.data.status,
         holdUntil:
           parsed.data.status === 'HOLD' ? (parsed.data.holdUntil ?? null) : null,
-      });
+      };
+
+      if (parsed.data.status === 'INACTIVE') {
+        patch.inactivationReason = parsed.data.reason?.trim() || parsed.data.inactivationReason?.trim() || null;
+        patch.inactivatedAt = new Date().toISOString();
+      } else if (parsed.data.status === 'ACTIVE') {
+        patch.inactivationReason = null;
+        patch.inactivatedAt = null;
+      }
+
+      const updated = await store.customers.update(customer.id, patch);
 
       // Pausing an account must also pause the work, or wash boys keep turning
       // up at a house that is no longer paying.
@@ -435,7 +449,18 @@ export async function POST(request: Request) {
       if (parsed.data.areaId !== undefined) patch.areaId = parsed.data.areaId;
       if (parsed.data.source !== undefined) patch.source = parsed.data.source;
       if (parsed.data.note !== undefined) patch.note = parsed.data.note;
-      if (parsed.data.status !== undefined) patch.status = parsed.data.status;
+      if (parsed.data.status !== undefined) {
+        patch.status = parsed.data.status;
+        if (parsed.data.status === 'INACTIVE') {
+          patch.inactivationReason = parsed.data.inactivationReason?.trim() || parsed.data.reason?.trim() || null;
+          patch.inactivatedAt = new Date().toISOString();
+        } else if (parsed.data.status === 'ACTIVE') {
+          patch.inactivationReason = null;
+          patch.inactivatedAt = null;
+        }
+      } else if (parsed.data.inactivationReason !== undefined) {
+        patch.inactivationReason = parsed.data.inactivationReason?.trim() || null;
+      }
 
       const updated = await store.customers.update(customer.id, patch);
 

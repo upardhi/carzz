@@ -18,6 +18,7 @@ import type {
 } from '../data/types';
 import { computePayoutRun } from './payroll';
 import { washDurationMinutes, washSpeedFlag } from '../util/washTiming';
+import { businessToday } from '../util/time';
 
 export type { AreaPerformance, StaffPerformanceRow };
 
@@ -594,3 +595,90 @@ export async function businessSummary(
     revenuePerCar: activeCars > 0 ? Math.round(collected / activeCars) : 0,
   };
 }
+
+export interface DailyOperationsSummary {
+  today: string;
+  washesToday: number;
+  todayWashedCustomers: number;
+  todayRemainingWashes: number;
+  nextDayRemainingWashes: number;
+  totalActiveCustomers: number;
+  totalCustomers: number;
+  monthlyRevenue: Rupees;
+}
+
+export async function dailyOperationsReport(
+  store: DataStore,
+  areaIds: Id[] | null = null,
+): Promise<DailyOperationsSummary> {
+  const today = businessToday();
+  const d = new Date(today);
+  d.setDate(d.getDate() + 1);
+  const tomorrow = d.toISOString().slice(0, 10);
+  const cycle = today.slice(0, 7);
+
+  const areaFilter = areaIds ? { areaId: { in: areaIds } } : {};
+
+  const [todayVisits, tomorrowVisits, allCustomers, invoices] = await Promise.all([
+    store.visits.find({ where: { scheduledDate: today, ...areaFilter } as never }),
+    store.visits.find({ where: { scheduledDate: tomorrow, ...areaFilter } as never }),
+    store.customers.find(areaIds ? { where: { areaId: { in: areaIds } } as never } : undefined),
+    store.invoices.find({ where: { cycle, ...areaFilter } as never }),
+  ]);
+
+  const doneToday = todayVisits.filter((v) => v.status === 'DONE');
+  const washedCustomerIds = new Set(doneToday.map((v) => v.customerId));
+  const todayRemaining = todayVisits.filter((v) => v.status === 'PENDING' || v.status === 'IN_PROGRESS');
+  const tomorrowRemaining = tomorrowVisits.filter((v) => v.status !== 'DONE' && v.status !== 'MISSED');
+
+  const activeCustomers = allCustomers.filter((c) => c.status === 'ACTIVE');
+  const monthlyRevenue = invoices.reduce((s, i) => s + i.paidAmount, 0);
+
+  return {
+    today,
+    washesToday: doneToday.length,
+    todayWashedCustomers: washedCustomerIds.size,
+    todayRemainingWashes: todayRemaining.length,
+    nextDayRemainingWashes: tomorrowRemaining.length,
+    totalActiveCustomers: activeCustomers.length,
+    totalCustomers: allCustomers.length,
+    monthlyRevenue,
+  };
+}
+
+export interface CustomerStaffGrowthSummary {
+  cycle: string;
+  totalCustomers: number;
+  newCustomersThisMonth: number;
+  inactiveCustomersThisMonth: number;
+  newWashBoysJoinedThisMonth: number;
+  inactiveWashBoysThisMonth: number;
+}
+
+export async function customerStaffGrowthReport(
+  store: DataStore,
+  cycle: string,
+  areaIds: Id[] | null = null,
+): Promise<CustomerStaffGrowthSummary> {
+  const areaFilter = areaIds ? { areaId: { in: areaIds } } : {};
+
+  const [customers, staff] = await Promise.all([
+    store.customers.find(areaIds ? { where: { areaId: { in: areaIds } } as never } : undefined),
+    store.staff.find({ where: { role: 'EMPLOYEE', ...areaFilter } as never }),
+  ]);
+
+  const newCustomers = customers.filter((c) => c.joinedOn && c.joinedOn.startsWith(cycle));
+  const inactiveCustomers = customers.filter((c) => c.status === 'INACTIVE');
+  const newStaff = staff.filter((s) => s.joinedOn && s.joinedOn.startsWith(cycle));
+  const inactiveStaff = staff.filter((s) => !s.active);
+
+  return {
+    cycle,
+    totalCustomers: customers.length,
+    newCustomersThisMonth: newCustomers.length,
+    inactiveCustomersThisMonth: inactiveCustomers.length,
+    newWashBoysJoinedThisMonth: newStaff.length,
+    inactiveWashBoysThisMonth: inactiveStaff.length,
+  };
+}
+

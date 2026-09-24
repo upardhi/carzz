@@ -59,6 +59,8 @@ export interface User {
   accountNumber?: string | null;
   ifscCode?: string | null;
   upiId?: string | null;
+  inactivationReason?: string | null;
+  inactivatedAt?: Timestamp | null;
 }
 
 /** A user plus its bcrypt/scrypt password hash. Never leaves the data layer. */
@@ -131,6 +133,8 @@ export interface Staff {
   bankIfsc?: string | null;
   upiId?: string | null;
   dob?: DateOnly | null;
+  inactivationReason?: string | null;
+  inactivatedAt?: Timestamp | null;
 }
 
 export interface Attendance {
@@ -264,6 +268,8 @@ export interface Customer {
   holdUntil: DateOnly | null;
   note: string | null;
   joinedOn: DateOnly;
+  inactivationReason?: string | null;
+  inactivatedAt?: Timestamp | null;
 }
 
 export interface PackageServiceItem {
@@ -928,3 +934,29 @@ export interface Notification {
   readAt: Timestamp | null;
   createdAt: Timestamp;
 }
+
+export type CustomerRequestType = 'PACKAGE_CHANGE' | 'ONE_WASH' | 'OTHER_SERVICE';
+export type CustomerRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+
+export interface CustomerRequest {
+  id: Id;
+  customerId: Id;
+  carId: Id | null;
+  type: CustomerRequestType;
+  status: CustomerRequestStatus;
+  currentPackageId: Id | null;
+  requestedPackageId: Id | null;
+  washType: string | null;
+  preferredDate: DateOnly | null;
+  preferredTime: string | null;
+  serviceDetails: string | null;
+  assignedStaffId: Id | null;
+  notes: string | null;
+  adminRemarks: string | null;
+  paymentStatus: string | null;
+  paymentAmount: Rupees | null;
+  createdAt: Timestamp;
+  decidedAt: Timestamp | null;
+  decidedByUserId: Id | null;
+}
+

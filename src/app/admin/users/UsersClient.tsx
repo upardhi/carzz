@@ -10,10 +10,12 @@ import {
   KpiGrid,
   Note,
   Tag,
-  Button,
 } from '@/components/ui/primitives';
 import { useToast } from '@/components/ui/ToastProvider';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
+import { IconTrash } from '@/components/shell/icons';
+import { WashBoyReviewsModal } from '@/components/console/WashBoyReviewsModal';
+import { TableActionMenu } from '@/components/ui/TableActionMenu';
 import type { User, Area, Region, Role } from '@/lib/data/types';
 import { ROLES } from '@/lib/data/types';
 import { formatDateFull } from '@/lib/util/format';
@@ -192,18 +194,28 @@ export function UsersClient({
   const areaById = new Map(areas.map((a) => [a.id, a]));
   const regionById = new Map(regions.map((r) => [r.id, r]));
 
+  // Inactivation Modal State
+  const [inactivationUser, setInactivationUser] = useState<User | null>(null);
+  const [inactivationReason, setInactivationReason] = useState('');
+  const [inactivatingPending, setInactivatingPending] = useState(false);
+
+  // Wash Boy Reviews Modal State
+  const [reviewStaff, setReviewStaff] = useState<{ id: string; name: string } | null>(null);
+
   // Toggle user active status
   const handleToggleActive = async (user: User) => {
-    const actionName = user.active ? 'Deactivate' : 'Reactivate';
-    const confirmMessage = user.active
-      ? `Are you sure you want to deactivate ${user.name}? Their login will stop working immediately.`
-      : `Reactivate ${user.name}? They will be able to log in again.`;
+    if (user.active) {
+      // Open modal to get inactivation reason
+      setInactivationUser(user);
+      setInactivationReason('');
+      return;
+    }
 
     const confirmed = await showConfirm({
-      title: `${actionName} ${user.name}`,
-      message: confirmMessage,
-      confirmText: actionName,
-      tone: user.active ? 'danger' : 'primary',
+      title: `Reactivate ${user.name}`,
+      message: `Reactivate ${user.name}? They will be able to log in again immediately.`,
+      confirmText: 'Reactivate',
+      tone: 'primary',
     });
 
     if (!confirmed) return;
@@ -216,7 +228,7 @@ export function UsersClient({
         body: JSON.stringify({
           action: 'setActive',
           userId: user.id,
-          active: !user.active,
+          active: true,
         }),
       });
 
@@ -225,17 +237,86 @@ export function UsersClient({
         throw new Error(data.error || 'Failed to update user status');
       }
 
-      toast.success(data.message || `${user.name}'s status has been updated.`, {
-        title: user.active ? 'User deactivated' : 'User reactivated',
+      toast.success(data.message || `${user.name} reactivated.`, {
+        title: 'User reactivated',
       });
 
-      // Refetch page data
       await fetchUsers(page, pageSize);
       router.refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not change user status', {
         title: 'Action failed',
       });
+    } finally {
+      setActionPendingId(null);
+    }
+  };
+
+  const confirmInactivation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inactivationUser || !inactivationReason.trim()) {
+      toast.error('Inactivation reason is required.');
+      return;
+    }
+
+    setInactivatingPending(true);
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'setActive',
+          userId: inactivationUser.id,
+          active: false,
+          reason: inactivationReason.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to deactivate user');
+      }
+
+      toast.success(data.message || `${inactivationUser.name} deactivated.`, {
+        title: 'User deactivated',
+      });
+
+      setInactivationUser(null);
+      await fetchUsers(page, pageSize);
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not deactivate user');
+    } finally {
+      setInactivatingPending(false);
+    }
+  };
+
+  const handleDeleteUser = async (user: User) => {
+    const confirmed = await showConfirm({
+      title: `Delete ${user.name}?`,
+      message: `Are you sure you want to permanently delete ${user.name}? Their login will be removed and any pending washes safely unassigned. This cannot be undone.`,
+      confirmText: 'Yes, Delete',
+      tone: 'danger',
+    });
+
+    if (!confirmed) return;
+
+    setActionPendingId(user.id);
+    try {
+      const res = await fetch(`/api/admin/users?userId=${user.id}`, {
+        method: 'DELETE',
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to delete user');
+      }
+
+      toast.success(data.message || `${user.name} deleted successfully.`);
+      await fetchUsers(page, pageSize);
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not delete user');
     } finally {
       setActionPendingId(null);
     }
@@ -476,7 +557,7 @@ export function UsersClient({
                     return (
                       <tr
                         key={user.id}
-                        className="hover:bg-surface-elevated/50 transition-colors"
+                        className="hover:bg-surface-elevated/50 transition-colors relative hover:z-30"
                       >
                         <td className="py-3 px-4 font-bold text-ink">
                           <Link
@@ -555,43 +636,104 @@ export function UsersClient({
                           {formatDateFull(user.createdAt)}
                         </td>
                         <td className="py-3 px-4">
-                          <Tag tone={user.active ? 'ok' : 'bad'}>
-                            {user.active ? 'Active' : 'Disabled'}
-                          </Tag>
+                          {!user.active && user.inactivationReason ? (
+                            <div className="relative group inline-flex items-center gap-1.5">
+                              <Tag tone="bad">Disabled</Tag>
+                              <span
+                                className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-rose-100 text-[10px] font-bold text-rose-700 cursor-help transition-transform group-hover:scale-110 shadow-2xs"
+                                title={`Reason: ${user.inactivationReason}`}
+                              >
+                                ℹ
+                              </span>
+                              {/* Modern Glassy Tooltip Card */}
+                              <div className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 hidden group-hover:block z-50 w-72 sm:w-80 rounded-2xl bg-slate-950/95 backdrop-blur-md p-3.5 text-left text-xs shadow-2xl border border-slate-800 animate-in fade-in zoom-in-95 duration-150">
+                                <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
+                                  <div className="flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-wider text-rose-400">
+                                    <span>⚠️</span>
+                                    <span>Inactivation Reason</span>
+                                  </div>
+                                  {user.inactivatedAt && (
+                                    <span className="text-[10px] text-slate-400 font-medium">
+                                      {formatDateFull(user.inactivatedAt)}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="pt-2 text-slate-200 text-xs font-normal leading-relaxed whitespace-pre-wrap break-words max-h-48 overflow-y-auto">
+                                  {user.inactivationReason}
+                                </div>
+                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-4 border-transparent border-b-slate-950" />
+                              </div>
+                            </div>
+                          ) : (
+                            <Tag tone={user.active ? 'ok' : 'bad'}>
+                              {user.active ? 'Active' : 'Disabled'}
+                            </Tag>
+                          )}
                         </td>
                         <td className="py-3 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            <Link
-                              href={`/admin/users/${user.id}`}
-                              className="rounded-lg border border-line bg-surface-elevated px-2.5 py-1 text-xs font-semibold text-ink hover:bg-slate-100 hover:text-blue-600 transition-colors"
-                              title="View Details"
-                            >
-                              View
-                            </Link>
-                            <Link
-                              href={`/admin/users/${user.id}/edit`}
-                              className="rounded-lg border border-line bg-surface-elevated px-2.5 py-1 text-xs font-semibold text-ink hover:bg-slate-100 hover:text-blue-600 transition-colors"
-                              title="Edit Details"
-                            >
-                              Edit
-                            </Link>
-                            {user.id === currentUserId ? (
-                              <span className="text-[11px] text-ink-mute px-1.5">Current</span>
-                            ) : (
-                              <Button
-                                size="sm"
-                                variant={user.active ? 'secondary' : 'primary'}
-                                disabled={actionPendingId === user.id}
-                                onClick={() => handleToggleActive(user)}
-                              >
-                                {actionPendingId === user.id
-                                  ? 'Saving…'
-                                  : user.active
-                                    ? 'Deactivate'
-                                    : 'Reactivate'}
-                              </Button>
-                            )}
-                          </div>
+                          <TableActionMenu
+                            label={`Actions for ${user.name}`}
+                            items={[
+                              {
+                                id: 'view',
+                                label: 'View Profile',
+                                icon: '👁️',
+                                href: `/admin/users/${user.id}`,
+                                variant: 'default',
+                              },
+                              {
+                                id: 'edit',
+                                label: 'Edit Details',
+                                icon: '✏️',
+                                href: `/admin/users/${user.id}/edit`,
+                                variant: 'default',
+                              },
+                              ...((user.role === 'EMPLOYEE' || user.staffId)
+                                ? [
+                                    {
+                                      id: 'complaints',
+                                      label: 'View Complaints',
+                                      icon: '🚨',
+                                      href: `/admin/complaints?staffId=${user.staffId || user.id}`,
+                                      variant: 'warning' as const,
+                                      dividerBefore: true,
+                                    },
+                                    {
+                                      id: 'reviews',
+                                      label: 'Reviews & Ratings',
+                                      icon: '⭐',
+                                      onClick: () =>
+                                        setReviewStaff({
+                                          id: user.staffId || user.id,
+                                          name: user.name,
+                                        }),
+                                      variant: 'primary' as const,
+                                    },
+                                  ]
+                                : []),
+                              ...(user.id !== currentUserId
+                                ? [
+                                    {
+                                      id: 'toggle-active',
+                                      label: user.active ? 'Deactivate Account' : 'Reactivate Account',
+                                      icon: user.active ? '🔒' : '🔓',
+                                      onClick: () => handleToggleActive(user),
+                                      variant: user.active ? ('danger' as const) : ('primary' as const),
+                                      dividerBefore: true,
+                                      disabled: actionPendingId === user.id,
+                                    },
+                                    {
+                                      id: 'delete',
+                                      label: 'Delete Account',
+                                      icon: <IconTrash width={14} height={14} className="text-rose-600" />,
+                                      onClick: () => handleDeleteUser(user),
+                                      variant: 'danger' as const,
+                                      disabled: actionPendingId === user.id,
+                                    },
+                                  ]
+                                : []),
+                            ]}
+                          />
                         </td>
                       </tr>
                     );
@@ -723,7 +865,63 @@ export function UsersClient({
           </div>
         )}
 
-        </div>
+        {/* Inactivation Modal */}
+        {inactivationUser && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+            <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-slate-200">
+              <div className="flex items-center gap-2.5 text-rose-600 mb-3">
+                <span className="text-xl">⚠️</span>
+                <h3 className="text-base font-bold text-slate-900">Deactivate Staff Member</h3>
+              </div>
+              <p className="text-xs text-slate-600 mb-4">
+                Please enter the mandatory reason for deactivating <strong>{inactivationUser.name}</strong>.
+              </p>
+
+              <form onSubmit={confirmInactivation} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    Inactivation Reason <span className="text-rose-500">*</span>
+                  </label>
+                  <textarea
+                    required
+                    rows={3}
+                    placeholder="e.g. Absconded without notice / Disciplinary violation / Resigned / Relocated"
+                    value={inactivationReason}
+                    onChange={(e) => setInactivationReason(e.target.value)}
+                    className="w-full rounded-xl border border-slate-300 p-3 text-xs focus:border-blue-600 focus:outline-none"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setInactivationUser(null)}
+                    className="rounded-xl px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={inactivatingPending || !inactivationReason.trim()}
+                    className="rounded-xl bg-rose-600 px-5 py-2 text-xs font-bold text-white shadow-md hover:bg-rose-700 disabled:opacity-50 cursor-pointer"
+                  >
+                    {inactivatingPending ? 'Saving...' : 'Confirm Inactivation'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Wash Boy Reviews Modal */}
+        {reviewStaff && (
+          <WashBoyReviewsModal
+            staffId={reviewStaff.id}
+            staffName={reviewStaff.name}
+            onClose={() => setReviewStaff(null)}
+          />
+        )}
+      </div>
     </>
   );
 }
