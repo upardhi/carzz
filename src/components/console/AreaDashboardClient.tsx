@@ -13,17 +13,24 @@ import {
   IconRefresh,
   IconRupee,
   IconStar,
-  IconUser,
   IconUsers,
   IconWallet,
 } from '@/components/shell/icons';
 import {
+  Card,
+  CardHeading,
+  Row,
   StatCard,
   StatGrid,
 } from '@/components/ui/primitives';
 import { WidgetTable } from '@/components/ui/WidgetTable';
-import { money, moneyShort } from '@/lib/util/format';
+import { money, moneyShort, percent } from '@/lib/util/format';
 import type { AreaPerformance } from '@/lib/data/types';
+import type {
+  BusinessSummary,
+  CustomerStaffGrowthSummary,
+  DailyOperationsSummary,
+} from '@/lib/services/reports';
 
 export interface StaffTodayItem {
   id: string;
@@ -58,8 +65,7 @@ interface AreaDashboardClientProps {
   oldestAlertDays: number;
   complaintsCount: number;
   escalatedComplaintsCount: number;
-  /** Washes that missed today — the manager-facing swap for complaint counts,
-   * since a plain manager no longer has complaint:view. */
+  /** Washes that missed today */
   notDoneToday?: number;
   lowRatedCount?: number;
   uninformedLeavesCount?: number;
@@ -70,24 +76,29 @@ interface AreaDashboardClientProps {
   base: string;
   pendingLeavesCount?: number;
   staffOnLeaveNames?: string[];
+  dailyOps: DailyOperationsSummary;
+  growth: CustomerStaffGrowthSummary;
+  summary: BusinessSummary;
+  unapprovedPayoutsCount?: number;
+  unapprovedPayoutsTotal?: number;
 }
 
 export function AreaDashboardClient({
-  totals,
-  activeCars,
-  carsToday,
-  completedToday,
-  inProgressToday,
-  pendingToday,
-  remainingToday,
+  totals: _totals,
+  activeCars: _activeCars,
+  carsToday: _carsToday,
+  completedToday: _completedToday,
+  inProgressToday: _inProgressToday,
+  pendingToday: _pendingToday,
+  remainingToday: _remainingToday,
   assignedToday: _assignedToday,
   notDoneToday = 0,
   lowRatedCount = 0,
   uninformedLeavesCount = 0,
   unassignedToday,
-  staffWorkingCount,
+  staffWorkingCount: _staffWorkingCount,
   staffAbsentCount,
-  staffAttendanceRate,
+  staffAttendanceRate: _staffAttendanceRate,
   outstanding,
   alertsCount,
   oldestAlertDays,
@@ -100,6 +111,11 @@ export function AreaDashboardClient({
   base,
   pendingLeavesCount = 0,
   staffOnLeaveNames = [],
+  dailyOps,
+  growth,
+  summary,
+  unapprovedPayoutsCount = 0,
+  unapprovedPayoutsTotal = 0,
 }: AreaDashboardClientProps) {
   const isManager = base === '/manager';
   const [staffPage, setStaffPage] = useState(1);
@@ -155,17 +171,12 @@ export function AreaDashboardClient({
     document.body.removeChild(link);
   }
 
-  // Calculate dynamic customer satisfaction & average rating
-  const ratedAreas = performance.filter((p) => (p.averageRating ?? 0) > 0);
-  const avgRatingNumber =
-    ratedAreas.length > 0
-      ? ratedAreas.reduce((s, p) => s + (p.averageRating ?? 0), 0) / ratedAreas.length
-      : 0;
-
-  const avgRatingDisplay = avgRatingNumber > 0 ? `${avgRatingNumber.toFixed(1)} ★` : '—';
-  const satisfactionPct = avgRatingNumber > 0 ? Math.round((avgRatingNumber / 5) * 100) : 0;
-
-  const completionPct = carsToday > 0 ? Math.round((completedToday / carsToday) * 100) : 0;
+  // Calculate metrics
+  const staffUtilization =
+    summary.staff > 0 ? (summary.washesDone / summary.staff).toFixed(0) : '0';
+  const collectionRate =
+    summary.billed > 0 ? Math.round((summary.collected / summary.billed) * 100) : 100;
+  const totalExpenses = summary.expenses + summary.payoutCost;
 
   return (
     <div className="space-y-6">
@@ -186,7 +197,7 @@ export function AreaDashboardClient({
             className="flex items-center gap-2 rounded-xl border border-line-strong bg-white px-3.5 py-1.5 text-xs font-semibold text-navy-950 shadow-sm transition-colors hover:border-navy-400 hover:bg-surface-muted"
           >
             <span>📅</span>
-            <span>Leaves & Absence</span>
+            <span>Leaves &amp; Absence</span>
             {pendingLeavesCount > 0 && (
               <span className="flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white">
                 {pendingLeavesCount}
@@ -273,113 +284,202 @@ export function AreaDashboardClient({
             href={`${base}/staff/leaves`}
             className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 transition-colors"
           >
-            Review & Approve →
+            Review &amp; Approve →
           </Link>
         </div>
       )}
 
-
-      {/* 8 KPI Operational & Financial Summary Metric Cards (4 columns x 2 rows) —
-          every card is a link straight to the screen that explains the number. */}
-      <StatGrid columns={4}>
+      {/* ===================================================================== */}
+      {/* 2.1 KEY STATISTICS (6 KPIs - Scoped to Area / Region)                 */}
+      {/* ===================================================================== */}
+      <StatGrid columns={3}>
+        <Link href={`${base}/customers`} className="block">
+          <StatCard
+            label="TOTAL ACTIVE CUSTOMERS"
+            value={dailyOps.totalActiveCustomers}
+            icon={<IconUsers width={20} height={20} strokeWidth={2} />}
+            tone="emerald"
+            subtext={`Active subscriptions out of ${dailyOps.totalCustomers} total`}
+            subtextTone="success"
+          />
+        </Link>
         <Link href={`${base}/schedule`} className="block">
           <StatCard
             label="TODAY'S WASHES"
-            value={`${completedToday} / ${carsToday}`}
+            value={dailyOps.washesToday}
+            icon={<IconDroplet width={20} height={20} strokeWidth={2} />}
+            tone="blue"
+            subtext={`${dailyOps.todayRemainingWashes} remaining washes today`}
+            subtextTone={dailyOps.todayRemainingWashes === 0 ? 'success' : 'warning'}
+          />
+        </Link>
+        <Link href={`${base}/schedule`} className="block">
+          <StatCard
+            label="TODAY'S WASHED CUSTOMERS"
+            value={dailyOps.todayWashedCustomers}
             icon={<IconCheckCircle width={20} height={20} strokeWidth={2} />}
             tone="emerald"
-            subtext={`${completionPct}% completed today — click to see the whole team's list`}
-            subtextTone={completionPct >= 80 ? 'success' : 'info'}
+            subtext="Unique subscribers serviced today"
+            subtextTone="success"
           />
         </Link>
         <Link href={`${base}/schedule?status=PENDING`} className="block">
           <StatCard
             label="REMAINING WASHES"
-            value={remainingToday}
+            value={dailyOps.todayRemainingWashes}
             icon={<IconClock width={20} height={20} strokeWidth={2} />}
-            tone="blue"
-            subtext={`${inProgressToday} in progress · ${pendingToday} pending`}
-            subtextTone="info"
-          />
-        </Link>
-        <Link href={`${base}/schedule`} className="block">
-          <StatCard
-            label="UNASSIGNED QUEUE"
-            value={unassignedToday}
-            icon={<IconUser width={20} height={20} strokeWidth={2} />}
-            tone={unassignedToday > 0 ? 'rose' : 'emerald'}
-            subtext={unassignedToday > 0 ? 'Requires immediate assignment' : 'All visits assigned to staff'}
-            subtextTone={unassignedToday > 0 ? 'danger' : 'success'}
-          />
-        </Link>
-        <Link href={`${base}/staff`} className="block">
-          <StatCard
-            label="STAFF ON DUTY"
-            value={`${staffWorkingCount} / ${staffToday.length}`}
-            icon={<IconUsers width={20} height={20} strokeWidth={2} />}
-            tone={staffAbsentCount > 0 ? 'amber' : 'emerald'}
-            subtext={`${staffAttendanceRate}% attendance · ${staffAbsentCount} absent`}
-            subtextTone={staffAbsentCount > 0 ? 'warning' : 'success'}
-          />
-        </Link>
-        <Link href={`${base}/customers`} className="block">
-          <StatCard
-            label="ACTIVE CARS"
-            value={activeCars}
-            icon={<IconCar width={20} height={20} strokeWidth={2} />}
-            tone="purple"
-            subtext={`${totals.customers} subscribed accounts`}
-            subtextTone="muted"
+            tone={dailyOps.todayRemainingWashes > 0 ? 'amber' : 'slate'}
+            subtext="Scheduled washes remaining today"
+            subtextTone={dailyOps.todayRemainingWashes > 0 ? 'warning' : 'muted'}
           />
         </Link>
         <Link href={isManager ? `${base}/team-alerts` : `${base}/reports`} className="block">
           <StatCard
-            label="CUSTOMER RATING"
-            value={avgRatingDisplay}
-            icon={<IconStar width={20} height={20} strokeWidth={2} />}
-            tone={avgRatingNumber >= 4 ? 'emerald' : avgRatingNumber > 0 ? 'amber' : 'slate'}
-            subtext={
-              avgRatingNumber > 0
-                ? `${satisfactionPct}% satisfaction rating`
-                : 'No customer ratings recorded yet'
-            }
-            subtextTone={avgRatingNumber >= 4 ? 'success' : avgRatingNumber > 0 ? 'warning' : 'muted'}
+            label="MONTHLY REVENUE"
+            value={moneyShort(summary.collected)}
+            icon={<IconWallet width={20} height={20} strokeWidth={2} />}
+            tone="emerald"
+            subtext={`${collectionRate}% collected of ${moneyShort(summary.billed)} billed`}
+            subtextTone="success"
           />
         </Link>
-        <Link href={`${base}/alerts`} className="block">
+        <Link href={`${base}/customers`} className="block">
           <StatCard
-            label="OUTSTANDING DUES"
-            value={moneyShort(outstanding)}
-            icon={<IconRupee width={20} height={20} strokeWidth={2.2} />}
-            tone="amber"
-            subtext={`${alertsCount} overdue customer accounts`}
-            subtextTone="warning"
+            label="TOTAL CUSTOMERS"
+            value={dailyOps.totalCustomers}
+            icon={<IconCar width={20} height={20} strokeWidth={2} />}
+            tone="purple"
+            subtext={`${growth.newCustomersThisMonth} new joined this month`}
+            subtextTone="muted"
           />
         </Link>
-        {isManager ? (
-          <Link href={`${base}/schedule?status=MISSED`} className="block">
-            <StatCard
-              label="MISSED WASHES"
-              value={notDoneToday}
-              icon={<IconAlert width={20} height={20} strokeWidth={2} />}
-              tone={notDoneToday > 0 ? 'rose' : 'emerald'}
-              subtext={notDoneToday > 0 ? 'Not done today — click to see which' : 'All washes done today'}
-              subtextTone={notDoneToday > 0 ? 'danger' : 'muted'}
-            />
-          </Link>
-        ) : (
-          <Link href={`${base}/complaints`} className="block">
-            <StatCard
-              label="OPEN COMPLAINTS"
-              value={complaintsCount}
-              icon={<IconAlert width={20} height={20} strokeWidth={2} />}
-              tone={complaintsCount > 0 ? 'rose' : 'emerald'}
-              subtext={escalatedComplaintsCount > 0 ? `${escalatedComplaintsCount} escalated to owner` : 'All resolved/normal'}
-              subtextTone={escalatedComplaintsCount > 0 ? 'danger' : 'muted'}
-            />
-          </Link>
-        )}
       </StatGrid>
+
+      {/* ===================================================================== */}
+      {/* 2.2 DAILY WORK & 2.3 PAYMENT & 2.4 CUSTOMER DASHBOARDS               */}
+      {/* ===================================================================== */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        {/* 2.2 Dedicated Daily Work Dashboard */}
+        <Card className="p-5 min-w-0 border-l-4 border-l-blue-500">
+          <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+            <CardHeading>Daily Work Operations</CardHeading>
+            <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-bold text-blue-700">
+              Today &amp; Tomorrow
+            </span>
+          </div>
+          <div className="space-y-1.5">
+            <Row label="Washed Today" value={`${dailyOps.washesToday} washes`} tone="success" />
+            <Row label="Today's Washed Customers" value={`${dailyOps.todayWashedCustomers} customers`} />
+            <Row
+              label="Remaining Washes Today"
+              value={`${dailyOps.todayRemainingWashes} pending`}
+              tone={dailyOps.todayRemainingWashes > 0 ? 'gold' : undefined}
+            />
+            <Row
+              label="Next Day Remaining Washes"
+              value={`${dailyOps.nextDayRemainingWashes} scheduled`}
+            />
+          </div>
+        </Card>
+
+        {/* 2.3 Payment Dashboard */}
+        <Card className="p-5 min-w-0 border-l-4 border-l-emerald-500">
+          <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+            <CardHeading>Payment Overview</CardHeading>
+            <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700">
+              {cycleLabel}
+            </span>
+          </div>
+          <div className="space-y-1.5">
+            <Row label="Monthly Revenue (Billed)" value={money(summary.billed)} />
+            <Row label="Monthly Collected Revenue" value={money(summary.collected)} tone="success" />
+            <Row
+              label="Monthly Pending Amount"
+              value={money(summary.outstanding)}
+              tone={summary.outstanding > 0 ? 'danger' : undefined}
+            />
+            <Row label="Collection Efficiency" value={percent(summary.billed ? summary.collected / summary.billed : 0)} />
+          </div>
+        </Card>
+
+        {/* 2.4 Customer & Staff Dashboard */}
+        <Card className="p-5 min-w-0 border-l-4 border-l-purple-500">
+          <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+            <CardHeading>Customer &amp; Staff Growth</CardHeading>
+            <span className="rounded-full bg-purple-50 px-2.5 py-0.5 text-[11px] font-bold text-purple-700">
+              This Month
+            </span>
+          </div>
+          <div className="space-y-1.5">
+            <Row label="Total Customers" value={growth.totalCustomers} />
+            <Row label="New Customers This Month" value={`+${growth.newCustomersThisMonth}`} tone="success" />
+            <Row
+              label="Inactive Customers This Month"
+              value={`${growth.inactiveCustomersThisMonth}`}
+              tone={growth.inactiveCustomersThisMonth > 0 ? 'danger' : undefined}
+            />
+            <Row label="New Wash Boys Joined" value={`+${growth.newWashBoysJoinedThisMonth}`} tone="success" />
+            <Row
+              label="Inactive Wash Boys"
+              value={`${growth.inactiveWashBoysThisMonth}`}
+              tone={growth.inactiveWashBoysThisMonth > 0 ? 'danger' : undefined}
+            />
+          </div>
+        </Card>
+      </div>
+
+      {/* ===================================================================== */}
+      {/* 2.1 MONTHLY FINANCIAL P&L BREAKDOWN & QUALITY METRICS                 */}
+      {/* ===================================================================== */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* Monthly Financial P&L Breakdown Card */}
+        <Card className="p-5 min-w-0">
+          <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+            <CardHeading>Monthly Financial P&amp;L Breakdown</CardHeading>
+            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-bold text-slate-700">
+              Profit &amp; Loss
+            </span>
+          </div>
+          <div className="space-y-1.5">
+            <Row label="Monthly Collected Revenue" value={money(summary.collected)} tone="success" />
+            <Row label="Pending Revenue (Outstanding)" value={money(summary.outstanding)} tone={summary.outstanding > 0 ? 'gold' : undefined} />
+            <Row label="Remaining Payments" value={money(summary.outstanding)} />
+            <Row label="Total Revenue (Gross Billed)" value={money(summary.billed)} />
+            <Row label="Total Expenses (Staff &amp; Goods)" value={money(totalExpenses)} tone="danger" />
+            <div className="border-t border-slate-200/80 pt-2 mt-2">
+              <Row
+                label="Net Profit"
+                value={money(summary.profit)}
+                tone={summary.profit > 0 ? 'success' : 'danger'}
+              />
+            </div>
+          </div>
+        </Card>
+
+        {/* Operational Quality Card */}
+        <Card className="p-5 min-w-0">
+          <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+            <CardHeading>Service Quality &amp; Efficiency</CardHeading>
+            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-bold text-slate-700">
+              Metrics
+            </span>
+          </div>
+          <div className="space-y-1.5">
+            <Row label="Staff Productivity" value={`${staffUtilization} washes / staff`} />
+            <Row label="Open Complaints" value={summary.openComplaints} tone={summary.openComplaints > 0 ? 'gold' : undefined} />
+            <Row
+              label="Customer CSAT Rating"
+              value={
+                summary.averageRating > 0
+                  ? `${summary.averageRating.toFixed(1)} ★ (${Math.round((summary.averageRating / 5) * 100)}%)`
+                  : '—'
+              }
+            />
+            <Row label="Direct Cost Per Wash" value={money(summary.costPerWash)} />
+            <Row label="Revenue Per Car (ARPU)" value={money(summary.revenuePerCar)} />
+          </div>
+        </Card>
+      </div>
 
       {/* Middle Section: Operations Action Center & Staff Today */}
       <div className="grid gap-5 lg:grid-cols-12">
@@ -451,6 +551,25 @@ export function AreaDashboardClient({
                 </Link>
               ) : null}
 
+              {/* Alert 0.7: Unapproved Payouts (if any) */}
+              {unapprovedPayoutsCount > 0 ? (
+                <div className="flex items-center justify-between rounded-xl border border-rose-200 border-l-4 border-l-rose-500 bg-rose-50/40 p-4 shadow-xs">
+                  <div className="flex items-center gap-3.5">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-600">
+                      <IconRupee width={20} height={20} strokeWidth={2.2} />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-rose-950">
+                        {unapprovedPayoutsCount} staff payout{unapprovedPayoutsCount === 1 ? '' : 's'} pending approval
+                      </h3>
+                      <p className="mt-0.5 text-xs text-rose-700 font-medium">
+                        {money(unapprovedPayoutsTotal)} total awaiting review by admin.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
               {/* Alert 1: Chase customers */}
               <Link href={`${base}/alerts`} className="block group">
                 <div className="flex items-center justify-between rounded-xl border border-line-soft border-l-4 border-l-amber-500 bg-white p-4 shadow-xs transition-all hover:bg-slate-50/70 hover:shadow-sm">
@@ -477,8 +596,6 @@ export function AreaDashboardClient({
 
               {isManager ? (
                 <>
-                  {/* Manager's job is wash completion and quality, not complaint
-                      handling — that moved to area admin and up. */}
                   {notDoneToday > 0 ? (
                     <Link href={`${base}/schedule?status=MISSED`} className="block group">
                       <div className="flex items-center justify-between rounded-xl border border-line-soft border-l-4 border-l-rose-500 bg-white p-4 shadow-xs transition-all hover:bg-slate-50/70 hover:shadow-sm">
@@ -626,11 +743,6 @@ export function AreaDashboardClient({
                 );
               },
             },
-            // {
-            //   id: 'signedIn',
-            //   header: 'SIGNED IN',
-            //   render: (staff) => staff.signedIn || '—',
-            // },
             {
               id: 'cars',
               header: 'CARS',
@@ -684,78 +796,11 @@ export function AreaDashboardClient({
         />
       </div>
 
-      {/* Bottom Section: This Month & Year Overview */}
+      {/* Bottom Section: Area Profitability / Performance Breakdown Table */}
       <div className="grid gap-5 lg:grid-cols-12">
-        {/* Left Column: This Month (~5 cols) */}
-        <div className="flex flex-col justify-between rounded-2xl border border-line-soft bg-white p-5 shadow-sm lg:col-span-5">
-          <div>
-            <h2 className="mb-4 text-base font-semibold text-navy-950">
-              This month — {cycleLabel}
-            </h2>
-
-            <div className="space-y-3 text-xs">
-              {/* Washes needed */}
-              <div className="flex items-center justify-between py-1">
-                <span className="flex items-center gap-2 text-slate-500">
-                  <IconDroplet width={16} height={16} className="text-sky-500" />
-                  Washes needed
-                </span>
-                <span className="font-semibold text-navy-950">
-                  {totals.washesDone}
-                </span>
-              </div>
-
-              {/* Washes missed */}
-              <div className="flex items-center justify-between py-1">
-                <span className="flex items-center gap-2 text-slate-500">
-                  <IconAlert width={16} height={16} className="text-rose-500" />
-                  Washes missed
-                </span>
-                <span className="font-semibold text-rose-600">
-                  {totals.washesMissed}
-                </span>
-              </div>
-
-              {/* Collected */}
-              <div className="flex items-center justify-between py-1">
-                <span className="flex items-center gap-2 text-slate-500">
-                  <IconWallet width={16} height={16} className="text-emerald-500" />
-                  Collected
-                </span>
-                <span className="font-semibold text-emerald-600">
-                  {money(totals.collected)}
-                </span>
-              </div>
-
-              {/* Outstanding */}
-              <div className="flex items-center justify-between py-1">
-                <span className="flex items-center gap-2 text-slate-500">
-                  <IconClock width={16} height={16} className="text-amber-500" />
-                  Outstanding
-                </span>
-                <span className="font-semibold text-amber-600">
-                  {money(outstanding)}
-                </span>
-              </div>
-
-              {/* Average rating */}
-              <div className="flex items-center justify-between py-1">
-                <span className="flex items-center gap-2 text-slate-500">
-                  <IconStar width={16} height={16} className="text-amber-400" />
-                  Average rating
-                </span>
-                <span className="flex items-center gap-1 font-semibold text-navy-950">
-                  {avgRatingDisplay}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column: Year overview (~7 cols) */}
         <WidgetTable<AreaPerformance>
-          className="lg:col-span-7"
-          title="Year overview"
+          className="lg:col-span-12"
+          title="Area Performance &amp; Profitability"
           data={performance}
           keyExtractor={(area) => area.area.id}
           pageSize={10}
@@ -772,13 +817,35 @@ export function AreaDashboardClient({
               header: 'CUSTOMERS',
               align: 'center',
               className: 'font-semibold text-navy-950',
-              render: (area) => area.customers,
+              render: (area) => `${area.customers} (${area.activeCars} cars)`,
             },
             {
               id: 'collected',
               header: 'COLLECTED',
               className: 'font-semibold text-emerald-600',
               render: (area) => money(area.collected),
+            },
+            {
+              id: 'cost',
+              header: 'COST',
+              className: 'font-semibold text-slate-600',
+              render: (area) => money(area.goodsCost + area.payoutCost),
+            },
+            {
+              id: 'profit',
+              header: 'PROFIT',
+              className: 'font-bold text-slate-900',
+              render: (area) => (
+                <span
+                  className={
+                    area.profit > 0
+                      ? 'font-semibold text-emerald-600'
+                      : 'font-semibold text-rose-600'
+                  }
+                >
+                  {money(area.profit)}
+                </span>
+              ),
             },
             {
               id: 'outstanding',

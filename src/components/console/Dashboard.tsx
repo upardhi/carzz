@@ -6,7 +6,13 @@ import type { Session } from '@/lib/auth/server';
 import { scopeAreaFilter } from '@/lib/auth/rbac';
 import { getStore } from '@/lib/data';
 import { loadRedAlerts } from '@/lib/services/accounts';
-import { areaPerformance } from '@/lib/services/reports';
+import { computePayoutRun } from '@/lib/services/payroll';
+import {
+  areaPerformance,
+  businessSummary,
+  dailyOperationsReport,
+  customerStaffGrowthReport,
+} from '@/lib/services/reports';
 import {
   currentCycle,
   cycleLabel,
@@ -15,7 +21,8 @@ import {
 } from '@/lib/util/format';
 
 /**
- * The console dashboard screen.
+ * The console dashboard screen for Area Admins and Managers.
+ * Scoped precisely to their assigned area or region.
  */
 export async function ConsoleDashboard({
   session,
@@ -28,6 +35,10 @@ export async function ConsoleDashboard({
   const cycle = currentCycle();
   const today = todayISO();
   const areaFilter = scopeAreaFilter(session.scope);
+  const areaIds = session.scope.areaIds;
+
+  const payouts = await computePayoutRun(store, cycle, areaIds);
+  const performance = await areaPerformance(store, cycle, areaIds, payouts);
 
   const [
     visits,
@@ -35,13 +46,15 @@ export async function ConsoleDashboard({
     complaintsCount,
     escalatedComplaintsCount,
     staff,
-    performance,
     attendance,
     allLeaves,
     lowRatedCount,
+    dailyOps,
+    growth,
+    summary,
   ] = await Promise.all([
     store.visits.find({ where: { scheduledDate: today, ...areaFilter } as never }),
-    loadRedAlerts(store, session.scope.areaIds),
+    loadRedAlerts(store, areaIds),
     store.complaints.count({
       status: { in: ['OPEN', 'ESCALATED'] },
       ...areaFilter,
@@ -51,20 +64,17 @@ export async function ConsoleDashboard({
       ...areaFilter,
     } as never),
     store.staff.find({ where: { role: 'EMPLOYEE', ...areaFilter } as never }),
-    areaPerformance(store, cycle, session.scope.areaIds, undefined, {
-      skipPayoutsAndGoods: true,
-    }),
     store.attendance.find({ where: { date: today } }),
     store.leaves.find({ orderBy: [{ field: 'appliedAt', dir: 'desc' }] }),
-    // A wash boy's quality problem, not a money one — this is what a manager
-    // actually needs to act on day to day, unlike the payment-chasing alerts.
     store.visits.count({
       cycle,
       rating: { ne: null, lt: 3 },
       ...areaFilter,
     } as never),
+    dailyOperationsReport(store, areaIds),
+    customerStaffGrowthReport(store, cycle, areaIds),
+    businessSummary(store, cycle, areaIds, performance),
   ]);
-
 
   const staffIds = new Set(staff.map((s) => s.id));
   const staffById = new Map(staff.map((s) => [s.id, s]));
@@ -96,6 +106,9 @@ export async function ConsoleDashboard({
   const pending = visits.filter((v) => v.status === 'PENDING').length;
   const missed = visits.filter((v) => v.status === 'MISSED').length;
   const outstanding = alerts.reduce((sum, a) => sum + a.amount, 0);
+
+  const unapproved = payouts.filter((p) => p.status === 'DRAFT' && p.net > 0);
+  const unapprovedTotal = unapproved.reduce((sum, p) => sum + p.net, 0);
 
   const totals = performance.reduce(
     (acc, area) => ({
@@ -165,8 +178,11 @@ export async function ConsoleDashboard({
       base={base}
       pendingLeavesCount={pendingLeavesCount}
       staffOnLeaveNames={staffOnLeaveNames}
+      dailyOps={dailyOps}
+      growth={growth}
+      summary={summary}
+      unapprovedPayoutsCount={unapproved.length}
+      unapprovedPayoutsTotal={unapprovedTotal}
     />
   );
 }
-
-
