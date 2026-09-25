@@ -46,8 +46,6 @@ export async function ConsoleDashboard({
     complaintsCount,
     escalatedComplaintsCount,
     staff,
-    attendance,
-    allLeaves,
     lowRatedCount,
     dailyOps,
     growth,
@@ -64,8 +62,6 @@ export async function ConsoleDashboard({
       ...areaFilter,
     } as never),
     store.staff.find({ where: { role: 'EMPLOYEE', ...areaFilter } as never }),
-    store.attendance.find({ where: { date: today } }),
-    store.leaves.find({ orderBy: [{ field: 'appliedAt', dir: 'desc' }] }),
     store.visits.count({
       cycle,
       rating: { ne: null, lt: 3 },
@@ -76,17 +72,28 @@ export async function ConsoleDashboard({
     businessSummary(store, cycle, areaIds, performance),
   ]);
 
-  const staffIds = new Set(staff.map((s) => s.id));
+  const staffIds = staff.map((s) => s.id);
+  const staffIdSet = new Set(staffIds);
   const staffById = new Map(staff.map((s) => [s.id, s]));
+
+  const [attendance, allLeaves] = await Promise.all([
+    staffIds.length
+      ? store.attendance.find({ where: { date: today, staffId: { in: staffIds } } as never })
+      : [],
+    staffIds.length
+      ? store.leaves.find({ where: { staffId: { in: staffIds } } as never })
+      : [],
+  ]);
+
   const attendanceByStaff = new Map(attendance.map((a) => [a.staffId, a]));
 
   const pendingLeavesCount = allLeaves.filter(
-    (l) => staffIds.has(l.staffId) && l.status === 'PENDING',
+    (l) => staffIdSet.has(l.staffId) && l.status === 'PENDING',
   ).length;
 
   const staffOnLeaveToday = allLeaves.filter(
     (l) =>
-      staffIds.has(l.staffId) &&
+      staffIdSet.has(l.staffId) &&
       l.status === 'APPROVED' &&
       l.startDate <= today &&
       l.endDate >= today,
@@ -96,7 +103,7 @@ export async function ConsoleDashboard({
   );
 
   const uninformedLeavesCount = allLeaves.filter(
-    (l) => staffIds.has(l.staffId) && l.type === 'UNINFORMED',
+    (l) => staffIdSet.has(l.staffId) && l.type === 'UNINFORMED',
   ).length;
 
   const unassigned = visits.filter((v) => !v.staffId && v.status === 'PENDING');

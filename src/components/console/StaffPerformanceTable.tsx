@@ -6,6 +6,7 @@ import { Kpi, KpiGrid } from '@/components/ui/primitives';
 import type { Area, StaffPerformanceRow } from '@/lib/data/types';
 import { percent } from '@/lib/util/format';
 import { useDebounce } from '@/lib/util/debounce';
+import { FlaggedWashesModal } from '@/components/console/FlaggedWashesModal';
 
 interface Props {
   rows: StaffPerformanceRow[];
@@ -21,6 +22,7 @@ export function StaffPerformanceTable({ rows, areas, totalStaff }: Props) {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [flaggedModal, setFlaggedModal] = useState<{ staffId?: string; staffName?: string } | null>(null);
 
   const areaMap = useMemo(() => new Map(areas.map((a) => [a.id, a.name])), [areas]);
 
@@ -188,12 +190,14 @@ export function StaffPerformanceTable({ rows, areas, totalStaff }: Props) {
       sortable: true,
       render: (row) =>
         row.flaggedWashes > 0 ? (
-          <span
-            title="Washes finished suspiciously fast or that took much longer than usual"
-            className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-800"
+          <button
+            type="button"
+            onClick={() => setFlaggedModal({ staffId: row.staffId, staffName: row.name })}
+            title="Click to view details of flagged washes"
+            className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-800 hover:bg-amber-100 hover:border-amber-300 hover:scale-105 active:scale-95 transition cursor-pointer"
           >
             ⚠ {row.flaggedWashes}
-          </span>
+          </button>
         ) : (
           <span className="text-slate-300">—</span>
         ),
@@ -241,12 +245,21 @@ export function StaffPerformanceTable({ rows, areas, totalStaff }: Props) {
           tone={totalComplaints > 10 ? 'rose' : 'slate'}
           subtext="Total logged"
         />
-        <Kpi
-          label="FLAGGED WASHES"
-          value={totalFlagged}
-          tone={totalFlagged > 0 ? 'amber' : 'slate'}
-          subtext="Too fast or too slow"
-        />
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => setFlaggedModal({})}
+          onKeyDown={(e) => e.key === 'Enter' && setFlaggedModal({})}
+          className="cursor-pointer transition hover:scale-[1.02] active:scale-[0.99] focus:outline-none"
+          title="Click to inspect all flagged washes"
+        >
+          <Kpi
+            label="FLAGGED WASHES"
+            value={totalFlagged}
+            tone={totalFlagged > 0 ? 'amber' : 'slate'}
+            subtext={totalFlagged > 0 ? 'Click to inspect ↗' : 'Too fast or too slow'}
+          />
+        </div>
       </KpiGrid>
 
       {/* Main White Card Container with padding containing Search, Table, and Pagination */}
@@ -309,6 +322,14 @@ export function StaffPerformanceTable({ rows, areas, totalStaff }: Props) {
           pageSizeOptions={[10, 20, 50, 100]}
         />
       </div>
+
+      {flaggedModal && (
+        <FlaggedWashesModal
+          staffId={flaggedModal.staffId}
+          staffName={flaggedModal.staffName}
+          onClose={() => setFlaggedModal(null)}
+        />
+      )}
     </div>
   );
 }

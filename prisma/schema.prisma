@@ -329,6 +329,11 @@ model Staff {
   @@index([areaId, role])
   @@index([active])
   @@index([userId])
+  @@index([role, active])
+  @@index([role, areaId, active])
+  @@index([role, joinedOn])
+  @@index([role, areaId, joinedOn])
+  @@index([joinedOn])
 }
 
 model Attendance {
@@ -451,6 +456,9 @@ model Customer {
   @@index([areaId, status])
   @@index([phone])
   @@index([referredById, joinedOn])
+  @@index([status])
+  @@index([joinedOn])
+  @@index([areaId, joinedOn])
 }
 
 model ServicePackage {

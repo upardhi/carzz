@@ -607,7 +607,44 @@ export interface DailyOperationsSummary {
   monthlyRevenue: Rupees;
 }
 
-export async function dailyOperationsReport(
+interface DailyOpsCacheEntry {
+  data: Promise<DailyOperationsSummary>;
+  expires: number;
+}
+const dailyOpsCache: Map<string, DailyOpsCacheEntry> =
+  ((globalThis as unknown as { __dailyOpsCache?: Map<string, DailyOpsCacheEntry> })
+    .__dailyOpsCache ??= new Map());
+
+export function invalidateDailyOperationsCache(): void {
+  dailyOpsCache.clear();
+}
+
+export function dailyOperationsReport(
+  store: DataStore,
+  areaIds: Id[] | null = null,
+): Promise<DailyOperationsSummary> {
+  const today = businessToday();
+  const cacheKey = `${today}:${areaIds ? areaIds.slice().sort().join(',') : 'all'}`;
+  const now = Date.now();
+  const cached = dailyOpsCache.get(cacheKey);
+  if (cached && cached.expires > now) {
+    return cached.data;
+  }
+
+  const promise = _computeDailyOperationsReport(store, areaIds).catch((err) => {
+    dailyOpsCache.delete(cacheKey);
+    throw err;
+  });
+
+  dailyOpsCache.set(cacheKey, {
+    data: promise,
+    expires: now + 30_000,
+  });
+
+  return promise;
+}
+
+async function _computeDailyOperationsReport(
   store: DataStore,
   areaIds: Id[] | null = null,
 ): Promise<DailyOperationsSummary> {
@@ -619,10 +656,17 @@ export async function dailyOperationsReport(
 
   const areaFilter = areaIds ? { areaId: { in: areaIds } } : {};
 
-  const [todayVisits, tomorrowVisits, allCustomers, invoices] = await Promise.all([
+  const [
+    todayVisits,
+    tomorrowVisits,
+    totalActiveCustomers,
+    totalCustomers,
+    invoices,
+  ] = await Promise.all([
     store.visits.find({ where: { scheduledDate: today, ...areaFilter } as never }),
     store.visits.find({ where: { scheduledDate: tomorrow, ...areaFilter } as never }),
-    store.customers.find(areaIds ? { where: { areaId: { in: areaIds } } as never } : undefined),
+    store.customers.count({ status: 'ACTIVE', ...areaFilter } as never),
+    store.customers.count(areaFilter as never),
     store.invoices.find({ where: { cycle, ...areaFilter } as never }),
   ]);
 
@@ -630,8 +674,6 @@ export async function dailyOperationsReport(
   const washedCustomerIds = new Set(doneToday.map((v) => v.customerId));
   const todayRemaining = todayVisits.filter((v) => v.status === 'PENDING' || v.status === 'IN_PROGRESS');
   const tomorrowRemaining = tomorrowVisits.filter((v) => v.status !== 'DONE' && v.status !== 'MISSED');
-
-  const activeCustomers = allCustomers.filter((c) => c.status === 'ACTIVE');
   const monthlyRevenue = invoices.reduce((s, i) => s + i.paidAmount, 0);
 
   return {
@@ -640,8 +682,8 @@ export async function dailyOperationsReport(
     todayWashedCustomers: washedCustomerIds.size,
     todayRemainingWashes: todayRemaining.length,
     nextDayRemainingWashes: tomorrowRemaining.length,
-    totalActiveCustomers: activeCustomers.length,
-    totalCustomers: allCustomers.length,
+    totalActiveCustomers,
+    totalCustomers,
     monthlyRevenue,
   };
 }
@@ -655,30 +697,87 @@ export interface CustomerStaffGrowthSummary {
   inactiveWashBoysThisMonth: number;
 }
 
-export async function customerStaffGrowthReport(
+interface GrowthCacheEntry {
+  data: Promise<CustomerStaffGrowthSummary>;
+  expires: number;
+}
+const growthCache: Map<string, GrowthCacheEntry> =
+  ((globalThis as unknown as { __growthCache?: Map<string, GrowthCacheEntry> })
+    .__growthCache ??= new Map());
+
+export function invalidateGrowthCache(): void {
+  growthCache.clear();
+}
+
+export function customerStaffGrowthReport(
+  store: DataStore,
+  cycle: string,
+  areaIds: Id[] | null = null,
+): Promise<CustomerStaffGrowthSummary> {
+  const cacheKey = `${cycle}:${areaIds ? areaIds.slice().sort().join(',') : 'all'}`;
+  const now = Date.now();
+  const cached = growthCache.get(cacheKey);
+  if (cached && cached.expires > now) {
+    return cached.data;
+  }
+
+  const promise = _computeCustomerStaffGrowthReport(store, cycle, areaIds).catch((err) => {
+    growthCache.delete(cacheKey);
+    throw err;
+  });
+
+  growthCache.set(cacheKey, {
+    data: promise,
+    expires: now + 60_000,
+  });
+
+  return promise;
+}
+
+async function _computeCustomerStaffGrowthReport(
   store: DataStore,
   cycle: string,
   areaIds: Id[] | null = null,
 ): Promise<CustomerStaffGrowthSummary> {
   const areaFilter = areaIds ? { areaId: { in: areaIds } } : {};
+  const cycleStart = `${cycle}-01`;
+  const cycleEnd = `${cycle}-31`;
 
-  const [customers, staff] = await Promise.all([
-    store.customers.find(areaIds ? { where: { areaId: { in: areaIds } } as never } : undefined),
-    store.staff.find({ where: { role: 'EMPLOYEE', ...areaFilter } as never }),
+  const [
+    totalCustomers,
+    newCustomersThisMonth,
+    inactiveCustomersThisMonth,
+    newWashBoysJoinedThisMonth,
+    inactiveWashBoysThisMonth,
+  ] = await Promise.all([
+    store.customers.count(areaFilter as never),
+    store.customers.count({
+      ...areaFilter,
+      joinedOn: { gte: cycleStart, lte: cycleEnd },
+    } as never),
+    store.customers.count({
+      ...areaFilter,
+      status: 'INACTIVE',
+    } as never),
+    store.staff.count({
+      role: 'EMPLOYEE',
+      ...areaFilter,
+      joinedOn: { gte: cycleStart, lte: cycleEnd },
+    } as never),
+    store.staff.count({
+      role: 'EMPLOYEE',
+      ...areaFilter,
+      active: false,
+    } as never),
   ]);
-
-  const newCustomers = customers.filter((c) => c.joinedOn && c.joinedOn.startsWith(cycle));
-  const inactiveCustomers = customers.filter((c) => c.status === 'INACTIVE');
-  const newStaff = staff.filter((s) => s.joinedOn && s.joinedOn.startsWith(cycle));
-  const inactiveStaff = staff.filter((s) => !s.active);
 
   return {
     cycle,
-    totalCustomers: customers.length,
-    newCustomersThisMonth: newCustomers.length,
-    inactiveCustomersThisMonth: inactiveCustomers.length,
-    newWashBoysJoinedThisMonth: newStaff.length,
-    inactiveWashBoysThisMonth: inactiveStaff.length,
+    totalCustomers,
+    newCustomersThisMonth,
+    inactiveCustomersThisMonth,
+    newWashBoysJoinedThisMonth,
+    inactiveWashBoysThisMonth,
   };
 }
 
