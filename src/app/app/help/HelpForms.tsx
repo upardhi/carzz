@@ -6,6 +6,7 @@ import { Note } from '@/components/ui/primitives';
 import { COMPLAINT_TYPES, type ComplaintType } from '@/lib/data/types';
 import { COMPLAINT_TYPE_LABEL } from '@/lib/util/labels';
 import { safeOfflineFetch } from '@/lib/util/offlineQueue';
+import { isWashFeedbackExpired } from '@/lib/util/washTiming';
 
 export function RateWashForm({
   visitId,
@@ -13,12 +14,16 @@ export function RateWashForm({
   dateLabel,
   staffName,
   existingRating,
+  completedAt,
+  scheduledDate,
 }: {
   visitId: string;
   carLabel: string;
   dateLabel: string;
   staffName: string | null;
   existingRating: number | null;
+  completedAt?: string | null;
+  scheduledDate?: string | null;
 }) {
   const router = useRouter();
   const [rating, setRating] = useState(existingRating ?? 4);
@@ -26,7 +31,13 @@ export function RateWashForm({
   const [state, setState] = useState<{ ok?: string; error?: string }>({});
   const [pending, setPending] = useState(false);
 
+  const isExpired = isWashFeedbackExpired({ completedAt, scheduledDate });
+
   async function submit() {
+    if (isExpired) {
+      setState({ error: 'Review option is disabled after 7 days of wash completion.' });
+      return;
+    }
     if (rating < 1) {
       setState({ error: 'Tap a star to give your rating.' });
       return;
@@ -95,11 +106,11 @@ export function RateWashForm({
 
       <button
         type="button"
-        disabled={pending}
+        disabled={pending || isExpired}
         onClick={submit}
-        className="mt-3 w-full rounded-xl bg-[#214f92] py-3 text-[14px] font-semibold text-white shadow-xs transition-all hover:bg-[#1a3f75] active:scale-[0.99] disabled:opacity-50"
+        className="mt-3 w-full rounded-xl bg-[#214f92] py-3 text-[14px] font-semibold text-white shadow-xs transition-all hover:bg-[#1a3f75] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {pending ? 'Sending…' : 'Submit rating'}
+        {pending ? 'Sending…' : isExpired ? 'Rating Closed (After 7 Days)' : 'Submit rating'}
       </button>
 
 

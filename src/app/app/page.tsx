@@ -85,6 +85,8 @@ export default async function CustomerHome() {
       rating: visit.rating,
       ratingComment: visit.ratingComment,
       isDone: visit.status === 'DONE',
+      completedAt: visit.completedAt,
+      scheduledDate: visit.scheduledDate,
       status:
         visit.status === 'DONE'
           ? 'Done'
@@ -429,6 +431,8 @@ export default async function CustomerHome() {
                           rating={b.rating}
                           ratingComment={b.ratingComment}
                           isMissed={!b.isDone}
+                          completedAt={b.completedAt}
+                          scheduledDate={b.scheduledDate}
                           variant="compact"
                         />
                       )}

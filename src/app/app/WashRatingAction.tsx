@@ -6,6 +6,7 @@ import { toast } from '@/components/ui/ToastProvider';
 import { safeOfflineFetch } from '@/lib/util/offlineQueue';
 import { COMPLAINT_TYPES, type ComplaintType } from '@/lib/data/types';
 import { COMPLAINT_TYPE_LABEL } from '@/lib/util/labels';
+import { isWashFeedbackExpired } from '@/lib/util/washTiming';
 
 interface WashRatingActionProps {
   visitId: string;
@@ -16,6 +17,8 @@ interface WashRatingActionProps {
   rating?: number | null;
   ratingComment?: string | null;
   isMissed?: boolean;
+  completedAt?: string | null;
+  scheduledDate?: string | null;
   variant?: 'inline' | 'compact';
 }
 
@@ -28,11 +31,15 @@ export function WashRatingAction({
   rating: initialRating,
   ratingComment: initialComment,
   isMissed = false,
+  completedAt,
+  scheduledDate,
   variant = 'inline',
 }: WashRatingActionProps) {
   const router = useRouter();
   const [currentRating, setCurrentRating] = useState<number | null>(initialRating ?? null);
   const [currentComment, setCurrentComment] = useState<string | null>(initialComment ?? null);
+
+  const isExpired = isWashFeedbackExpired({ completedAt, scheduledDate });
 
   // Modal visibility states
   const [showRateModal, setShowRateModal] = useState(false);
@@ -54,6 +61,10 @@ export function WashRatingAction({
 
   async function handleSaveRating(e: React.FormEvent) {
     e.preventDefault();
+    if (isExpired) {
+      toast.error('Review option is disabled after 7 days of wash completion.');
+      return;
+    }
     if (selectedStars < 1 || selectedStars > 5) {
       toast.error('Please select between 1 and 5 stars.');
       return;
@@ -97,6 +108,10 @@ export function WashRatingAction({
 
   async function handleSaveComplaint(e: React.FormEvent) {
     e.preventDefault();
+    if (isExpired) {
+      toast.error('Complaint option is disabled after 7 days of wash completion.');
+      return;
+    }
     if (!complaintBody.trim() || complaintBody.trim().length < 5) {
       toast.error('Please describe the issue in at least 5 characters.');
       return;
@@ -149,6 +164,16 @@ export function WashRatingAction({
                 <span>★</span>
                 <span>{currentRating} Rated</span>
               </span>
+            ) : isExpired ? (
+              <button
+                type="button"
+                disabled
+                title="Review option is disabled after 7 days of wash completion"
+                className="inline-flex items-center gap-1 rounded-lg bg-slate-100 border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-400 cursor-not-allowed opacity-75"
+              >
+                <span>⭐</span>
+                <span>Rate (Closed)</span>
+              </button>
             ) : (
               <button
                 type="button"
@@ -165,6 +190,16 @@ export function WashRatingAction({
             <span className="text-[10.5px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
               ✓ Reported
             </span>
+          ) : isExpired ? (
+            <button
+              type="button"
+              disabled
+              title="Issue reporting is disabled after 7 days of wash completion"
+              className="inline-flex items-center gap-1 rounded-lg bg-slate-100 border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-400 cursor-not-allowed opacity-75"
+            >
+              <span>⚠️</span>
+              <span>Issue (Closed)</span>
+            </button>
           ) : (
             <button
               type="button"
@@ -180,7 +215,7 @@ export function WashRatingAction({
       ) : (
         /* INLINE VARIANT FOR CAR DETAIL FEED */
         <div className="flex items-center justify-between flex-wrap gap-2 pt-1">
-          {/* Left Action: Rate Wash (Locked once rated) */}
+          {/* Left Action: Rate Wash (Locked once rated, disabled after 7 days) */}
           {!isMissed ? (
             <div className="flex items-center gap-2">
               {currentRating !== null ? (
@@ -188,6 +223,16 @@ export function WashRatingAction({
                   <span>★</span>
                   <span>Rated {currentRating}.0 Stars</span>
                 </span>
+              ) : isExpired ? (
+                <button
+                  type="button"
+                  disabled
+                  title="Review option is disabled after 7 days of wash completion"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 border border-slate-200 px-3.5 py-1.5 text-xs font-semibold text-slate-400 cursor-not-allowed"
+                >
+                  <span>⭐</span>
+                  <span>Rating Closed (After 7 Days)</span>
+                </button>
               ) : (
                 <button
                   type="button"
@@ -211,13 +256,23 @@ export function WashRatingAction({
             </div>
           )}
 
-          {/* Right Action: Report Issue / Raise Complaint */}
+          {/* Right Action: Report Issue / Raise Complaint (Disabled after 7 days) */}
           <div>
             {complaintSubmitted ? (
               <span className="inline-flex items-center gap-1 text-xs font-bold text-rose-700 bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-200">
                 <span>✓</span>
                 <span>Issue Reported</span>
               </span>
+            ) : isExpired ? (
+              <button
+                type="button"
+                disabled
+                title="Issue reporting is disabled after 7 days of wash completion"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 text-slate-400 border border-slate-200 px-3.5 py-1.5 text-xs font-semibold cursor-not-allowed"
+              >
+                <span>⚠️</span>
+                <span>Issue Reporting Closed</span>
+              </button>
             ) : (
               <button
                 type="button"

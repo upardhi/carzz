@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { HttpError, requireApiSession } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { rateVisit, WashRuleError } from '@/lib/services/visits';
+import { isWashFeedbackExpired } from '@/lib/util/washTiming';
 
 const schema = z.object({
   visitId: z.string().min(1),
@@ -24,6 +25,13 @@ export async function POST(request: Request) {
     // checked against the session rather than trusted from the payload.
     if (!visit || visit.customerId !== session.user.customerId) {
       throw new HttpError(404, 'That wash was not found on your account.');
+    }
+
+    if (isWashFeedbackExpired(visit)) {
+      throw new HttpError(
+        400,
+        'Review option is disabled after 7 days of wash completion.',
+      );
     }
 
     const rules = await store.getPayoutSettings();

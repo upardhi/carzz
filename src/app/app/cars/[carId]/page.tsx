@@ -329,6 +329,8 @@ export default async function CarDetail({
                   staffName={staff.get(visit.staffId || '')?.name}
                   rating={visit.rating}
                   ratingComment={visit.ratingComment}
+                  completedAt={visit.completedAt}
+                  scheduledDate={visit.scheduledDate}
                 />
               </div>
             </div>
@@ -363,6 +365,8 @@ export default async function CarDetail({
                   dateLabel={formatDateFull(visit.scheduledDate)}
                   staffName={staff.get(visit.staffId || '')?.name}
                   isMissed={true}
+                  completedAt={visit.completedAt}
+                  scheduledDate={visit.scheduledDate}
                 />
               </div>
             </div>

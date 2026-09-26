@@ -33,3 +33,27 @@ export function formatDurationMinutes(minutes: number): string {
   const m = minutes % 60;
   return m === 0 ? `${h}h` : `${h}h ${m}m`;
 }
+
+export const WASH_FEEDBACK_WINDOW_DAYS = 7;
+export const WASH_FEEDBACK_WINDOW_MS = WASH_FEEDBACK_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+
+/**
+ * Checks whether the feedback / complaint window (7 days after wash completion) has expired.
+ */
+export function isWashFeedbackExpired(
+  visit: { completedAt?: string | null; scheduledDate?: string | null },
+  now = Date.now(),
+): boolean {
+  const completionTime = visit.completedAt
+    ? new Date(visit.completedAt).getTime()
+    : visit.scheduledDate
+    ? new Date(visit.scheduledDate).getTime()
+    : null;
+
+  if (completionTime === null || !Number.isFinite(completionTime)) {
+    return false;
+  }
+  return now - completionTime > WASH_FEEDBACK_WINDOW_MS;
+}
+
+

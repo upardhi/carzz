@@ -3,6 +3,7 @@ import 'server-only';
 import type { DataStore } from '../data/ports/store';
 import type { Id, MissReason, WashVisit } from '../data/types';
 import { slotInstant } from '../util/time';
+import { isWashFeedbackExpired } from '../util/washTiming';
 import { nextSlotAfter, plannedServiceFor, scheduleNextVisitForCar } from './schedule';
 import { invalidateAreaPerformanceCache } from './reports';
 
@@ -208,6 +209,11 @@ export async function rateVisit(
   }
   if (visit.rating !== null) {
     throw new WashRuleError('This wash has already been rated. Thank you!');
+  }
+  if (isWashFeedbackExpired(visit)) {
+    throw new WashRuleError(
+      'Review option is disabled after 7 days of wash completion.',
+    );
   }
   return store.visits.update(visitId, {
     rating,

@@ -162,7 +162,7 @@ export function CustomerSpecialRequestsModal({
         className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow-md hover:from-blue-700 hover:to-indigo-700 active:scale-[0.99] transition-all cursor-pointer"
       >
         <span className="text-sm">✨</span>
-        <span>Special Requests & Packages</span>
+        <span>Customer Requests</span>
       </button>
 
       {open && (

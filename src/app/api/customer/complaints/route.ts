@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { HttpError, requireApiSession } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { COMPLAINT_TYPES } from '@/lib/data/types';
+import { isWashFeedbackExpired } from '@/lib/util/washTiming';
 
 const schema = z.object({
   visitId: z.string().optional().nullable(),
@@ -62,6 +63,13 @@ export async function POST(request: Request) {
             orderBy: [{ field: 'scheduledDate', dir: 'desc' }],
           }));
       }
+    }
+
+    if (targetVisit && isWashFeedbackExpired(targetVisit)) {
+      throw new HttpError(
+        400,
+        'Complaint option is disabled after 7 days of wash completion.',
+      );
     }
 
     const complaint = await store.complaints.create({
