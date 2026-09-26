@@ -15,6 +15,7 @@ import { loadCustomerAccount } from '@/lib/services/accounts';
 import { WashActionControls } from './WashActionControls';
 import { CustomerSpecialRequestsModal } from './CustomerSpecialRequestsModal';
 import { WashRatingAction } from './WashRatingAction';
+import { WashProgressTimer } from '@/components/ui/WashProgressTimer';
 import {
   currentCycle,
   formatDate,
@@ -38,6 +39,14 @@ export default async function CustomerHome() {
     store.packages.find({ where: { active: true } }),
   ]);
   if (!account) notFound();
+
+  const activeInProgressVisit = account.visits.find((v) => v.status === 'IN_PROGRESS');
+  const inProgressCar = activeInProgressVisit
+    ? account.cars.find((c) => c.id === activeInProgressVisit.carId)
+    : null;
+  const inProgressStaff = activeInProgressVisit?.staffId
+    ? await store.staff.get(activeInProgressVisit.staffId)
+    : null;
 
   const staff = account.nextVisit?.staffId
     ? await store.staff.get(account.nextVisit.staffId)
@@ -67,7 +76,9 @@ export default async function CustomerHome() {
     const car = account.cars.find((c) => c.id === visit.carId);
 
     let subtitle = car ? `${car.make} ${car.model}` : 'Routine Wash';
-    if (visit.missReason) {
+    if (visit.status === 'IN_PROGRESS') {
+      subtitle = `🚿 Live Wash In Progress · ${car ? `${car.make} ${car.model}` : 'Vehicle'}`;
+    } else if (visit.missReason) {
       subtitle = `Missed: ${visit.missReason.replace(/_/g, ' ')}`;
     } else if (visit.missNote?.includes('[Free Compensatory Wash]')) {
       subtitle = `${car ? `${car.make} ${car.model} · ` : ''}🎁 Free Compensatory Wash`;
@@ -85,10 +96,14 @@ export default async function CustomerHome() {
       rating: visit.rating,
       ratingComment: visit.ratingComment,
       isDone: visit.status === 'DONE',
+      isInProgress: visit.status === 'IN_PROGRESS',
+      startedAt: visit.startedAt,
       completedAt: visit.completedAt,
       scheduledDate: visit.scheduledDate,
       status:
-        visit.status === 'DONE'
+        visit.status === 'IN_PROGRESS'
+          ? 'In Progress'
+          : visit.status === 'DONE'
           ? 'Done'
           : visit.status === 'MISSED'
           ? visit.rescheduledToVisitId
@@ -142,19 +157,29 @@ export default async function CustomerHome() {
       {/* 2. TOP 3 STAT CARDS (Matches Image Exactly)                               */}
       {/* ========================================================================= */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-5">
-        {/* Card 1: NEXT WASH */}
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs flex flex-col justify-between">
+        {/* Card 1: NEXT WASH / WASH IN PROGRESS */}
+        <div className={`rounded-2xl border bg-white p-5 shadow-2xs flex flex-col justify-between ${activeInProgressVisit ? 'border-blue-400 ring-2 ring-blue-100 bg-gradient-to-b from-blue-50/40 to-white' : 'border-slate-200/80'}`}>
           <div>
             <div className="flex items-start gap-3.5">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#e0f2fe] text-[#0284c7]">
-                <IconCalendar width={26} height={26} />
+              <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ${activeInProgressVisit ? 'bg-blue-600 text-white shadow-xs animate-pulse' : 'bg-[#e0f2fe] text-[#0284c7]'}`}>
+                {activeInProgressVisit ? <span className="text-2xl">🚿</span> : <IconCalendar width={26} height={26} />}
               </div>
               <div className="min-w-0 flex-1">
-                <h2 className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                  NEXT WASH
-                </h2>
+                <div className="flex items-center gap-1.5">
+                  <h2 className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    {activeInProgressVisit ? 'WASH IN PROGRESS' : 'NEXT WASH'}
+                  </h2>
+                  {activeInProgressVisit && (
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-500 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-600" />
+                    </span>
+                  )}
+                </div>
                 <div className="text-xl md:text-2xl font-bold tracking-tight text-slate-900 mt-0.5">
-                  {account.nextVisit
+                  {activeInProgressVisit
+                    ? `${inProgressCar?.make || ''} ${inProgressCar?.model || 'Vehicle'}`
+                    : account.nextVisit
                     ? formatDateFull(account.nextVisit.scheduledDate)
                     : account.cars.length === 0
                     ? 'No Cars Added'
@@ -165,7 +190,23 @@ export default async function CustomerHome() {
               </div>
             </div>
 
-            {account.nextVisit ? (
+            {activeInProgressVisit ? (
+              <div className="mt-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-semibold text-blue-950">
+                    Cleaner: {inProgressStaff?.name ?? 'Assigned Staff'}
+                  </div>
+                  <WashProgressTimer
+                    startedAt={activeInProgressVisit.startedAt}
+                    variant="compact"
+                  />
+                </div>
+                <div className="flex items-center gap-1.5 text-xs text-blue-800 font-medium bg-blue-50 border border-blue-200/70 px-2.5 py-1.5 rounded-lg">
+                  <span>🚿</span>
+                  <span>{activeInProgressVisit.plannedService || 'Package Wash'} in progress</span>
+                </div>
+              </div>
+            ) : account.nextVisit ? (
               <div className="mt-3">
                 <div className="text-[15px] font-bold text-slate-900">
                   {formatTime(account.nextVisit.scheduledTime)}
@@ -197,7 +238,15 @@ export default async function CustomerHome() {
           </div>
 
           <div className="mt-4">
-            {account.nextVisit ? (
+            {activeInProgressVisit ? (
+              <Link
+                href={`/app/cars/${activeInProgressVisit.carId}`}
+                className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 py-2.5 px-3 text-xs font-bold text-white shadow-xs transition-colors"
+              >
+                <span>View Live Progress & Photos</span>
+                <span>→</span>
+              </Link>
+            ) : account.nextVisit ? (
               <WashActionControls
                 visitId={account.nextVisit.id}
                 scheduledDate={formatDateFull(account.nextVisit.scheduledDate)}
@@ -309,10 +358,13 @@ export default async function CustomerHome() {
                 car.make?.toLowerCase().includes('tata');
               const carImgSrc = isAltroz ? '/cars/altroz.jpg' : '/cars/ertiga.jpg';
               const packageTotal = car.package?.washesPerMonth ?? 0;
+              const carInProgress = account.visits.find(
+                (v) => v.carId === car.id && v.status === 'IN_PROGRESS',
+              );
 
               return (
                 <Link key={car.id} href={`/app/cars/${car.id}`} className="block group">
-                  <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-2xs transition-all group-hover:border-blue-300 group-hover:shadow-xs flex items-center justify-between gap-3">
+                  <div className={`rounded-2xl border bg-white p-4 shadow-2xs transition-all group-hover:border-blue-300 group-hover:shadow-xs flex items-center justify-between gap-3 ${carInProgress ? 'border-blue-400 ring-1 ring-blue-200 bg-blue-50/20' : 'border-slate-200/80'}`}>
                     <div className="flex items-center gap-3.5 min-w-0">
                       <div className="flex h-14 w-20 shrink-0 items-center justify-center rounded-xl bg-slate-50 border border-slate-100/80 overflow-hidden p-1">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -333,7 +385,13 @@ export default async function CustomerHome() {
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
-                      {!car.serviceStarted ? (
+                      {carInProgress ? (
+                        <WashProgressTimer
+                          startedAt={carInProgress.startedAt}
+                          variant="badge"
+                          label="In Progress"
+                        />
+                      ) : !car.serviceStarted ? (
                         <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-200/80 px-2.5 py-0.5 text-xs font-bold text-amber-700">
                           Pending Start
                         </span>
@@ -409,19 +467,27 @@ export default async function CustomerHome() {
                       </div>
                     </div>
                     <div className="shrink-0 flex items-center gap-2">
-                      <span
-                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold border ${
-                          b.status === 'Cancelled'
-                            ? 'bg-slate-100 text-slate-600 border-slate-200'
-                            : b.status === 'Rescheduled'
-                            ? 'bg-amber-50 text-amber-700 border-amber-200'
-                            : b.status === 'Pending'
-                            ? 'bg-blue-50 text-blue-700 border-blue-200'
-                            : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                        }`}
-                      >
-                        {b.status}
-                      </span>
+                      {b.status === 'In Progress' ? (
+                        <WashProgressTimer
+                          startedAt={b.startedAt}
+                          variant="badge"
+                          label="In Progress"
+                        />
+                      ) : (
+                        <span
+                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold border ${
+                            b.status === 'Cancelled'
+                              ? 'bg-slate-100 text-slate-600 border-slate-200'
+                              : b.status === 'Rescheduled'
+                              ? 'bg-amber-50 text-amber-700 border-amber-200'
+                              : b.status === 'Pending'
+                              ? 'bg-blue-50 text-blue-700 border-blue-200'
+                              : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          }`}
+                        >
+                          {b.status}
+                        </span>
+                      )}
                       {(b.isDone || b.status === 'Cancelled' || b.status === 'Rescheduled') && (
                         <WashRatingAction
                           visitId={b.id}

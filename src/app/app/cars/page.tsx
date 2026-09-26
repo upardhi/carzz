@@ -82,6 +82,10 @@ export default async function CustomerCars() {
                 ? '/cars/altroz.jpg'
                 : undefined;
 
+            const inProgressVisit = account.visits.find(
+              (v) => v.carId === car.id && v.status === 'IN_PROGRESS',
+            );
+
             const nextCarVisit = car.serviceStarted
               ? account.visits.find(
                   (v) =>
@@ -91,7 +95,9 @@ export default async function CustomerCars() {
                 )
               : null;
 
-            const nextWashText = nextCarVisit
+            const nextWashText = inProgressVisit
+              ? 'Wash in progress now'
+              : nextCarVisit
               ? `${formatDateFull(nextCarVisit.scheduledDate)}, ${formatTime(car.scheduleTime)}`
               : !car.serviceStarted
               ? 'Service pending start'
@@ -111,6 +117,8 @@ export default async function CustomerCars() {
                 totalWashes={totalCount}
                 nextWash={nextWashText}
                 active={car.active}
+                inProgress={Boolean(inProgressVisit)}
+                inProgressStartedAt={inProgressVisit?.startedAt}
                 imageSrc={carImage}
                 historyHref={`/app/cars/${car.id}`}
               />

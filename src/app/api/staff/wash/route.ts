@@ -87,6 +87,10 @@ export async function POST(request: Request) {
       });
     }
 
+    if (visit.status === 'IN_PROGRESS' || visit.startedAt || visit.beforePhotoUrl) {
+      throw new HttpError(400, 'Cannot skip or mark vehicle as unavailable once cleaning has started.');
+    }
+
     const { visit: updated, replacement } = await missWash(store, visit.id, {
       staffId: session.user.staffId ?? null,
       reason: parsed.data.reason,

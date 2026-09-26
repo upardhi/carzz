@@ -15,6 +15,7 @@ import {
 import { MISS_REASON_LABEL } from '@/lib/util/labels';
 import { resolvePublicPhotoUrl } from '@/lib/util/photoUrl';
 import { WashRatingAction } from '../../WashRatingAction';
+import { WashProgressTimer } from '@/components/ui/WashProgressTimer';
 
 export const metadata = { title: 'Wash history' };
 
@@ -37,6 +38,10 @@ export default async function CarDetail({
   // opening someone else's car by editing the URL.
   const car = account?.cars.find((c) => c.id === carId);
   if (!account || !car) notFound();
+
+  const inProgressVisit = account.visits.find(
+    (v) => v.carId === carId && v.status === 'IN_PROGRESS',
+  );
 
   const settings = await store.getAppSettings();
   const history = account.visits
@@ -96,15 +101,78 @@ export default async function CarDetail({
           >
             ← Back to all cars
           </Link>
-          <h1 className="text-xl md:text-2xl font-bold tracking-tight">
-            {car.make} {car.model}
-          </h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-xl md:text-2xl font-bold tracking-tight">
+              {car.make} {car.model}
+            </h1>
+            {inProgressVisit && (
+              <WashProgressTimer
+                startedAt={inProgressVisit.startedAt}
+                variant="badge"
+                label="Wash In Progress"
+                className="bg-blue-500/20 text-blue-200 border-blue-400/40"
+              />
+            )}
+          </div>
           <p className="mt-1 text-xs md:text-sm text-slate-300 font-medium">
             {car.colour} · <span className="font-mono">{car.plate}</span>
           </p>
         </div>
         <div className="absolute right-[-20px] bottom-[-20px] h-32 w-32 rounded-full bg-blue-500/10 pointer-events-none" />
       </div>
+
+      {/* 1.1 Live Wash In Progress Hero Alert (When wash is actively running) */}
+      {inProgressVisit && (
+        <div className="relative overflow-hidden rounded-2xl border-2 border-blue-400 bg-gradient-to-r from-[#0a234f] via-[#0c2f6d] to-[#113a7c] p-5 text-white shadow-md animate-in fade-in duration-300">
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-300" />
+                </span>
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-cyan-300">
+                  Live Cleaning In Progress
+                </span>
+              </div>
+              <h2 className="text-lg font-bold text-white">
+                Vehicle is being washed right now
+              </h2>
+              <p className="text-xs text-blue-200">
+                Started at <span className="font-semibold text-white">{formatClock(inProgressVisit.startedAt)}</span>
+                {inProgressVisit.staffId && (
+                  <>
+                    {' '}· Cleaner:{' '}
+                    <span className="font-semibold text-white">
+                      {staff.get(inProgressVisit.staffId)?.name ?? 'Assigned Cleaner'}
+                    </span>
+                  </>
+                )}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <WashProgressTimer
+                startedAt={inProgressVisit.startedAt}
+                variant="card"
+                className="bg-white/10 border-white/20 text-white backdrop-blur-sm"
+              />
+            </div>
+          </div>
+
+          <div className="mt-3.5 pt-3 border-t border-white/15 flex flex-wrap items-center gap-2 text-xs">
+            <span className="text-blue-200 font-medium">Service being performed:</span>
+            <span className="inline-flex items-center gap-1 rounded-md bg-white/20 px-2 py-0.5 font-bold text-white">
+              🚿 {inProgressVisit.plannedService || 'Scheduled Package Wash'}
+            </span>
+            {inProgressVisit.beforePhotoUrl && (
+              <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/25 text-emerald-300 border border-emerald-400/30 px-2 py-0.5 font-semibold text-[11px]">
+                ✓ Before photo recorded
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* 2. Top Stats Grid */}
       <div className="grid grid-cols-2 gap-3">
@@ -247,9 +315,96 @@ export default async function CarDetail({
           </div>
         ) : null}
 
-        {history.map((visit) =>
-          visit.status === 'DONE' ? (
-            <div key={visit.id} className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-2xs space-y-3">
+        {history.map((visit) => {
+          if (visit.status === 'IN_PROGRESS') {
+            const beforeResolved = resolvePublicPhotoUrl(visit.beforePhotoUrl) || visit.beforePhotoUrl;
+            const cleanerName = visit.staffId ? staff.get(visit.staffId)?.name : null;
+
+            return (
+              <div
+                key={visit.id}
+                className="rounded-2xl border-2 border-blue-400 bg-gradient-to-b from-blue-50/90 via-sky-50/40 to-white p-4 shadow-xs space-y-3 relative overflow-hidden animate-in fade-in duration-200"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-slate-900">
+                        {formatDateFull(visit.scheduledDate)}
+                      </span>
+                      <span className="text-xs text-blue-400">·</span>
+                      <span className="text-xs font-semibold text-blue-700">
+                        Started {formatClock(visit.startedAt)}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                      <span className="inline-flex items-center gap-1 rounded-md bg-blue-100/80 border border-blue-200 px-2 py-0.5 text-[11px] font-semibold text-blue-900">
+                        🚿 {visit.plannedService || 'Package Wash'}
+                      </span>
+                      {cleanerName ? (
+                        <span className="text-[11px] font-medium text-slate-600">
+                          by {cleanerName.split(' ')[0]}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  {/* Live Timer & Status in History Header */}
+                  <WashProgressTimer
+                    startedAt={visit.startedAt}
+                    variant="history-header"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  {/* Before Photo */}
+                  <div className="relative flex aspect-[4/3] flex-col items-center justify-center overflow-hidden rounded-xl border border-blue-200 bg-slate-50 text-xs font-semibold text-slate-600 shadow-2xs">
+                    {beforeResolved ? (
+                      <>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={beforeResolved}
+                          alt="Before wash photo"
+                          className="h-full w-full object-cover"
+                        />
+                        <span className="absolute inset-x-0 bottom-0 bg-slate-900/80 py-1 text-center text-[10.5px] font-semibold text-white backdrop-blur-xs flex items-center justify-center gap-1">
+                          <span className="text-emerald-400">✓</span> Before Photo
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <IconCamera width={22} height={22} className="text-slate-400" />
+                        <span className="mt-1 text-slate-500">Before Photo</span>
+                        <span className="text-[10px] font-normal text-slate-400">recording...</span>
+                      </>
+                    )}
+                  </div>
+
+                  {/* After Photo Pending */}
+                  <div className="relative flex aspect-[4/3] flex-col items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-blue-300 bg-blue-50/40 text-xs font-semibold text-blue-900 p-3 text-center">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-blue-600 mb-1 animate-pulse">
+                      🚿
+                    </div>
+                    <span className="font-bold text-[11px] text-blue-950">After Photo Pending</span>
+                    <span className="text-[10px] font-normal text-slate-500 mt-0.5">
+                      Uploads when wash finishes
+                    </span>
+                  </div>
+                </div>
+
+                <div className="rounded-xl bg-blue-50/80 border border-blue-200/70 px-3 py-2 text-xs text-blue-900 font-medium flex items-center gap-2">
+                  <span className="relative flex h-2 w-2 shrink-0">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-500 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-600" />
+                  </span>
+                  <span>Vehicle is currently being cleaned. Live duration timer is updating.</span>
+                </div>
+              </div>
+            );
+          }
+
+          if (visit.status === 'DONE') {
+            return (
+              <div key={visit.id} className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-2xs space-y-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-sm font-bold text-slate-900">
@@ -334,44 +489,47 @@ export default async function CarDetail({
                 />
               </div>
             </div>
-          ) : (
-            <div key={visit.id} className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4 shadow-2xs space-y-2.5">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-sm font-bold text-amber-950">
-                    {formatDateFull(visit.scheduledDate)}
-                  </div>
-                  <div className="text-xs font-medium text-amber-700 mt-0.5">
-                    Reason:{' '}
-                    {visit.missReason
-                      ? MISS_REASON_LABEL[visit.missReason]
-                      : 'Not recorded'}
-                  </div>
+          );
+        }
+
+        return (
+          <div key={visit.id} className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4 shadow-2xs space-y-2.5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-sm font-bold text-amber-950">
+                  {formatDateFull(visit.scheduledDate)}
                 </div>
-                <span className="inline-flex items-center rounded-full bg-amber-100 border border-amber-300 px-2.5 py-0.5 text-[11px] font-semibold text-amber-800">
-                  Not done
-                </span>
-              </div>
-              {visit.rescheduledToVisitId ? (
-                <div className="text-xs font-medium text-amber-900 bg-amber-100/60 p-2.5 rounded-xl border border-amber-200">
-                  This wash was <b>skipped and moved to your next scheduled date</b>. You have not lost any paid washes.
+                <div className="text-xs font-medium text-amber-700 mt-0.5">
+                  Reason:{' '}
+                  {visit.missReason
+                    ? MISS_REASON_LABEL[visit.missReason]
+                    : 'Not recorded'}
                 </div>
-              ) : null}
-              <div className="pt-2 border-t border-amber-200/60">
-                <WashRatingAction
-                  visitId={visit.id}
-                  carId={car.id}
-                  carLabel={`${car.make} ${car.model}`}
-                  dateLabel={formatDateFull(visit.scheduledDate)}
-                  staffName={staff.get(visit.staffId || '')?.name}
-                  isMissed={true}
-                  completedAt={visit.completedAt}
-                  scheduledDate={visit.scheduledDate}
-                />
               </div>
+              <span className="inline-flex items-center rounded-full bg-amber-100 border border-amber-300 px-2.5 py-0.5 text-[11px] font-semibold text-amber-800">
+                Not done
+              </span>
             </div>
-          ),
-        )}
+            {visit.rescheduledToVisitId ? (
+              <div className="text-xs font-medium text-amber-900 bg-amber-100/60 p-2.5 rounded-xl border border-amber-200">
+                This wash was <b>skipped and moved to your next scheduled date</b>. You have not lost any paid washes.
+              </div>
+            ) : null}
+            <div className="pt-2 border-t border-amber-200/60">
+              <WashRatingAction
+                visitId={visit.id}
+                carId={car.id}
+                carLabel={`${car.make} ${car.model}`}
+                dateLabel={formatDateFull(visit.scheduledDate)}
+                staffName={staff.get(visit.staffId || '')?.name}
+                isMissed={true}
+                completedAt={visit.completedAt}
+                scheduledDate={visit.scheduledDate}
+              />
+            </div>
+          </div>
+        );
+      })}
 
         <div className="rounded-xl border border-slate-200/80 bg-slate-50 p-3 text-center text-xs font-medium text-slate-500">
           Wash photos are kept securely for {settings.photoRetentionMonths}{' '}

@@ -15,6 +15,7 @@ import { resolvePublicPhotoUrl } from '@/lib/util/photoUrl';
 import { formatDateFull, formatClock } from '@/lib/util/format';
 import { washDurationMinutes, formatDurationMinutes, washSpeedFlag } from '@/lib/util/washTiming';
 import { MISS_REASON_LABEL } from '@/lib/util/labels';
+import { WashProgressTimer } from '@/components/ui/WashProgressTimer';
 import type { WashVisit } from '@/lib/data/types';
 
 interface CarInfo {
@@ -334,9 +335,11 @@ export function CarWashHistoryModal({
                           <IconAlert width={12} height={12} /> {visit.missReason ? MISS_REASON_LABEL[visit.missReason] : 'Missed'}
                         </span>
                       ) : visit.status === 'IN_PROGRESS' ? (
-                        <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">
-                          ⚡ In Progress
-                        </span>
+                        <WashProgressTimer
+                          startedAt={visit.startedAt}
+                          variant="badge"
+                          label="In Progress"
+                        />
                       ) : (
                         <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
                           📅 Scheduled
@@ -349,6 +352,18 @@ export function CarWashHistoryModal({
                   <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Left: Timing & Services */}
                     <div className="space-y-1.5 text-xs">
+                      {visit.status === 'IN_PROGRESS' && visit.startedAt && (
+                        <div className="flex items-center gap-2 rounded-lg bg-blue-50/80 p-2 border border-blue-200/80 text-blue-900 font-semibold">
+                          <span className="animate-pulse">🚿</span>
+                          <span>Started at {formatClock(visit.startedAt)}</span>
+                          <span>·</span>
+                          <WashProgressTimer
+                            startedAt={visit.startedAt}
+                            variant="compact"
+                          />
+                        </div>
+                      )}
+
                       {visit.startedAt && visit.completedAt && (
                         <div className="flex items-center gap-1.5 text-slate-700">
                           <IconClock width={14} height={14} className="text-slate-400" />

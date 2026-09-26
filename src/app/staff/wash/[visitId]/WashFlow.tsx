@@ -55,13 +55,32 @@ export function WashFlow({
   const [washStartedAt, setWashStartedAt] = useState<string | null>(startedAt);
   const [elapsedSeconds, setElapsedSeconds] = useState<number | null>(null);
 
-  // Initial work checklist: auto-select services that still have quota remaining
+  // Initial work checklist: auto-select services that still have quota remaining (and exclude quota-met ones)
   const [done, setDone] = useState<string[]>(() => {
+    const available = services.filter((svc) => {
+      const stat = serviceStats.find(
+        (s) => s.name.toLowerCase() === svc.toLowerCase(),
+      );
+      return !stat?.isQuotaMet;
+    });
     const due = serviceStats
-      .filter((s) => !s.shouldDefaultSkip)
+      .filter((s) => !s.isQuotaMet && !s.shouldDefaultSkip)
       .map((s) => s.name);
-    return due.length > 0 ? due : services.slice(0, 1);
+    return due.length > 0 ? due : available.slice(0, 1);
   });
+
+  const toggleService = (service: string) => {
+    const stat = serviceStats.find(
+      (s) => s.name.toLowerCase() === service.toLowerCase(),
+    );
+    if (stat?.isQuotaMet) return; // Disallow selecting quota-met services
+
+    setDone((current) =>
+      current.includes(service)
+        ? current.filter((s) => s !== service)
+        : [...current, service],
+    );
+  };
 
   const [uploading, setUploading] = useState<'before' | 'after' | null>(null);
   const [starting, setStarting] = useState(false);
@@ -340,19 +359,19 @@ export function WashFlow({
                   <button
                     type="button"
                     onClick={() => setActiveCamera('before')}
-                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 py-3.5 text-sm font-bold text-white shadow-md hover:from-blue-700 hover:to-indigo-700 active:scale-[0.99] transition-all cursor-pointer"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 py-3 text-sm font-bold text-white shadow-md hover:from-blue-700 hover:to-indigo-700 active:scale-[0.99] transition-all cursor-pointer"
                   >
-                    <IconCamera width={20} height={20} />
-                    <span>📸 Take Before Photo</span>
+                    <IconCamera width={18} height={18} />
+                    <span>Take Before Photo</span>
                   </button>
                 ) : (
                   <button
                     type="button"
                     disabled={starting}
                     onClick={startWash}
-                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 py-4 text-base font-black text-white shadow-lg hover:from-emerald-700 hover:to-teal-700 active:scale-[0.99] transition-all cursor-pointer ring-4 ring-emerald-100"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 py-3.5 text-sm md:text-base font-bold text-white shadow-md hover:from-emerald-700 hover:to-teal-700 active:scale-[0.99] transition-all cursor-pointer ring-4 ring-emerald-100"
                   >
-                    <span>▶ START WASH (Start Timer)</span>
+                    <span>▶ Start Wash (Start Timer)</span>
                   </button>
                 )}
               </div>
@@ -434,36 +453,77 @@ export function WashFlow({
 
             {/* Checklist of Work Done */}
             <div className="pt-3 border-t border-slate-100">
-              <div className="flex items-center justify-between mb-2.5">
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                  Services Done ({done.length} selected)
-                </p>
-                <span className="text-[11px] font-semibold text-blue-600">
-                  Tap to toggle
-                </span>
-              </div>
+              {(() => {
+                const availableServices = services.filter((svc) => {
+                  const stat = serviceStats.find(
+                    (s) => s.name.toLowerCase() === svc.toLowerCase(),
+                  );
+                  return !stat?.isQuotaMet;
+                });
+                const activeSelectedCount = done.filter((d) => availableServices.includes(d)).length;
+
+                return (
+                  <div className="flex items-center justify-between mb-2.5">
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                      Services Done ({activeSelectedCount} of {availableServices.length} selected)
+                    </p>
+                    <span className="text-[11px] font-semibold text-blue-600">
+                      Tap to toggle
+                    </span>
+                  </div>
+                );
+              })()}
 
               <div className="space-y-2">
                 {services.map((service) => {
-                  const on = done.includes(service);
                   const stat = serviceStats.find(
                     (s) => s.name.toLowerCase() === service.toLowerCase(),
                   );
+                  const isCompleted = stat?.isQuotaMet ?? false;
+                  const on = done.includes(service) && !isCompleted;
+
+                  if (isCompleted) {
+                    return (
+                      <div
+                        key={service}
+                        className="flex w-full items-center justify-between rounded-xl p-3 text-left text-xs bg-slate-100/70 border border-slate-200/90 cursor-not-allowed opacity-80 select-none"
+                      >
+                        <div className="flex items-start gap-3 min-w-0 pr-2">
+                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-slate-300 bg-slate-200/70 text-slate-500 text-xs font-bold mt-0.5">
+                            ✓
+                          </span>
+                          <div className="min-w-0">
+                            <span className="text-slate-600 font-bold block truncate">
+                              {service}
+                            </span>
+                            <span className="text-[11px] text-slate-500 font-medium block mt-0.5">
+                              Monthly quota fulfilled ({stat?.timesDoneThisCycle}/{stat?.quotaPerMonth} washes done)
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0 flex flex-col items-end gap-1">
+                          <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300">
+                            {stat?.timesDoneThisCycle}/{stat?.quotaPerMonth} mo
+                          </span>
+                          <span className="text-[9.5px] font-bold text-amber-700 uppercase tracking-wide">
+                            Quota Met (Disabled)
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  }
 
                   return (
                     <button
                       key={service}
                       type="button"
                       aria-pressed={on}
-                      onClick={() =>
-                        setDone((current) =>
-                          on ? current.filter((s) => s !== service) : [...current, service],
-                        )
-                      }
+                      onClick={() => toggleService(service)}
                       className={`flex w-full items-center justify-between rounded-xl p-3 text-left text-xs font-semibold transition-all cursor-pointer ${
                         on
-                          ? 'bg-blue-50/70 text-slate-900 border border-blue-200 shadow-2xs'
-                          : 'bg-white text-slate-400 border border-dashed border-slate-200 hover:bg-slate-50/50'
+                          ? 'bg-blue-50/90 text-slate-900 border-2 border-blue-500 shadow-2xs ring-2 ring-blue-100'
+                          : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
                       }`}
                     >
                       <div className="flex items-start gap-3 min-w-0 pr-2">
@@ -477,14 +537,14 @@ export function WashFlow({
                           {on ? <IconCheck width={12} height={12} strokeWidth={3} /> : null}
                         </span>
                         <div className="min-w-0">
-                          <span className={on ? 'text-slate-900 font-bold block truncate' : 'text-slate-400 line-through block truncate'}>
+                          <span className={on ? 'text-blue-950 font-bold block truncate' : 'text-slate-800 font-medium block truncate'}>
                             {service}
                           </span>
                           <span className="text-[11px] text-slate-500 font-normal block mt-0.5">
                             {stat?.lastDoneDate ? (
                               <>Last done: <strong className="text-slate-700">{formatDate(stat.lastDoneDate)}</strong></>
                             ) : (
-                              <span className="text-emerald-700 font-semibold">✨ Due today (Not done yet this month)</span>
+                              <span className="text-emerald-700 font-semibold">✨ Due today (0 washes done this month)</span>
                             )}
                           </span>
                         </div>
@@ -494,19 +554,17 @@ export function WashFlow({
                         {stat && (
                           <span
                             className={`text-[10.5px] font-bold px-2 py-0.5 rounded-md ${
-                              stat.isQuotaMet
-                                ? 'bg-amber-100 text-amber-800 border border-amber-200'
-                                : 'bg-blue-50 text-blue-800 border border-blue-200'
+                              on
+                                ? 'bg-blue-100 text-blue-900 border border-blue-300'
+                                : 'bg-slate-100 text-slate-700 border border-slate-200'
                             }`}
                           >
                             {stat.timesDoneThisCycle}/{stat.quotaPerMonth} mo
                           </span>
                         )}
-                        {stat?.isQuotaMet ? (
-                          <span className="text-[9.5px] font-semibold text-amber-700">Quota Met</span>
-                        ) : (
-                          <span className="text-[9.5px] font-semibold text-emerald-600">Recommended</span>
-                        )}
+                        <span className="text-[9.5px] font-semibold text-emerald-600">
+                          {stat?.timesDoneThisCycle === 0 ? '✨ Recommended' : 'Available'}
+                        </span>
                       </div>
                     </button>
                   );
@@ -520,20 +578,20 @@ export function WashFlow({
                 <button
                   type="button"
                   onClick={() => setActiveCamera('after')}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 py-3.5 text-sm font-bold text-white shadow-md hover:from-blue-700 hover:to-indigo-700 active:scale-[0.99] transition-all cursor-pointer"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 py-3 text-sm font-bold text-white shadow-md hover:from-blue-700 hover:to-indigo-700 active:scale-[0.99] transition-all cursor-pointer"
                 >
-                  <IconCamera width={20} height={20} />
-                  <span>📸 Take After Photo</span>
+                  <IconCamera width={18} height={18} />
+                  <span>Take After Photo</span>
                 </button>
               ) : (
                 <button
                   type="button"
                   disabled={pending || !done.length}
                   onClick={closeWash}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 py-4 text-base font-black text-white shadow-lg hover:from-emerald-700 hover:to-teal-700 active:scale-[0.99] transition-all cursor-pointer ring-4 ring-emerald-100 disabled:opacity-50"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 py-3.5 text-sm md:text-base font-bold text-white shadow-md hover:from-emerald-700 hover:to-teal-700 active:scale-[0.99] transition-all cursor-pointer ring-4 ring-emerald-100 disabled:opacity-50"
                 >
-                  <IconCheck width={22} height={22} strokeWidth={3} />
-                  <span>{pending ? 'Saving…' : '✅ COMPLETE & SUBMIT WASH'}</span>
+                  <IconCheck width={18} height={18} strokeWidth={3} />
+                  <span>{pending ? 'Saving…' : 'Complete & Submit Wash'}</span>
                 </button>
               )}
             </div>
@@ -622,24 +680,87 @@ export function WashFlow({
             {filteredHistory.length === 0 ? (
               <p className="text-xs text-slate-400 text-center py-3 font-medium">No history for this filter.</p>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 {filteredHistory.map((item) => (
-                  <div key={item.id} className="p-3 rounded-xl border border-slate-100 bg-slate-50 text-xs space-y-1">
+                  <div key={item.id} className="p-3.5 rounded-xl border border-slate-200/80 bg-slate-50 text-xs space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-800">{formatDate(item.date)}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900 text-[13px]">{formatDate(item.date)}</span>
+                        {item.time && (
+                          <span className="text-slate-400 text-[11px] font-medium">· {item.time}</span>
+                        )}
+                      </div>
                       <span
-                        className={`rounded px-2 py-0.5 text-[10px] font-bold ${
-                          item.status === 'DONE' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                        className={`rounded-full px-2.5 py-0.5 text-[10.5px] font-bold border ${
+                          item.status === 'DONE'
+                            ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                            : 'bg-rose-50 text-rose-800 border-rose-200'
                         }`}
                       >
                         {item.status === 'DONE' ? '✓ Done' : 'Missed'}
                       </span>
                     </div>
-                    {item.durationMinutes !== null && (
-                      <div className="text-[11px] text-slate-500">
-                        ⏱ Took {formatDurationMinutes(item.durationMinutes)}
+
+                    {/* All Services Availed in this wash */}
+                    {item.status === 'DONE' && (
+                      <div className="space-y-1 pt-1 border-t border-slate-200/60">
+                        <span className="text-[11px] font-semibold text-slate-500 block">Services Availed:</span>
+                        {Array.isArray(item.servicesDone) && item.servicesDone.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {item.servicesDone.map((svc) => (
+                              <span
+                                key={svc}
+                                className="inline-flex items-center gap-1 rounded-md bg-white border border-blue-200 px-2 py-0.5 text-[11px] font-bold text-blue-900 shadow-2xs"
+                              >
+                                <span>✓</span> {svc}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="inline-flex items-center rounded-md bg-white border border-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                            Standard Exterior Wash
+                          </span>
+                        )}
                       </div>
                     )}
+
+                    {item.status === 'MISSED' && item.missReason && (
+                      <div className="text-[11.5px] text-amber-800 bg-amber-50/80 p-2 rounded-lg border border-amber-200">
+                        <b>Reason:</b> {MISS_REASON_LABEL[item.missReason as MissReason] || item.missReason}
+                        {item.missNote && <span className="block text-[11px] text-amber-700 mt-0.5">{item.missNote}</span>}
+                      </div>
+                    )}
+
+                    {/* Wash Timing & Photos Info */}
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
+                      {item.durationMinutes !== null ? (
+                        <span>⏱️ Took <b>{formatDurationMinutes(item.durationMinutes)}</b></span>
+                      ) : (
+                        <span />
+                      )}
+                      {(item.beforePhotoUrl || item.afterPhotoUrl) && (
+                        <div className="flex items-center gap-2">
+                          {item.beforePhotoUrl && (
+                            <button
+                              type="button"
+                              onClick={() => setPreviewPhoto({ kind: 'before', url: item.beforePhotoUrl! })}
+                              className="text-[11px] font-bold text-blue-600 hover:underline cursor-pointer flex items-center gap-0.5"
+                            >
+                              <span>📷 Before</span>
+                            </button>
+                          )}
+                          {item.afterPhotoUrl && (
+                            <button
+                              type="button"
+                              onClick={() => setPreviewPhoto({ kind: 'after', url: item.afterPhotoUrl! })}
+                              className="text-[11px] font-bold text-blue-600 hover:underline cursor-pointer flex items-center gap-0.5"
+                            >
+                              <span>📷 After</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -655,16 +776,19 @@ export function WashFlow({
         </div>
       )}
 
-      {/* 5. Safety Action: Missed / Skipped Wash */}
-      <div className="pt-2 text-center">
-        <button
-          type="button"
-          onClick={() => setMissOpen(true)}
-          className="text-xs font-bold text-rose-600 hover:text-rose-800 hover:underline py-2 cursor-pointer"
-        >
-          ⚠️ Vehicle Not Available / Skip Wash
-        </button>
-      </div>
+      {/* 5. Safety Action: Missed / Skipped Wash (ONLY before wash has started) */}
+      {!isWashStarted && !before && (
+        <div className="pt-2 text-center">
+          <button
+            type="button"
+            onClick={() => setMissOpen(true)}
+            className="text-xs font-bold text-rose-600 hover:text-rose-800 hover:underline py-2 cursor-pointer inline-flex items-center gap-1.5"
+          >
+            <span>⚠️</span>
+            <span>Vehicle Not Available / Skip Wash</span>
+          </button>
+        </div>
+      )}
 
       {/* Camera and Lightbox Modals */}
       {activeCamera && (
@@ -720,12 +844,12 @@ function PhotoTile({
           }
         }}
         disabled={disabled || busy}
-        className={`relative flex h-full w-full flex-col items-center justify-center gap-2 overflow-hidden rounded-2xl border-2 text-xs font-bold transition-all shadow-2xs ${
+        className={`relative flex h-full w-full flex-col items-center justify-center gap-1.5 overflow-hidden rounded-xl border-2 text-xs font-bold transition-all shadow-2xs ${
           url
             ? 'border-emerald-500 bg-emerald-50 text-emerald-700 active:opacity-85'
             : disabled
             ? 'border-dashed border-slate-200 bg-slate-50 text-slate-400'
-            : 'border-dashed border-blue-400 bg-blue-50/60 text-blue-900 hover:bg-blue-100/60 active:scale-[0.99] cursor-pointer'
+            : 'border-dashed border-blue-400 bg-blue-50/50 text-blue-900 hover:bg-blue-100/60 active:scale-[0.99] cursor-pointer'
         }`}
       >
         {url ? (
@@ -736,18 +860,18 @@ function PhotoTile({
               alt={`${label} photo`}
               className="h-full w-full object-cover"
             />
-            <span className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-slate-900/80 py-1.5 text-[11px] font-bold text-white backdrop-blur-xs">
-              <IconCheck width={13} height={13} strokeWidth={3} />
-              {label} · Tap to View
+            <span className="absolute inset-x-1.5 bottom-1.5 flex items-center justify-center gap-1 rounded-lg bg-slate-900/85 py-1 text-[10.5px] font-bold text-white backdrop-blur-xs shadow-xs">
+              <IconCheck width={12} height={12} strokeWidth={3} />
+              <span>{label} · View</span>
             </span>
           </>
         ) : (
           <>
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-blue-600">
-              <IconCamera width={24} height={24} />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-blue-600 shadow-2xs">
+              <IconCamera width={20} height={20} />
             </div>
             <span className="text-xs font-bold text-slate-800">{busy ? 'Saving…' : label}</span>
-            <span className="text-[11px] font-normal text-slate-500">Tap to open camera</span>
+            <span className="text-[10.5px] font-medium text-blue-600">Tap to capture</span>
           </>
         )}
       </button>
@@ -759,9 +883,10 @@ function PhotoTile({
             e.stopPropagation();
             onRetake();
           }}
-          className="absolute top-2.5 right-2.5 flex items-center gap-1 rounded-full bg-black/75 px-3 py-1 text-[11px] font-bold text-white shadow-md backdrop-blur-xs hover:bg-black/90 active:scale-95 transition-all cursor-pointer z-10"
+          className="absolute top-2 right-2 flex items-center gap-1 rounded-full bg-slate-900/85 border border-white/20 px-2.5 py-0.5 text-[10.5px] font-bold text-white shadow-md backdrop-blur-xs hover:bg-black active:scale-95 transition-all cursor-pointer z-10"
         >
-          📷 Retake
+          <IconCamera width={11} height={11} />
+          <span>Retake</span>
         </button>
       )}
     </div>
