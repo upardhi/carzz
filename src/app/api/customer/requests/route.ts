@@ -29,20 +29,52 @@ export async function GET() {
       limit: 20,
     });
 
-    const [packages, cars] = await Promise.all([
+    const [packages, cars, visits, staff] = await Promise.all([
       store.packages.find(),
       store.cars.find({ where: { customerId: session.user.customerId } }),
+      store.visits.find({ where: { customerId: session.user.customerId } as never }),
+      store.staff.find(),
     ]);
 
     const packageMap = new Map(packages.map((p) => [p.id, p]));
     const carMap = new Map(cars.map((c) => [c.id, c]));
+    const staffMap = new Map(staff.map((s) => [s.id, s]));
 
-    const enriched = requests.map((r) => ({
-      ...r,
-      car: r.carId ? carMap.get(r.carId) : null,
-      currentPackage: r.currentPackageId ? packageMap.get(r.currentPackageId) : null,
-      requestedPackage: r.requestedPackageId ? packageMap.get(r.requestedPackageId) : null,
-    }));
+    const enriched = requests.map((r) => {
+      const carVisits = r.carId
+        ? visits.filter((v) => v.carId === r.carId)
+        : visits;
+
+      const sorted = [...carVisits].sort((a, b) => {
+        const dateA = a.completedAt || a.scheduledDate || '';
+        const dateB = b.completedAt || b.scheduledDate || '';
+        return dateB.localeCompare(dateA);
+      });
+
+      const lastDone = sorted.find((v) => v.status === 'DONE');
+      const last = lastDone || sorted[0] || null;
+      let previousWash = null;
+      if (last) {
+        const s = last.staffId ? staffMap.get(last.staffId) : null;
+        previousWash = {
+          id: last.id,
+          scheduledDate: last.scheduledDate,
+          completedAt: last.completedAt,
+          service: last.servicesDone && last.servicesDone.length > 0 ? last.servicesDone.join(', ') : last.plannedService || 'Regular Wash',
+          status: last.status,
+          staffName: s?.name || null,
+          rating: last.rating ?? last.managerRating ?? null,
+        };
+      }
+
+      return {
+        ...r,
+        car: r.carId ? carMap.get(r.carId) : null,
+        currentPackage: r.currentPackageId ? packageMap.get(r.currentPackageId) : null,
+        requestedPackage: r.requestedPackageId ? packageMap.get(r.requestedPackageId) : null,
+        previousWash,
+      };
+    });
 
     return NextResponse.json({ ok: true, requests: enriched });
   } catch (error) {

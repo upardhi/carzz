@@ -85,54 +85,66 @@ async function AdminDashboardContent() {
       {/* 2.1 KEY STATISTICS (6 KPIs)                                           */}
       {/* ===================================================================== */}
       <StatGrid columns={3}>
-        <StatCard
-          label="TOTAL ACTIVE CUSTOMERS"
-          value={dailyOps.totalActiveCustomers}
-          icon={<IconUsers width={20} height={20} strokeWidth={2} />}
-          tone="emerald"
-          subtext={`Active subscriptions out of ${dailyOps.totalCustomers} total`}
-          subtextTone="success"
-        />
-        <StatCard
-          label="TODAY'S WASHES"
-          value={dailyOps.washesToday}
-          icon={<IconDroplet width={20} height={20} strokeWidth={2} />}
-          tone="blue"
-          subtext={`${dailyOps.todayRemainingWashes} remaining washes today`}
-          subtextTone={dailyOps.todayRemainingWashes === 0 ? 'success' : 'warning'}
-        />
-        <StatCard
-          label="TODAY'S WASHED CUSTOMERS"
-          value={dailyOps.todayWashedCustomers}
-          icon={<IconCheckCircle width={20} height={20} strokeWidth={2} />}
-          tone="emerald"
-          subtext="Unique subscribers serviced today"
-          subtextTone="success"
-        />
-        <StatCard
-          label="REMAINING WASHES"
-          value={dailyOps.todayRemainingWashes}
-          icon={<IconClock width={20} height={20} strokeWidth={2} />}
-          tone={dailyOps.todayRemainingWashes > 0 ? 'amber' : 'slate'}
-          subtext="Scheduled washes remaining today"
-          subtextTone={dailyOps.todayRemainingWashes > 0 ? 'warning' : 'muted'}
-        />
-        <StatCard
-          label="MONTHLY REVENUE"
-          value={moneyShort(summary.collected)}
-          icon={<IconWallet width={20} height={20} strokeWidth={2} />}
-          tone="emerald"
-          subtext={`${collectionRate}% collected of ${moneyShort(summary.billed)} billed`}
-          subtextTone="success"
-        />
-        <StatCard
-          label="TOTAL CUSTOMERS"
-          value={dailyOps.totalCustomers}
-          icon={<IconCar width={20} height={20} strokeWidth={2} />}
-          tone="purple"
-          subtext={`${growth.newCustomersThisMonth} new joined this month`}
-          subtextTone="muted"
-        />
+        <Link href="/admin/customers" className="block">
+          <StatCard
+            label="TOTAL ACTIVE CUSTOMERS"
+            value={dailyOps.totalActiveCustomers}
+            icon={<IconUsers width={20} height={20} strokeWidth={2} />}
+            tone="emerald"
+            subtext={`Active subscriptions out of ${dailyOps.totalCustomers} total`}
+            subtextTone="success"
+          />
+        </Link>
+        <Link href="/admin/schedule" className="block">
+          <StatCard
+            label="TODAY'S WASHES"
+            value={dailyOps.washesToday}
+            icon={<IconDroplet width={20} height={20} strokeWidth={2} />}
+            tone="blue"
+            subtext={`${dailyOps.todayRemainingWashes} remaining washes today`}
+            subtextTone={dailyOps.todayRemainingWashes === 0 ? 'success' : 'warning'}
+          />
+        </Link>
+        <Link href="/admin/schedule" className="block">
+          <StatCard
+            label="TODAY'S WASHED CUSTOMERS"
+            value={dailyOps.todayWashedCustomers}
+            icon={<IconCheckCircle width={20} height={20} strokeWidth={2} />}
+            tone="emerald"
+            subtext="Unique subscribers serviced today"
+            subtextTone="success"
+          />
+        </Link>
+        <Link href="/admin/schedule" className="block">
+          <StatCard
+            label="REMAINING WASHES"
+            value={dailyOps.todayRemainingWashes}
+            icon={<IconClock width={20} height={20} strokeWidth={2} />}
+            tone={dailyOps.todayRemainingWashes > 0 ? 'amber' : 'slate'}
+            subtext="Scheduled washes remaining today"
+            subtextTone={dailyOps.todayRemainingWashes > 0 ? 'warning' : 'muted'}
+          />
+        </Link>
+        <Link href="/admin/accounting" className="block">
+          <StatCard
+            label="MONTHLY REVENUE"
+            value={moneyShort(summary.collected)}
+            icon={<IconWallet width={20} height={20} strokeWidth={2} />}
+            tone="emerald"
+            subtext={`${collectionRate}% collected of ${moneyShort(summary.billed)} billed`}
+            subtextTone="success"
+          />
+        </Link>
+        <Link href="/admin/customers" className="block">
+          <StatCard
+            label="TOTAL CUSTOMERS"
+            value={dailyOps.totalCustomers}
+            icon={<IconCar width={20} height={20} strokeWidth={2} />}
+            tone="purple"
+            subtext={`${growth.newCustomersThisMonth} new joined this month`}
+            subtextTone="muted"
+          />
+        </Link>
       </StatGrid>
 
       {/* ===================================================================== */}
@@ -140,70 +152,110 @@ async function AdminDashboardContent() {
       {/* ===================================================================== */}
       <div className="mt-5 grid gap-4 lg:grid-cols-3">
         {/* 2.2 Dedicated Daily Work Dashboard */}
-        <Card className="p-5 min-w-0 border-l-4 border-l-blue-500">
-          <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
-            <CardHeading>Daily Work Operations</CardHeading>
-            <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-bold text-blue-700">
-              Today &amp; Tomorrow
-            </span>
+        <Card className="p-5 min-w-0 border-l-4 border-l-blue-500 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+              <CardHeading>Daily Work Operations</CardHeading>
+              <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-bold text-blue-700">
+                Today &amp; Tomorrow
+              </span>
+            </div>
+            <div className="space-y-1.5">
+              <Row label="Washed Today" value={`${dailyOps.washesToday} washes`} tone="success" />
+              <Row label="Today's Washed Customers" value={`${dailyOps.todayWashedCustomers} customers`} />
+              <Row
+                label="Remaining Washes Today"
+                value={`${dailyOps.todayRemainingWashes} pending`}
+                tone={dailyOps.todayRemainingWashes > 0 ? 'gold' : undefined}
+              />
+              <Row
+                label="Next Day Remaining Washes"
+                value={`${dailyOps.nextDayRemainingWashes} scheduled`}
+              />
+            </div>
           </div>
-          <div className="space-y-1.5">
-            <Row label="Washed Today" value={`${dailyOps.washesToday} washes`} tone="success" />
-            <Row label="Today's Washed Customers" value={`${dailyOps.todayWashedCustomers} customers`} />
-            <Row
-              label="Remaining Washes Today"
-              value={`${dailyOps.todayRemainingWashes} pending`}
-              tone={dailyOps.todayRemainingWashes > 0 ? 'gold' : undefined}
-            />
-            <Row
-              label="Next Day Remaining Washes"
-              value={`${dailyOps.nextDayRemainingWashes} scheduled`}
-            />
+          <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-end">
+            <Link
+              href="/admin/schedule"
+              className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors flex items-center gap-1"
+            >
+              <span>Open Operations Schedule</span>
+              <span>→</span>
+            </Link>
           </div>
         </Card>
 
         {/* 2.3 Payment Dashboard */}
-        <Card className="p-5 min-w-0 border-l-4 border-l-emerald-500">
-          <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
-            <CardHeading>Payment Overview</CardHeading>
-            <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700">
-              {cycleLabel(cycle)}
-            </span>
+        <Card className="p-5 min-w-0 border-l-4 border-l-emerald-500 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+              <CardHeading>Payment Overview</CardHeading>
+              <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700">
+                {cycleLabel(cycle)}
+              </span>
+            </div>
+            <div className="space-y-1.5">
+              <Row label="Monthly Revenue (Billed)" value={money(summary.billed)} />
+              <Row label="Monthly Collected Revenue" value={money(summary.collected)} tone="success" />
+              <Row
+                label="Monthly Pending Amount"
+                value={money(summary.outstanding)}
+                tone={summary.outstanding > 0 ? 'danger' : undefined}
+              />
+              <Row label="Collection Efficiency" value={percent(summary.billed ? summary.collected / summary.billed : 0)} />
+            </div>
           </div>
-          <div className="space-y-1.5">
-            <Row label="Monthly Revenue (Billed)" value={money(summary.billed)} />
-            <Row label="Monthly Collected Revenue" value={money(summary.collected)} tone="success" />
-            <Row
-              label="Monthly Pending Amount"
-              value={money(summary.outstanding)}
-              tone={summary.outstanding > 0 ? 'danger' : undefined}
-            />
-            <Row label="Collection Efficiency" value={percent(summary.billed ? summary.collected / summary.billed : 0)} />
+          <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-end">
+            <Link
+              href="/admin/accounting"
+              className="text-xs font-semibold text-emerald-600 hover:text-emerald-800 transition-colors flex items-center gap-1"
+            >
+              <span>Open Financial Ledger</span>
+              <span>→</span>
+            </Link>
           </div>
         </Card>
 
         {/* 2.4 Customer & Staff Dashboard */}
-        <Card className="p-5 min-w-0 border-l-4 border-l-purple-500">
-          <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
-            <CardHeading>Customer &amp; Staff Growth</CardHeading>
-            <span className="rounded-full bg-purple-50 px-2.5 py-0.5 text-[11px] font-bold text-purple-700">
-              This Month
-            </span>
+        <Card className="p-5 min-w-0 border-l-4 border-l-purple-500 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+              <CardHeading>Customer &amp; Staff Growth</CardHeading>
+              <span className="rounded-full bg-purple-50 px-2.5 py-0.5 text-[11px] font-bold text-purple-700">
+                This Month
+              </span>
+            </div>
+            <div className="space-y-1.5">
+              <Row label="Total Customers" value={growth.totalCustomers} />
+              <Row label="New Customers This Month" value={`+${growth.newCustomersThisMonth}`} tone="success" />
+              <Row
+                label="Inactive Customers This Month"
+                value={`${growth.inactiveCustomersThisMonth}`}
+                tone={growth.inactiveCustomersThisMonth > 0 ? 'danger' : undefined}
+              />
+              <Row label="New Wash Boys Joined" value={`+${growth.newWashBoysJoinedThisMonth}`} tone="success" />
+              <Row
+                label="Inactive Wash Boys"
+                value={`${growth.inactiveWashBoysThisMonth}`}
+                tone={growth.inactiveWashBoysThisMonth > 0 ? 'danger' : undefined}
+              />
+            </div>
           </div>
-          <div className="space-y-1.5">
-            <Row label="Total Customers" value={growth.totalCustomers} />
-            <Row label="New Customers This Month" value={`+${growth.newCustomersThisMonth}`} tone="success" />
-            <Row
-              label="Inactive Customers This Month"
-              value={`${growth.inactiveCustomersThisMonth}`}
-              tone={growth.inactiveCustomersThisMonth > 0 ? 'danger' : undefined}
-            />
-            <Row label="New Wash Boys Joined" value={`+${growth.newWashBoysJoinedThisMonth}`} tone="success" />
-            <Row
-              label="Inactive Wash Boys"
-              value={`${growth.inactiveWashBoysThisMonth}`}
-              tone={growth.inactiveWashBoysThisMonth > 0 ? 'danger' : undefined}
-            />
+          <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
+            <Link
+              href="/admin/customers"
+              className="text-xs font-semibold text-purple-600 hover:text-purple-800 transition-colors flex items-center gap-1"
+            >
+              <span>Customers</span>
+              <span>→</span>
+            </Link>
+            <Link
+              href="/admin/staff"
+              className="text-xs font-semibold text-purple-600 hover:text-purple-800 transition-colors flex items-center gap-1"
+            >
+              <span>Staff</span>
+              <span>→</span>
+            </Link>
           </div>
         </Card>
       </div>
@@ -370,50 +422,79 @@ async function AdminDashboardContent() {
         </Card>
 
         {/* 2.1 Monthly Financial P&L Breakdown Card */}
-        <Card className="p-5 min-w-0">
-          <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
-            <CardHeading>Monthly Financial P&amp;L Breakdown</CardHeading>
-            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-bold text-slate-700">
-              Profit &amp; Loss
-            </span>
-          </div>
-          <div className="space-y-1.5">
-            <Row label="Monthly Collected Revenue" value={money(summary.collected)} tone="success" />
-            <Row label="Pending Revenue (Outstanding)" value={money(summary.outstanding)} tone={summary.outstanding > 0 ? 'gold' : undefined} />
-            <Row label="Remaining Payments" value={money(summary.outstanding)} />
-            <Row label="Total Revenue (Gross Billed)" value={money(summary.billed)} />
-            <Row label="Total Expenses (Staff &amp; Goods)" value={money(totalExpenses)} tone="danger" />
-            <div className="border-t border-slate-200/80 pt-2 mt-2">
-              <Row
-                label="Net Profit"
-                value={money(summary.profit)}
-                tone={summary.profit > 0 ? 'success' : 'danger'}
-              />
+        <Card className="p-5 min-w-0 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+              <CardHeading>Monthly Financial P&amp;L Breakdown</CardHeading>
+              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-bold text-slate-700">
+                Profit &amp; Loss
+              </span>
             </div>
+            <div className="space-y-1.5">
+              <Row label="Monthly Collected Revenue" value={money(summary.collected)} tone="success" />
+              <Row label="Pending Revenue (Outstanding)" value={money(summary.outstanding)} tone={summary.outstanding > 0 ? 'gold' : undefined} />
+              <Row label="Remaining Payments" value={money(summary.outstanding)} />
+              <Row label="Total Revenue (Gross Billed)" value={money(summary.billed)} />
+              <Row label="Total Expenses (Staff &amp; Goods)" value={money(totalExpenses)} tone="danger" />
+              <div className="border-t border-slate-200/80 pt-2 mt-2">
+                <Row
+                  label="Net Profit"
+                  value={money(summary.profit)}
+                  tone={summary.profit > 0 ? 'success' : 'danger'}
+                />
+              </div>
+            </div>
+          </div>
+          <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-end">
+            <Link
+              href="/admin/accounting"
+              className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors flex items-center gap-1"
+            >
+              <span>View Financial Reports</span>
+              <span>→</span>
+            </Link>
           </div>
         </Card>
 
         {/* Operational Quality Card */}
-        <Card className="p-5 min-w-0">
-          <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
-            <CardHeading>Service Quality &amp; Efficiency</CardHeading>
-            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-bold text-slate-700">
-              Metrics
-            </span>
+        <Card className="p-5 min-w-0 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+              <CardHeading>Service Quality &amp; Efficiency</CardHeading>
+              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-bold text-slate-700">
+                Metrics
+              </span>
+            </div>
+            <div className="space-y-1.5">
+              <Row label="Staff Productivity" value={`${staffUtilization} washes / staff`} />
+              <Row label="Open Complaints" value={summary.openComplaints} tone={summary.openComplaints > 0 ? 'gold' : undefined} />
+              <Row
+                label="Customer CSAT Rating"
+                value={
+                  summary.averageRating > 0
+                    ? `${summary.averageRating.toFixed(1)} ★ (${Math.round((summary.averageRating / 5) * 100)}%)`
+                    : '—'
+                }
+              />
+              <Row label="Direct Cost Per Wash" value={money(summary.costPerWash)} />
+              <Row label="Revenue Per Car (ARPU)" value={money(summary.revenuePerCar)} />
+            </div>
           </div>
-          <div className="space-y-1.5">
-            <Row label="Staff Productivity" value={`${staffUtilization} washes / staff`} />
-            <Row label="Open Complaints" value={summary.openComplaints} tone={summary.openComplaints > 0 ? 'gold' : undefined} />
-            <Row
-              label="Customer CSAT Rating"
-              value={
-                summary.averageRating > 0
-                  ? `${summary.averageRating.toFixed(1)} ★ (${Math.round((summary.averageRating / 5) * 100)}%)`
-                  : '—'
-              }
-            />
-            <Row label="Direct Cost Per Wash" value={money(summary.costPerWash)} />
-            <Row label="Revenue Per Car (ARPU)" value={money(summary.revenuePerCar)} />
+          <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
+            <Link
+              href="/admin/complaints"
+              className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors flex items-center gap-1"
+            >
+              <span>Complaints</span>
+              <span>→</span>
+            </Link>
+            <Link
+              href="/admin/reports/staff"
+              className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors flex items-center gap-1"
+            >
+              <span>Staff Reports</span>
+              <span>→</span>
+            </Link>
           </div>
         </Card>
       </div>

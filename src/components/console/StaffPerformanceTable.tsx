@@ -12,9 +12,10 @@ interface Props {
   rows: StaffPerformanceRow[];
   areas: Area[];
   totalStaff: number;
+  cycle?: string;
 }
 
-export function StaffPerformanceTable({ rows, areas, totalStaff }: Props) {
+export function StaffPerformanceTable({ rows, areas, totalStaff, cycle }: Props) {
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 250);
   const [selectedArea, setSelectedArea] = useState('ALL');
@@ -327,6 +328,7 @@ export function StaffPerformanceTable({ rows, areas, totalStaff }: Props) {
         <FlaggedWashesModal
           staffId={flaggedModal.staffId}
           staffName={flaggedModal.staffName}
+          cycle={cycle}
           onClose={() => setFlaggedModal(null)}
         />
       )}

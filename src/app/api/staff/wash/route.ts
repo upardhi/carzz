@@ -8,6 +8,10 @@ import { resolvePublicPhotoUrl } from '@/lib/util/photoUrl';
 
 const schema = z.discriminatedUnion('action', [
   z.object({
+    action: z.literal('start'),
+    visitId: z.string().min(1),
+  }),
+  z.object({
     action: z.literal('complete'),
     visitId: z.string().min(1),
     servicesDone: z.array(z.string()).min(1),
@@ -42,6 +46,25 @@ export async function POST(request: Request) {
       session.scope.areaIds.includes(visit.areaId);
     if (!isAssigned && !(session.user.role !== 'EMPLOYEE' && inScope)) {
       throw new HttpError(403, 'This wash is not assigned to you.');
+    }
+
+    if (parsed.data.action === 'start') {
+      const startedAt = visit.startedAt ?? new Date().toISOString();
+      const updated = await store.visits.update(visit.id, {
+        status: 'IN_PROGRESS',
+        startedAt,
+        staffId: session.user.staffId ?? visit.staffId ?? '',
+      });
+      return NextResponse.json({
+        ok: true,
+        visit: {
+          ...updated,
+          beforePhotoUrl: resolvePublicPhotoUrl(updated.beforePhotoUrl),
+          afterPhotoUrl: resolvePublicPhotoUrl(updated.afterPhotoUrl),
+        },
+        startedAt,
+        message: 'Wash started! Clock is running.',
+      });
     }
 
     if (parsed.data.action === 'complete') {

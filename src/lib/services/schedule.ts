@@ -70,9 +70,16 @@ export async function scheduleNextVisitForCar(
   cycle: string,
   fromDate?: DateOnly | null,
 ): Promise<WashVisit | null> {
+  const today = todayISO();
+  if (customer.status === 'INACTIVE' || !car.active || car.serviceStarted === false) {
+    return null;
+  }
+  if (customer.status === 'HOLD' && customer.holdUntil && customer.holdUntil >= today) {
+    return null;
+  }
+
   const pkg = await store.packages.get(car.packageId);
   const quota = pkg?.washesPerMonth ?? 8;
-  const today = todayISO();
 
   // Get all visits for this car in the cycle
   const existing = await store.visits.find({
@@ -91,7 +98,11 @@ export async function scheduleNextVisitForCar(
     (v) => v.status === 'PENDING' && v.scheduledDate < today,
   );
   for (const p of pastPending) {
-    await store.visits.delete(p.id);
+    try {
+      await store.visits.delete(p.id);
+    } catch {
+      // Silently continue if record was already deleted
+    }
   }
 
   // Check if there is already an upcoming pending or in-progress visit on or after today
@@ -107,7 +118,11 @@ export async function scheduleNextVisitForCar(
     const extraOpen = openUpcoming.slice(1);
     for (const extra of extraOpen) {
       if (extra.status === 'PENDING') {
-        await store.visits.delete(extra.id);
+        try {
+          await store.visits.delete(extra.id);
+        } catch {
+          // Silently continue if record was already deleted
+        }
       }
     }
     return firstOpen;

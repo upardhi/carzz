@@ -3,9 +3,10 @@ import { z } from 'zod';
 import { requireApiSession } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { resolvePublicPhotoUrl } from '@/lib/util/photoUrl';
-import { formatClock, formatDateFull } from '@/lib/util/format';
+import { formatClock, formatDateFull, currentCycle } from '@/lib/util/format';
 import { washDurationMinutes, formatDurationMinutes, washSpeedFlag } from '@/lib/util/washTiming';
 import { scopeAreaFilter } from '@/lib/auth/rbac';
+import { opsError } from '@/app/api/ops/_guard';
 
 const querySchema = z.object({
   staffId: z.string().optional(),
@@ -39,24 +40,24 @@ export async function GET(request: Request) {
       );
     }
 
-    const { staffId, areaId, cycle, speedType, page, pageSize, search } = parseResult.data;
+    const { staffId, areaId, cycle: requestedCycle, speedType, page, pageSize, search } = parseResult.data;
+    const cycle = requestedCycle || currentCycle();
     const store = await getStore();
     const settings = await store.getAppSettings();
     const areaScopeFilter = scopeAreaFilter(session.scope);
 
-    // Prepare visit filters
+    // Fast indexed lookup by cycle & status
     const whereClause: Record<string, unknown> = {
+      cycle,
       status: 'DONE',
       ...areaScopeFilter,
     };
     if (staffId) whereClause.staffId = staffId;
     if (areaId) whereClause.areaId = areaId;
-    if (cycle) whereClause.cycle = cycle;
 
     const allDoneVisits = await store.visits.find({
       where: whereClause as never,
-      orderBy: [{ field: 'completedAt', dir: 'desc' }],
-      limit: 1000,
+      limit: 500,
     });
 
     // Compute duration & speed flag for each visit
@@ -72,13 +73,24 @@ export async function GET(request: Request) {
       });
     }
 
+    // Sort descending by completedAt / startedAt / scheduledDate
+    flaggedVisitsWithMetadata.sort((a, b) => {
+      const timeA = a.visit.completedAt ? new Date(a.visit.completedAt).getTime() : 0;
+      const timeB = b.visit.completedAt ? new Date(b.visit.completedAt).getTime() : 0;
+      return timeB - timeA;
+    });
+
+    const totalFlagged = flaggedVisitsWithMetadata.length;
+    const fastCount = flaggedVisitsWithMetadata.filter((i) => i.speedFlag === 'fast').length;
+    const slowCount = flaggedVisitsWithMetadata.filter((i) => i.speedFlag === 'slow').length;
+
     // Filter by speedType if requested
     let filtered = flaggedVisitsWithMetadata;
     if (speedType !== 'ALL') {
       filtered = filtered.filter((item) => item.speedFlag === speedType);
     }
 
-    // Fetch related entities (customers, cars, staff, areas)
+    // Fetch related entities in parallel
     const customerIds = [...new Set(filtered.map((item) => item.visit.customerId))];
     const carIds = [...new Set(filtered.map((item) => item.visit.carId))];
     const staffIds = [
@@ -86,7 +98,6 @@ export async function GET(request: Request) {
         filtered.map((item) => item.visit.staffId).filter((id): id is string => Boolean(id)),
       ),
     ];
-    const areaIds = [...new Set(filtered.map((item) => item.visit.areaId))];
 
     const [customers, cars, staffList, areas] = await Promise.all([
       customerIds.length
@@ -107,7 +118,7 @@ export async function GET(request: Request) {
       const customer = customerById.get(visit.customerId);
       const car = carById.get(visit.carId);
       const staff = visit.staffId ? staffById.get(visit.staffId) : null;
-      const areaName = areaById.get(visit.areaId) ?? 'Unknown Area';
+      const areaName = areaById.get(visit.areaId) ?? 'Area';
 
       return {
         id: visit.id,
@@ -167,15 +178,12 @@ export async function GET(request: Request) {
       );
     }
 
-    const totalFlagged = flaggedVisitsWithMetadata.length;
-    const fastCount = flaggedVisitsWithMetadata.filter((i) => i.speedFlag === 'fast').length;
-    const slowCount = flaggedVisitsWithMetadata.filter((i) => i.speedFlag === 'slow').length;
-
     const totalFiltered = items.length;
     const totalPages = Math.max(1, Math.ceil(totalFiltered / pageSize));
     const paginatedItems = items.slice((page - 1) * pageSize, page * pageSize);
 
     return NextResponse.json({
+      ok: true,
       items: paginatedItems,
       stats: {
         totalFlagged,
@@ -194,7 +202,6 @@ export async function GET(request: Request) {
       },
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Internal server error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return opsError(err);
   }
 }

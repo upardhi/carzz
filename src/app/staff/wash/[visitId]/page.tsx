@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { requirePermission } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
@@ -8,7 +9,7 @@ import { resolvePublicPhotoUrl } from '@/lib/util/photoUrl';
 import { washDurationMinutes, washSpeedFlag } from '@/lib/util/washTiming';
 import { WashFlow } from './WashFlow';
 
-export const metadata = { title: 'Wash' };
+export const metadata = { title: 'Wash Service' };
 
 export interface ServiceUsageStat {
   name: string;
@@ -72,7 +73,7 @@ export default async function WashPage({
 
   const pkg = await store.packages.get(car.packageId);
 
-  // 1. Properly query database for all visits for this car to establish full history for this active package running
+  // Query database for all visits for this car to establish full history
   const allCarVisits = await store.visits.find({
     where: { carId: car.id },
     orderBy: [{ field: 'scheduledDate', dir: 'desc' }],
@@ -167,50 +168,135 @@ export default async function WashPage({
       : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(customer.address)}`;
 
   return (
-    <div className="space-y-4">
-      {/* 1. Vehicle & Customer Summary Header */}
-      <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200/60 px-2.5 py-0.5 text-[11.5px] font-semibold text-blue-700 mb-2">
-              🚗 Wash in Progress
-            </div>
-            <h1 className="text-lg font-bold text-slate-900">{customer.name}</h1>
-            <p className="text-sm font-semibold text-slate-700 mt-0.5">
-              {car.make} {car.model} · <span className="font-mono text-blue-900">{car.plate}</span> · {car.colour}
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-3 text-xs font-medium text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100 flex items-start gap-2">
-          <span className="text-sm">📍</span>
-          <div>
-            <span>{customer.address}</span>
-            {customer.landmark ? (
-              <span className="block text-slate-500 font-semibold mt-0.5">
-                Landmark: {customer.landmark}
-              </span>
-            ) : null}
-          </div>
-        </div>
-
-        {customer.note || car.specialInstructions ? (
-          <div className="mt-2.5 rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs font-semibold text-amber-900">
-            ⚠️ Note: {customer.note ?? car.specialInstructions}
-          </div>
-        ) : null}
-
-        <a
-          href={mapsHref}
-          target="_blank"
-          rel="noreferrer"
-          className="mt-3.5 flex items-center justify-center gap-1.5 w-full rounded-xl border border-slate-200 bg-white py-2.5 text-center text-xs font-semibold text-slate-800 hover:bg-slate-50 transition-colors shadow-2xs"
+    <div className="max-w-4xl mx-auto space-y-5 pb-12 antialiased">
+      {/* Back Link */}
+      <div className="flex items-center justify-between px-1">
+        <Link
+          href="/staff"
+          className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 transition-colors"
         >
-          <span>🧭</span>
-          <span>Open in Google Maps</span>
-        </a>
+          <span>←</span>
+          <span>Back to Today&apos;s Schedule</span>
+        </Link>
+        <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2.5 py-0.5 text-[11px] font-bold text-blue-700">
+          🚗 {visit.startedAt ? 'Wash In Progress' : 'Ready to Start'}
+        </span>
       </div>
 
+      {/* 1. Vehicle & Customer Summary Header Card */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-3.5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-mono text-xs font-black tracking-wide bg-slate-900 text-white px-2.5 py-0.5 rounded-lg">
+                {car.plate}
+              </span>
+              <span className="text-xs font-bold text-slate-700">
+                {car.make} {car.model} {car.colour ? `· ${car.colour}` : ''}
+              </span>
+            </div>
+            <h1 className="text-lg font-extrabold text-slate-900 mt-2">
+              {customer.name}
+            </h1>
+            {customer.phone && (
+              <a
+                href={`tel:${customer.phone}`}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:underline mt-0.5"
+              >
+                <span>📞</span>
+                <span>+91 {customer.phone}</span>
+              </a>
+            )}
+          </div>
+
+          <div className="text-right shrink-0">
+            <span className="text-[11px] font-bold text-slate-500 block">Package Plan</span>
+            <span className="text-xs font-extrabold text-blue-700 block mt-0.5">
+              {pkg?.name ?? 'Standard'}
+            </span>
+            <span className="text-[10.5px] font-semibold text-slate-400">
+              Wash {totalDoneThisCycle + 1} of {totalPackageWashes}
+            </span>
+          </div>
+        </div>
+
+        {/* Location & Maps */}
+        <div className="rounded-xl bg-slate-50 border border-slate-100 p-3 space-y-2 text-xs">
+          <div className="flex items-start gap-2 text-slate-700">
+            <span className="text-sm shrink-0 mt-0.5">📍</span>
+            <div className="min-w-0">
+              <p className="font-medium text-slate-800 leading-snug">{customer.address}</p>
+              {customer.landmark && (
+                <p className="text-slate-500 font-semibold mt-0.5">
+                  Landmark: {customer.landmark}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <a
+            href={mapsHref}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center justify-center gap-1.5 w-full rounded-lg bg-white border border-slate-200 py-2 text-center text-xs font-bold text-slate-800 hover:bg-slate-100 hover:border-slate-300 transition-all shadow-2xs cursor-pointer"
+          >
+            <span>🧭</span>
+            <span>Open Location in Google Maps</span>
+          </a>
+        </div>
+
+        {/* Last Completed Wash Summary */}
+        {pastHistory.find((v) => v.status === 'DONE') ? (
+          (() => {
+            const lastWash = pastHistory.find((v) => v.status === 'DONE')!;
+            return (
+              <div className="rounded-xl bg-blue-50/70 border border-blue-200/70 p-3 space-y-1.5 text-xs">
+                <div className="flex items-center justify-between font-bold text-blue-950">
+                  <span className="flex items-center gap-1.5">
+                    <span>⏮️</span>
+                    <span>Last Wash: {lastWash.date}</span>
+                  </span>
+                  <span className="text-[11px] text-blue-700 font-semibold bg-white px-2 py-0.5 rounded-md border border-blue-200">
+                    Previous Service History
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                  <span className="text-[11px] font-semibold text-slate-600">Services done last time:</span>
+                  {Array.isArray(lastWash.servicesDone) && lastWash.servicesDone.length > 0 ? (
+                    lastWash.servicesDone.map((s) => (
+                      <span
+                        key={s}
+                        className="inline-flex items-center gap-0.5 rounded-md bg-white border border-blue-200 px-2 py-0.5 text-[11px] font-bold text-blue-900"
+                      >
+                        ✓ {s}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-[11px] font-medium text-slate-500">Standard exterior cleaning</span>
+                  )}
+                </div>
+              </div>
+            );
+          })()
+        ) : (
+          <div className="rounded-xl bg-slate-50 border border-slate-200/70 p-2.5 text-xs text-slate-600">
+            ✨ First wash for this vehicle in this cycle. Full package services recommended!
+          </div>
+        )}
+
+        {/* Special Instructions or Customer Note */}
+        {(customer.note || car.specialInstructions) && (
+          <div className="rounded-xl bg-amber-50 border border-amber-200/80 p-3 text-xs font-semibold text-amber-900 flex items-start gap-2">
+            <span className="text-base shrink-0">⚠️</span>
+            <div>
+              <span className="font-bold text-amber-950">Instructions / Note: </span>
+              <span>{customer.note || car.specialInstructions}</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 2. Interactive Guided Wash Workflow */}
       <WashFlow
         visitId={visit.id}
         services={parsedPackageServices.map((s) => s.name)}

@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { IconCamera, IconStar } from '@/components/shell/icons';
+import { IconCamera } from '@/components/shell/icons';
 import { requirePermission } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { loadCustomerAccount } from '@/lib/services/accounts';
@@ -14,6 +14,7 @@ import {
 } from '@/lib/util/format';
 import { MISS_REASON_LABEL } from '@/lib/util/labels';
 import { resolvePublicPhotoUrl } from '@/lib/util/photoUrl';
+import { WashRatingAction } from '../../WashRatingAction';
 
 export const metadata = { title: 'Wash history' };
 
@@ -319,21 +320,20 @@ export default async function CarDetail({
                 })}
               </div>
 
-              {visit.rating ? (
-                <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600 pt-1">
-                  <span>Your rating:</span>
-                  <span className="inline-flex items-center gap-0.5 font-bold text-amber-500 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/60">
-                    {visit.rating} <IconStar width={13} height={13} />
-                  </span>
-                </div>
-              ) : (
-                <p className="text-xs font-medium text-slate-400 pt-1">
-                  Not rated yet — you can rate this wash in the Help tab.
-                </p>
-              )}
+              <div className="pt-2 border-t border-slate-100">
+                <WashRatingAction
+                  visitId={visit.id}
+                  carId={car.id}
+                  carLabel={`${car.make} ${car.model}`}
+                  dateLabel={formatDateFull(visit.scheduledDate)}
+                  staffName={staff.get(visit.staffId || '')?.name}
+                  rating={visit.rating}
+                  ratingComment={visit.ratingComment}
+                />
+              </div>
             </div>
           ) : (
-            <div key={visit.id} className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4 shadow-2xs">
+            <div key={visit.id} className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4 shadow-2xs space-y-2.5">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-sm font-bold text-amber-950">
@@ -351,10 +351,20 @@ export default async function CarDetail({
                 </span>
               </div>
               {visit.rescheduledToVisitId ? (
-                <div className="mt-2 text-xs font-medium text-amber-900 bg-amber-100/60 p-2.5 rounded-xl border border-amber-200">
+                <div className="text-xs font-medium text-amber-900 bg-amber-100/60 p-2.5 rounded-xl border border-amber-200">
                   This wash was <b>skipped and moved to your next scheduled date</b>. You have not lost any paid washes.
                 </div>
               ) : null}
+              <div className="pt-2 border-t border-amber-200/60">
+                <WashRatingAction
+                  visitId={visit.id}
+                  carId={car.id}
+                  carLabel={`${car.make} ${car.model}`}
+                  dateLabel={formatDateFull(visit.scheduledDate)}
+                  staffName={staff.get(visit.staffId || '')?.name}
+                  isMissed={true}
+                />
+              </div>
             </div>
           ),
         )}

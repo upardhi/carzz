@@ -36,11 +36,13 @@ import { WashTodayAction } from './WashTodayAction';
 import { QuickAssignStaff } from './QuickAssignStaff';
 import {
   AddCarModalButton,
+  CarWashHistoryButton,
   DeleteCarButton,
   EditCarModalButton,
   EditCustomerModalButton,
   InactivateCustomerButton,
   RescheduleVisitButton,
+  VisitPhotoPreviewButton,
 } from './EditCustomerActions';
 
 export async function ConsoleCustomerDetail({
@@ -253,6 +255,23 @@ export async function ConsoleCustomerDetail({
                         />
                       )
                     )}
+                    <CarWashHistoryButton
+                      car={{
+                        id: car.id,
+                        make: car.make,
+                        model: car.model,
+                        plate: car.plate,
+                        packageName: car.package?.name,
+                        washesPerMonth: car.package?.washesPerMonth,
+                      }}
+                      customer={{
+                        id: customer.id,
+                        name: customer.name,
+                        phone: customer.phone,
+                      }}
+                      visits={visits}
+                      staffList={staff}
+                    />
                     <EditCarModalButton
                       customerId={customer.id}
                       car={car}
@@ -516,12 +535,16 @@ export async function ConsoleCustomerDetail({
                 id: 'photos',
                 header: 'PHOTOS',
                 align: 'center',
-                render: (visit) =>
-                  visit.beforePhotoUrl && visit.afterPhotoUrl ? (
-                    <Tag tone="ok">Both</Tag>
-                  ) : (
-                    <span className="text-slate-400">—</span>
-                  ),
+                render: (visit) => {
+                  const car = cars.find((c) => c.id === visit.carId);
+                  return (
+                    <VisitPhotoPreviewButton
+                      beforePhotoUrl={visit.beforePhotoUrl}
+                      afterPhotoUrl={visit.afterPhotoUrl}
+                      title={`${car?.model ?? 'Car'} (${formatDateFull(visit.scheduledDate)})`}
+                    />
+                  );
+                },
               },
               {
                 id: 'rating',

@@ -5,7 +5,8 @@ import { getStore } from '@/lib/data';
 import { COMPLAINT_TYPES } from '@/lib/data/types';
 
 const schema = z.object({
-  carId: z.string().optional(),
+  visitId: z.string().optional().nullable(),
+  carId: z.string().optional().nullable(),
   type: z.enum(COMPLAINT_TYPES),
   body: z.string().trim().min(5, 'Please tell us what happened.').max(1000),
 });
@@ -28,35 +29,46 @@ export async function POST(request: Request) {
     const customer = await store.customers.get(session.user.customerId);
     if (!customer) throw new HttpError(404, 'Customer record not found.');
 
-    // Attach the most recent completed wash for the specific car if specified, or customer generally
-    let lastVisit = parsed.data.carId
-      ? (await store.visits.findOne({
-          where: { customerId: customer.id, carId: parsed.data.carId, status: 'DONE' },
-          orderBy: [{ field: 'scheduledDate', dir: 'desc' }],
-        })) ||
-        (await store.visits.findOne({
-          where: { customerId: customer.id, carId: parsed.data.carId },
-          orderBy: [{ field: 'scheduledDate', dir: 'desc' }],
-        }))
-      : null;
+    let targetVisit: Awaited<ReturnType<typeof store.visits.get>> = null;
 
-    if (!lastVisit) {
-      lastVisit =
-        (await store.visits.findOne({
-          where: { customerId: customer.id, status: 'DONE' },
-          orderBy: [{ field: 'scheduledDate', dir: 'desc' }],
-        })) ||
-        (await store.visits.findOne({
-          where: { customerId: customer.id },
-          orderBy: [{ field: 'scheduledDate', dir: 'desc' }],
-        }));
+    // 1. If explicit visitId is provided, link to that exact wash
+    if (parsed.data.visitId) {
+      const visit = await store.visits.get(parsed.data.visitId);
+      if (visit && visit.customerId === customer.id) {
+        targetVisit = visit;
+      }
+    }
+
+    // 2. If no exact visitId, search by carId or latest visit
+    if (!targetVisit) {
+      if (parsed.data.carId) {
+        targetVisit =
+          (await store.visits.findOne({
+            where: { customerId: customer.id, carId: parsed.data.carId, status: 'DONE' },
+            orderBy: [{ field: 'scheduledDate', dir: 'desc' }],
+          })) ||
+          (await store.visits.findOne({
+            where: { customerId: customer.id, carId: parsed.data.carId },
+            orderBy: [{ field: 'scheduledDate', dir: 'desc' }],
+          }));
+      } else {
+        targetVisit =
+          (await store.visits.findOne({
+            where: { customerId: customer.id, status: 'DONE' },
+            orderBy: [{ field: 'scheduledDate', dir: 'desc' }],
+          })) ||
+          (await store.visits.findOne({
+            where: { customerId: customer.id },
+            orderBy: [{ field: 'scheduledDate', dir: 'desc' }],
+          }));
+      }
     }
 
     const complaint = await store.complaints.create({
       customerId: customer.id,
       areaId: customer.areaId,
-      staffId: lastVisit?.staffId ?? null,
-      visitId: lastVisit?.id ?? null,
+      staffId: targetVisit?.staffId ?? null,
+      visitId: targetVisit?.id ?? null,
       type: parsed.data.type,
       body: parsed.data.body,
       status: 'OPEN',
@@ -69,7 +81,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       complaint,
-      message: 'Sent to your area manager. You will get a reply here.',
+      message: 'Complaint submitted to your area manager. You can track resolutions in Help & Support.',
     });
   } catch (error) {
     if (error instanceof HttpError) {

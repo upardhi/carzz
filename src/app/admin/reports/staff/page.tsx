@@ -34,6 +34,7 @@ export default async function AdminStaffPerformancePage() {
         rows={staffData.rows}
         areas={areas}
         totalStaff={staffData.total}
+        cycle={cycle}
       />
     </>
   );

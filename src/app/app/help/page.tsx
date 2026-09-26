@@ -1,12 +1,12 @@
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { requirePermission } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { loadCustomerAccount } from '@/lib/services/accounts';
-import { currentCycle, formatDateFull } from '@/lib/util/format';
+import { currentCycle } from '@/lib/util/format';
 import { ComplaintHistory, type ComplaintItemData } from './ComplaintHistory';
-import { ComplaintForm, RateWashForm } from './HelpForms';
 
-export const metadata = { title: 'Help & feedback' };
+export const metadata = { title: 'Help & profile' };
 
 export default async function CustomerHelp() {
   const session = await requirePermission('self:feedback');
@@ -27,40 +27,6 @@ export default async function CustomerHelp() {
       .slice(0, 2)
       .map((p) => p[0]?.toUpperCase() ?? '')
       .join('') || 'C';
-
-  // Sort visits descending so the most recent completed wash surfaces first.
-  const doneVisits = account.visits
-    .filter((v) => v.status === 'DONE')
-    .sort(
-      (a, b) =>
-        new Date(b.completedAt || b.scheduledDate).getTime() -
-        new Date(a.completedAt || a.scheduledDate).getTime(),
-    );
-
-  const rules = await store.getPayoutSettings();
-
-  // Every completed wash can be rated once, not just the latest — a customer
-  // catching up after a busy week should still be able to rate each one.
-  const unratedVisits = doneVisits.filter((v) => v.rating === null).slice(0, 20);
-  const ratedVisits = doneVisits.filter((v) => v.rating !== null).slice(0, 5);
-
-  const accountCars = account.cars;
-  async function describeVisit(visit: (typeof doneVisits)[number]) {
-    const car =
-      accountCars.find((c) => c.id === visit.carId) || (await store.cars.get(visit.carId));
-    const staffMember = visit.staffId ? await store.staff.get(visit.staffId) : null;
-    return {
-      visit,
-      carLabel: car ? `${car.make} ${car.model}`.trim() || car.plate : 'Your Vehicle',
-      dateLabel: formatDateFull(visit.completedAt || visit.scheduledDate),
-      staffName: staffMember?.name ? staffMember.name.split(' ')[0] : null,
-    };
-  }
-
-  const [unratedDetails, ratedDetails] = await Promise.all([
-    Promise.all(unratedVisits.map(describeVisit)),
-    Promise.all(ratedVisits.map(describeVisit)),
-  ]);
 
   const complaints = await store.complaints.find({
     where: { customerId: account.customer.id },
@@ -116,13 +82,6 @@ export default async function CustomerHelp() {
         )
       : [];
 
-  const registeredCars = account.cars.map((c) => ({
-    id: c.id,
-    make: c.make,
-    model: c.model,
-    plate: c.plate,
-  }));
-
   return (
     <div className="space-y-4">
       {/* 1. Hero Welcome Banner */}
@@ -132,7 +91,7 @@ export default async function CustomerHelp() {
             Help & Support, {customerName.split(' ')[0]}! 👋
           </h1>
           <p className="mt-1 text-xs md:text-sm text-slate-300 font-medium">
-            Rate your recent washes, raise tickets, and get fast manager resolutions.
+            Track manager complaint resolutions, service status, and manage your account profile.
           </p>
           <div className="mt-3.5 inline-block">
             <span className="text-[11px] md:text-xs font-semibold tracking-wide text-blue-200 uppercase bg-blue-900/50 px-3 py-1 rounded-full border border-blue-400/30">
@@ -167,123 +126,45 @@ export default async function CustomerHelp() {
         <form action="/api/auth/logout" method="post" className="mt-4 pt-3 border-t border-slate-100">
           <button
             type="submit"
-            className="w-full py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 font-semibold text-[13px] transition-colors"
+            className="w-full py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 font-semibold text-[13px] transition-colors cursor-pointer"
           >
             Sign out of account
           </button>
         </form>
       </div>
 
-      {/* 3. Rate Your Washes Card */}
-      <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs">
-        <div className="flex items-center gap-2.5 mb-4">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-amber-600 font-bold text-base">
-            ★
-          </div>
-          <div>
-            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-900">
-              Rate Your Washes
-            </h3>
-            <p className="text-xs text-slate-500">
-              Every completed wash can be rated once — reward your cleaner for great service
-            </p>
-          </div>
-        </div>
-
-        {unratedDetails.length > 0 ? (
-          <div className="space-y-4">
-            {unratedDetails.map(({ visit, carLabel, dateLabel, staffName }, i) => (
-              <div key={visit.id}>
-                {i > 0 ? <div className="mb-4 border-t border-slate-100" /> : null}
-                <RateWashForm
-                  visitId={visit.id}
-                  carLabel={carLabel}
-                  dateLabel={dateLabel}
-                  staffName={staffName}
-                  existingRating={null}
-                />
-              </div>
-            ))}
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-[12.5px] font-semibold text-emerald-700">
-              A rating of {rules.goodReviewMinStars || 4} stars or more pays your wash
-              cleaner ₹{rules.goodReviewBonus || 10} extra bonus for that wash!
-            </div>
-          </div>
-        ) : (
-          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-5 text-center">
-            <p className="text-sm font-medium text-slate-500">
-              {doneVisits.length > 0 ? "You're all caught up — every wash is rated." : 'No completed washes to rate yet.'}
-            </p>
-            <p className="mt-1 text-xs text-slate-400">
-              Once your cleaner completes a wash, you will be able to rate the service and leave feedback here.
-            </p>
-          </div>
-        )}
-
-        {ratedDetails.length > 0 ? (
-          <div className="mt-5 border-t border-slate-100 pt-4">
-            <p className="mb-2.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-              Recently rated (locked)
-            </p>
-            <div className="space-y-2">
-              {ratedDetails.map(({ visit, carLabel, dateLabel }) => (
-                <div
-                  key={visit.id}
-                  className="rounded-xl border border-slate-200/70 bg-slate-50 p-3 text-[12.5px]"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-semibold text-slate-700">
-                      {carLabel} · {dateLabel}
-                    </span>
-                    <span className="text-amber-500 font-bold">
-                      {'★'.repeat(visit.rating ?? 0)}
-                    </span>
-                  </div>
-                  {visit.ratingComment ? (
-                    <p className="mt-1 text-slate-500 italic">&ldquo;{visit.ratingComment}&rdquo;</p>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : null}
-      </div>
-
-      {/* 4. Raise A Complaint Card */}
-      <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs">
-        <div className="flex items-center gap-2.5 mb-4">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-50 text-rose-600 font-bold text-base">
-            ⚠️
-          </div>
-          <div>
-            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-900">
-              Raise A Complaint
-            </h3>
-            <p className="text-xs text-slate-500">Issue with quality, missed wash, or timing</p>
-          </div>
-        </div>
-
-        <ComplaintForm cars={registeredCars} />
-      </div>
-
-      {/* 5. My Complaints & Resolutions */}
+      {/* 3. My Complaints & Resolutions Tracking */}
       <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs space-y-3">
         <div className="flex items-start sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
-          <div>
-            <h3 className="text-sm font-bold text-slate-900">
-              My Complaints & Resolutions
-            </h3>
-            <p className="text-[11.5px] text-slate-500 font-medium mt-0.5">
-              Track the status, manager investigation notes, and reschedule/re-wash actions.
-            </p>
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 text-base font-bold">
+              📋
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">
+                My Complaints & Resolutions
+              </h3>
+              <p className="text-[11.5px] text-slate-500 font-medium mt-0.5">
+                Track status, manager investigation findings, and re-wash arrangements.
+              </p>
+            </div>
           </div>
           <span className="shrink-0 whitespace-nowrap rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 border border-slate-200/60">
             {displayComplaints.length} Total
           </span>
         </div>
-        
+
         <div className="pt-2">
-          <ComplaintHistory complaints={displayComplaints} />
+          {displayComplaints.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-xs text-slate-500 space-y-2">
+              <p className="font-medium text-slate-600">No complaints reported.</p>
+              <p className="text-slate-400">
+                If you ever face an issue with any wash quality or timing, you can click <span className="font-bold text-slate-700">&ldquo;⚠️ Report Issue&rdquo;</span> directly on that wash in your <Link href="/app/cars" className="text-blue-600 underline font-semibold">Car History</Link> or Dashboard.
+              </p>
+            </div>
+          ) : (
+            <ComplaintHistory complaints={displayComplaints} />
+          )}
         </div>
       </div>
     </div>

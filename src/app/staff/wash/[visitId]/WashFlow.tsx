@@ -29,15 +29,9 @@ interface Props {
   initialAfter: string | null;
   requireBothPhotos: boolean;
   nextSlotDate: string | null;
-  /** Set the moment the before photo was taken — the clock this wash is timed against. */
   startedAt: string | null;
 }
 
-/**
- * The wash execution flow for wash staff.
- * Displays service quota intelligence (this month and last month usage),
- * past wash history with photos, and guided work checklist.
- */
 export function WashFlow({
   visitId,
   services,
@@ -51,13 +45,14 @@ export function WashFlow({
   pastHistory,
   initialBefore,
   initialAfter,
-  requireBothPhotos,
+  requireBothPhotos: _requireBothPhotos,
   nextSlotDate,
   startedAt,
 }: Props) {
   const router = useRouter();
   const [before, setBefore] = useState<string | null>(initialBefore);
   const [after, setAfter] = useState<string | null>(initialAfter);
+  const [washStartedAt, setWashStartedAt] = useState<string | null>(startedAt);
   const [elapsedSeconds, setElapsedSeconds] = useState<number | null>(null);
 
   // Initial work checklist: auto-select services that still have quota remaining
@@ -69,34 +64,34 @@ export function WashFlow({
   });
 
   const [uploading, setUploading] = useState<'before' | 'after' | null>(null);
+  const [starting, setStarting] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Live "how long is this taking" clock, ticking from the moment the before
-  // photo was taken until the wash is closed — the same window the recorded
-  // duration (and the too-fast/too-slow flag) is measured against.
+  const isWashStarted = Boolean(washStartedAt);
+  const currentStep = !before || !isWashStarted ? 1 : !after ? 2 : 3;
+
+  // Live timer ticking from startedAt until after photo / completion
   useEffect(() => {
-    if (!startedAt || after) {
+    if (!washStartedAt || after) {
       setElapsedSeconds(null);
       return;
     }
-    const startMs = new Date(startedAt).getTime();
+    const startMs = new Date(washStartedAt).getTime();
     const tick = () => setElapsedSeconds(Math.max(0, Math.floor((Date.now() - startMs) / 1000)));
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [startedAt, after]);
+  }, [washStartedAt, after]);
+
   const [missOpen, setMissOpen] = useState(false);
   const [activeCamera, setActiveCamera] = useState<'before' | 'after' | null>(null);
   const [previewPhoto, setPreviewPhoto] = useState<{ kind: 'before' | 'after'; url: string } | null>(null);
 
-  // History tab filtering: 'ALL' | 'THIS_MONTH' | 'LAST_MONTH'
+  // History tab filtering & accordion
   const [historyTab, setHistoryTab] = useState<'ALL' | 'THIS_MONTH' | 'LAST_MONTH'>('ALL');
-  const [showHistory, setShowHistory] = useState(true);
-
-  const ready = requireBothPhotos
-    ? Boolean(before && after && done.length)
-    : done.length > 0;
+  const [showHistory, setShowHistory] = useState(false);
+  const [showQuotaDetails, setShowQuotaDetails] = useState(false);
 
   async function upload(kind: 'before' | 'after', file: File) {
     setUploading(kind);
@@ -113,8 +108,13 @@ export function WashFlow({
         setError(data.error ?? 'Could not save that photo.');
         return;
       }
-      if (kind === 'before') setBefore(data.url);
-      else setAfter(data.url);
+      if (kind === 'before') {
+        setBefore(data.url);
+        toast.success('Before photo saved! Tap "START WASH" to start cleaning.');
+      } else {
+        setAfter(data.url);
+        toast.success('After photo saved! Ready to complete wash.');
+      }
     } catch {
       setError('No signal. Move somewhere with network and tap again.');
     } finally {
@@ -122,7 +122,44 @@ export function WashFlow({
     }
   }
 
+  async function startWash() {
+    if (!before) {
+      setError('Please take the Before Photo first.');
+      return;
+    }
+    setStarting(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/staff/wash', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'start', visitId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? 'Could not start wash.');
+        return;
+      }
+      const nowIso = data.startedAt || new Date().toISOString();
+      setWashStartedAt(nowIso);
+      toast.success('Wash started! Cleaning timer is running.');
+    } catch {
+      setError('Network issue. Please tap start again.');
+    } finally {
+      setStarting(false);
+    }
+  }
+
   async function closeWash() {
+    if (!before || !after) {
+      setError('Both Before and After photos are required.');
+      return;
+    }
+    if (!done.length) {
+      setError('Please select at least one service done.');
+      return;
+    }
+
     setPending(true);
     setError(null);
     try {
@@ -143,7 +180,7 @@ export function WashFlow({
           title: 'Saved Offline (Auto-Sync)',
         });
       } else {
-        toast.success('Wash marked complete!');
+        toast.success('Wash completed successfully! Great job.');
       }
 
       router.push('/staff');
@@ -177,242 +214,387 @@ export function WashFlow({
   }
 
   return (
-    <>
-      {/* 0. Live wash timer — running from the before photo until the wash closes */}
-      {elapsedSeconds !== null ? (
-        <div className="flex items-center justify-between rounded-2xl border border-blue-200 bg-blue-50 px-5 py-3 shadow-2xs">
-          <span className="text-xs font-bold uppercase tracking-wider text-blue-700">
-            ⏱ Time on this wash
-          </span>
-          <span className="font-mono text-lg font-bold text-blue-900">
-            {String(Math.floor(elapsedSeconds / 60)).padStart(2, '0')}:
-            {String(elapsedSeconds % 60).padStart(2, '0')}
-          </span>
-        </div>
-      ) : null}
-
-      {/* 1. Service Quota & Skip Advisory Card */}
-      <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
-          <div>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Active Package:</span>
-              <span className="text-xs font-bold text-slate-900">{packageName}</span>
+    <div className="space-y-4">
+      {/* ========================================================================= */}
+      {/* 1. VISUAL 3-STEP PROGRESS STEPPER                                         */}
+      {/* ========================================================================= */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex items-center justify-between">
+          {/* Step 1 */}
+          <div className="flex-1 flex flex-col items-center text-center">
+            <div
+              className={`flex h-9 w-9 items-center justify-center rounded-xl text-xs font-black transition-all ${
+                before
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'bg-blue-600 text-white ring-4 ring-blue-100 animate-pulse'
+              }`}
+            >
+              {before ? '✓' : '1'}
             </div>
-            <p className="text-[11.5px] font-medium text-slate-500 mt-0.5">
-              {totalDoneThisCycle} of {totalPackageWashes} washes completed this month ({currentCycleLabel})
-            </p>
-          </div>
-          <span className="shrink-0 rounded-full bg-blue-50 border border-blue-200 px-2.5 py-1 text-[11px] font-bold text-blue-700 whitespace-nowrap text-center flex items-center justify-center min-w-[max-content]">
-            {totalPackageWashes - totalDoneThisCycle} washes left
-          </span>
-        </div>
-
-        {/* Service-by-service breakdown */}
-        <div className="mt-3.5 space-y-2">
-          <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-            <span>Service Quota & Past History</span>
-          </div>
-
-          <div className="space-y-2">
-            {serviceStats.map((stat) => {
-              const isChecked = done.includes(stat.name);
-              return (
-                <div
-                  key={stat.name}
-                  className={`rounded-xl border p-3 transition-all ${
-                    stat.isQuotaMet
-                      ? 'border-amber-200/80 bg-amber-50/40'
-                      : 'border-slate-200/70 bg-slate-50/60'
-                  }`}
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-xs font-bold text-slate-900">{stat.name}</span>
-                        {stat.isQuotaMet ? (
-                          <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-[10.5px] font-bold text-amber-800">
-                            ✓ Monthly Quota Full (Skip Suggested)
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-1.5 py-0.5 text-[10.5px] font-bold text-emerald-800">
-                            ⚡ Due Today ({stat.quotaPerMonth - stat.timesDoneThisCycle} left)
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="mt-2 flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-x-3 gap-y-1 text-[11px] font-medium text-slate-500">
-                        <span>
-                          This month: <strong className="text-slate-800">{stat.timesDoneThisCycle} / {stat.quotaPerMonth}</strong>
-                        </span>
-                        <span className="hidden sm:inline">·</span>
-                        <span>
-                          Last month ({lastCycleLabel.split(' ')[0]}): <strong className="text-slate-800">{stat.timesDoneLastCycle} done</strong>
-                        </span>
-                        {stat.lastDoneDate ? (
-                          <>
-                            <span className="hidden sm:inline">·</span>
-                            <span>Last done: <strong className="text-slate-700">{formatDate(stat.lastDoneDate)}</strong></span>
-                          </>
-                        ) : null}
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setDone((cur) =>
-                          isChecked ? cur.filter((s) => s !== stat.name) : [...cur, stat.name],
-                        )
-                      }
-                      className={`shrink-0 w-full sm:w-auto rounded-lg px-2.5 py-1.5 text-xs font-bold transition-colors ${
-                        isChecked
-                          ? 'bg-blue-600 text-white hover:bg-blue-700'
-                          : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                      }`}
-                    >
-                      {isChecked ? '✓ Doing Today' : '+ Add to Wash'}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* 2. Today's Wash Photos & Checklist Panel */}
-      <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600 font-bold text-sm">
-            📷
-          </div>
-          <div>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
-              Vehicle Wash Photos
-            </h3>
-            <p className="text-[11.5px] text-slate-500">Capture before and after wash photos</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <PhotoTile
-            label="Before"
-            url={before}
-            busy={uploading === 'before'}
-            onPick={() => setActiveCamera('before')}
-            onPreview={(url) => setPreviewPhoto({ kind: 'before', url })}
-            onRetake={() => setActiveCamera('before')}
-          />
-          <PhotoTile
-            label="After"
-            url={after}
-            busy={uploading === 'after'}
-            disabled={!before}
-            onPick={() => setActiveCamera('after')}
-            onPreview={(url) => setPreviewPhoto({ kind: 'after', url })}
-            onRetake={() => setActiveCamera('after')}
-          />
-        </div>
-
-        <div className="mt-5 pt-4 border-t border-slate-100">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              Work Done Checklist ({done.length} selected)
-            </p>
-            <span className="text-[11px] font-medium text-slate-400">
-              Tap to toggle
+            <span
+              className={`text-xs font-bold mt-1.5 ${
+                currentStep === 1 ? 'text-blue-700' : 'text-slate-700'
+              }`}
+            >
+              Before Photo
             </span>
           </div>
 
-          <div className="space-y-1.5">
-            {services.map((service) => {
-              const on = done.includes(service);
-              const stat = serviceStats.find((s) => s.name.toLowerCase() === service.toLowerCase());
+          <div
+            className={`h-1 flex-1 mx-2 rounded-full transition-colors ${
+              isWashStarted ? 'bg-emerald-500' : 'bg-slate-200'
+            }`}
+          />
 
-              return (
-                <button
-                  key={service}
-                  type="button"
-                  aria-pressed={on}
-                  onClick={() =>
-                    setDone((current) =>
-                      on ? current.filter((s) => s !== service) : [...current, service],
-                    )
-                  }
-                  className={`flex w-full items-center justify-between rounded-xl p-2.5 text-left text-[13.5px] font-semibold transition-colors ${
-                    on ? 'bg-slate-50 text-slate-900' : 'bg-white text-slate-400 hover:bg-slate-50/50'
-                  }`}
-                >
-                  <div className="flex items-center gap-3 min-w-0 pr-2">
-                    <span
-                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-all ${
-                        on
-                          ? 'border-emerald-600 bg-emerald-600 text-white shadow-2xs'
-                          : 'border-slate-300 bg-white'
-                      }`}
-                    >
-                      {on ? <IconCheck width={12} height={12} strokeWidth={3} /> : null}
-                    </span>
-                    <span className={on ? 'text-slate-900 truncate' : 'text-slate-400 line-through truncate'}>
-                      {service}
-                    </span>
-                  </div>
+          {/* Step 2 */}
+          <div className="flex-1 flex flex-col items-center text-center">
+            <div
+              className={`flex h-9 w-9 items-center justify-center rounded-xl text-xs font-black transition-all ${
+                after
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : isWashStarted
+                  ? 'bg-blue-600 text-white ring-4 ring-blue-100 animate-pulse'
+                  : 'bg-slate-100 text-slate-400 border border-slate-200'
+              }`}
+            >
+              {after ? '✓' : '2'}
+            </div>
+            <span
+              className={`text-xs font-bold mt-1.5 ${
+                currentStep === 2
+                  ? 'text-blue-700'
+                  : isWashStarted
+                  ? 'text-slate-700'
+                  : 'text-slate-400'
+              }`}
+            >
+              Wash &amp; After Photo
+            </span>
+          </div>
 
-                  {stat ? (
-                    <span
-                      className={`shrink-0 text-[11px] font-bold px-2 py-0.5 rounded-md ${
-                        stat.isQuotaMet
-                          ? 'bg-amber-100 text-amber-800'
-                          : 'bg-slate-100 text-slate-600'
-                      }`}
-                    >
-                      {stat.timesDoneThisCycle}/{stat.quotaPerMonth} mo
-                    </span>
-                  ) : null}
-                </button>
-              );
-            })}
+          <div
+            className={`h-1 flex-1 mx-2 rounded-full transition-colors ${
+              before && after && isWashStarted ? 'bg-emerald-500' : 'bg-slate-200'
+            }`}
+          />
+
+          {/* Step 3 */}
+          <div className="flex-1 flex flex-col items-center text-center">
+            <div
+              className={`flex h-9 w-9 items-center justify-center rounded-xl text-xs font-black transition-all ${
+                before && after && isWashStarted
+                  ? 'bg-emerald-600 text-white ring-4 ring-emerald-100 animate-bounce'
+                  : 'bg-slate-100 text-slate-400 border border-slate-200'
+              }`}
+            >
+              3
+            </div>
+            <span
+              className={`text-xs font-bold mt-1.5 ${
+                currentStep === 3 ? 'text-emerald-700 font-extrabold' : 'text-slate-400'
+              }`}
+            >
+              Complete
+            </span>
           </div>
         </div>
       </div>
 
-      {/* 3. Past Wash History & Photos Section */}
-      <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs">
-        <div className="flex items-center justify-between gap-2 mb-3">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 font-bold text-sm">
-              📜
-            </div>
-            <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
-                Car Wash History & Past Photos
+      {/* ========================================================================= */}
+      {/* 2. STEP 1: BEFORE PHOTO & START WASH (SHOWN BEFORE WASH STARTS)           */}
+      {/* ========================================================================= */}
+      {!isWashStarted && (
+        <div className="rounded-2xl border-2 border-blue-400 bg-white p-6 shadow-sm space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-xs font-black text-white">
+                1
+              </span>
+              <h3 className="text-sm md:text-base font-bold text-slate-900">
+                Step 1: Capture Before Photo
               </h3>
-              <p className="text-[11.5px] text-slate-500">
-                {pastHistory.length} recorded {pastHistory.length === 1 ? 'wash' : 'washes'} for this car
+            </div>
+            {before && (
+              <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
+                ✓ Photo Ready
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+            <div className="space-y-4">
+              <p className="text-xs md:text-sm text-slate-600 leading-relaxed">
+                Capture a clear photo of the vehicle before cleaning begins. Once captured, tap <strong>&ldquo;START WASH&rdquo;</strong> to start the service timer.
               </p>
+
+              <div className="p-3.5 bg-blue-50/70 rounded-xl border border-blue-100 text-xs text-blue-900 space-y-1">
+                <div className="font-bold">📸 Photo Guidelines:</div>
+                <ul className="list-disc list-inside text-[11.5px] text-blue-800 space-y-0.5">
+                  <li>Capture from front 45-degree angle</li>
+                  <li>Ensure license plate and car condition are visible</li>
+                </ul>
+              </div>
+
+              <div>
+                {!before ? (
+                  <button
+                    type="button"
+                    onClick={() => setActiveCamera('before')}
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 py-3.5 text-sm font-bold text-white shadow-md hover:from-blue-700 hover:to-indigo-700 active:scale-[0.99] transition-all cursor-pointer"
+                  >
+                    <IconCamera width={20} height={20} />
+                    <span>📸 Take Before Photo</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={starting}
+                    onClick={startWash}
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 py-4 text-base font-black text-white shadow-lg hover:from-emerald-700 hover:to-teal-700 active:scale-[0.99] transition-all cursor-pointer ring-4 ring-emerald-100"
+                  >
+                    <span>▶ START WASH (Start Timer)</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="w-full max-w-sm mx-auto md:max-w-none">
+              <PhotoTile
+                label="Before Wash Photo"
+                url={before}
+                busy={uploading === 'before'}
+                onPick={() => setActiveCamera('before')}
+                onPreview={(url) => setPreviewPhoto({ kind: 'before', url })}
+                onRetake={() => setActiveCamera('before')}
+              />
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setShowHistory(!showHistory)}
-            className="text-xs font-bold text-blue-600 hover:text-blue-700"
-          >
-            {showHistory ? 'Collapse' : 'Expand'}
-          </button>
         </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 3. STEP 2 & 3: WASH IN PROGRESS & AFTER PHOTO (SHOWN AFTER START)         */}
+      {/* ========================================================================= */}
+      {isWashStarted && (
+        <>
+          {/* Live Running Timer Banner */}
+          <div className="flex items-center justify-between rounded-2xl border-2 border-emerald-400 bg-emerald-50 px-5 py-3.5 shadow-sm">
+            <div className="flex items-center gap-2.5">
+              <span className="relative flex h-3.5 w-3.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-600"></span>
+              </span>
+              <div>
+                <span className="text-xs font-extrabold uppercase tracking-wider text-emerald-900 block">
+                  Wash In Progress
+                </span>
+                <span className="text-[11px] text-emerald-700 font-medium">
+                  Started at {new Date(washStartedAt!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+            </div>
+            <div className="text-right">
+              <span className="font-mono text-2xl font-black text-emerald-950 block">
+                {elapsedSeconds !== null ? (
+                  `${String(Math.floor(elapsedSeconds / 60)).padStart(2, '0')}:${String(
+                    elapsedSeconds % 60,
+                  ).padStart(2, '0')}`
+                ) : (
+                  '00:00'
+                )}
+              </span>
+            </div>
+          </div>
+
+          {/* Photos & Work Done Container */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center justify-between">
+              <span>📷 Proof Photos</span>
+              <span className="text-[11px] font-normal text-slate-500">Before &amp; After</span>
+            </h3>
+
+            <div className="grid grid-cols-2 gap-3">
+              <PhotoTile
+                label="Before Photo"
+                url={before}
+                busy={uploading === 'before'}
+                onPick={() => setActiveCamera('before')}
+                onPreview={(url) => setPreviewPhoto({ kind: 'before', url })}
+                onRetake={() => setActiveCamera('before')}
+              />
+              <PhotoTile
+                label="After Photo"
+                url={after}
+                busy={uploading === 'after'}
+                onPick={() => setActiveCamera('after')}
+                onPreview={(url) => setPreviewPhoto({ kind: 'after', url })}
+                onRetake={() => setActiveCamera('after')}
+              />
+            </div>
+
+            {/* Checklist of Work Done */}
+            <div className="pt-3 border-t border-slate-100">
+              <div className="flex items-center justify-between mb-2.5">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                  Services Done ({done.length} selected)
+                </p>
+                <span className="text-[11px] font-semibold text-blue-600">
+                  Tap to toggle
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                {services.map((service) => {
+                  const on = done.includes(service);
+                  const stat = serviceStats.find(
+                    (s) => s.name.toLowerCase() === service.toLowerCase(),
+                  );
+
+                  return (
+                    <button
+                      key={service}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() =>
+                        setDone((current) =>
+                          on ? current.filter((s) => s !== service) : [...current, service],
+                        )
+                      }
+                      className={`flex w-full items-center justify-between rounded-xl p-3 text-left text-xs font-semibold transition-all cursor-pointer ${
+                        on
+                          ? 'bg-blue-50/70 text-slate-900 border border-blue-200 shadow-2xs'
+                          : 'bg-white text-slate-400 border border-dashed border-slate-200 hover:bg-slate-50/50'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3 min-w-0 pr-2">
+                        <span
+                          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-all mt-0.5 ${
+                            on
+                              ? 'border-blue-600 bg-blue-600 text-white shadow-2xs'
+                              : 'border-slate-300 bg-white'
+                          }`}
+                        >
+                          {on ? <IconCheck width={12} height={12} strokeWidth={3} /> : null}
+                        </span>
+                        <div className="min-w-0">
+                          <span className={on ? 'text-slate-900 font-bold block truncate' : 'text-slate-400 line-through block truncate'}>
+                            {service}
+                          </span>
+                          <span className="text-[11px] text-slate-500 font-normal block mt-0.5">
+                            {stat?.lastDoneDate ? (
+                              <>Last done: <strong className="text-slate-700">{formatDate(stat.lastDoneDate)}</strong></>
+                            ) : (
+                              <span className="text-emerald-700 font-semibold">✨ Due today (Not done yet this month)</span>
+                            )}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="text-right shrink-0 flex flex-col items-end gap-1">
+                        {stat && (
+                          <span
+                            className={`text-[10.5px] font-bold px-2 py-0.5 rounded-md ${
+                              stat.isQuotaMet
+                                ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                : 'bg-blue-50 text-blue-800 border border-blue-200'
+                            }`}
+                          >
+                            {stat.timesDoneThisCycle}/{stat.quotaPerMonth} mo
+                          </span>
+                        )}
+                        {stat?.isQuotaMet ? (
+                          <span className="text-[9.5px] font-semibold text-amber-700">Quota Met</span>
+                        ) : (
+                          <span className="text-[9.5px] font-semibold text-emerald-600">Recommended</span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Action Buttons for Step 2 & 3 */}
+            <div className="pt-3 border-t border-slate-100">
+              {!after ? (
+                <button
+                  type="button"
+                  onClick={() => setActiveCamera('after')}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 py-3.5 text-sm font-bold text-white shadow-md hover:from-blue-700 hover:to-indigo-700 active:scale-[0.99] transition-all cursor-pointer"
+                >
+                  <IconCamera width={20} height={20} />
+                  <span>📸 Take After Photo</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={pending || !done.length}
+                  onClick={closeWash}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 py-4 text-base font-black text-white shadow-lg hover:from-emerald-700 hover:to-teal-700 active:scale-[0.99] transition-all cursor-pointer ring-4 ring-emerald-100 disabled:opacity-50"
+                >
+                  <IconCheck width={22} height={22} strokeWidth={3} />
+                  <span>{pending ? 'Saving…' : '✅ COMPLETE & SUBMIT WASH'}</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 4. COLLAPSIBLE PACKAGE DETAILS & HISTORY                                   */}
+      {/* ========================================================================= */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <button
+          type="button"
+          onClick={() => setShowQuotaDetails(!showQuotaDetails)}
+          className="flex w-full items-center justify-between text-left text-xs font-bold text-slate-800 cursor-pointer"
+        >
+          <span>📦 Package Plan &amp; Quotas</span>
+          <span className="text-slate-400 font-semibold">{showQuotaDetails ? '▲ Hide' : '▼ View'}</span>
+        </button>
+
+        {showQuotaDetails && (
+          <div className="mt-3 pt-3 border-t border-slate-100 space-y-2">
+            <div className="text-xs text-slate-700 font-medium">
+              <strong>Package:</strong> {packageName} ({totalDoneThisCycle} of {totalPackageWashes} washes done this month)
+            </div>
+            <div className="space-y-1.5 pt-1">
+              {serviceStats.map((stat) => (
+                <div
+                  key={stat.name}
+                  className="flex items-center justify-between text-xs p-2 rounded-lg bg-slate-50 border border-slate-100"
+                >
+                  <span className="font-semibold text-slate-800">{stat.name}</span>
+                  <span className="text-slate-500 font-medium">
+                    This month: {stat.timesDoneThisCycle} / {stat.quotaPerMonth}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Past Car Wash History Collapsible */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <button
+          type="button"
+          onClick={() => setShowHistory(!showHistory)}
+          className="flex w-full items-center justify-between text-left text-xs font-bold text-slate-800 cursor-pointer"
+        >
+          <span>📜 Past Wash History ({pastHistory.length})</span>
+          <span className="text-slate-400 font-semibold">{showHistory ? '▲ Hide' : '▼ View'}</span>
+        </button>
 
         {showHistory && (
-          <div className="space-y-3 pt-2">
-            {/* Filter Tabs */}
+          <div className="mt-3 pt-3 border-t border-slate-100 space-y-3">
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs font-bold">
               <button
                 type="button"
                 onClick={() => setHistoryTab('ALL')}
-                className={`rounded-lg px-3 py-1.5 transition-colors whitespace-nowrap ${
-                  historyTab === 'ALL'
-                    ? 'bg-slate-900 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                className={`rounded-lg px-3 py-1 text-xs cursor-pointer ${
+                  historyTab === 'ALL' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'
                 }`}
               >
                 All ({pastHistory.length})
@@ -420,171 +602,44 @@ export function WashFlow({
               <button
                 type="button"
                 onClick={() => setHistoryTab('THIS_MONTH')}
-                className={`rounded-lg px-3 py-1.5 transition-colors whitespace-nowrap ${
-                  historyTab === 'THIS_MONTH'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                className={`rounded-lg px-3 py-1 text-xs cursor-pointer ${
+                  historyTab === 'THIS_MONTH' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'
                 }`}
               >
-                This Month ({currentCycleLabel.split(' ')[0]})
+                This Month
               </button>
               <button
                 type="button"
                 onClick={() => setHistoryTab('LAST_MONTH')}
-                className={`rounded-lg px-3 py-1.5 transition-colors whitespace-nowrap ${
-                  historyTab === 'LAST_MONTH'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                className={`rounded-lg px-3 py-1 text-xs cursor-pointer ${
+                  historyTab === 'LAST_MONTH' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'
                 }`}
               >
-                Last Month ({lastCycleLabel.split(' ')[0]})
+                Last Month
               </button>
             </div>
 
             {filteredHistory.length === 0 ? (
-              <div className="rounded-xl bg-slate-50 p-6 text-center text-xs text-slate-500">
-                No wash history recorded for this filter.
-              </div>
+              <p className="text-xs text-slate-400 text-center py-3 font-medium">No history for this filter.</p>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {filteredHistory.map((item) => (
-                  <div
-                    key={item.id}
-                    className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-3.5 text-xs transition-colors hover:bg-slate-50"
-                  >
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-900">
-                          {formatDate(item.date)}
-                        </span>
-                        <span className="text-slate-400">·</span>
-                        <span className="text-slate-500 font-medium">{item.time}</span>
-                      </div>
+                  <div key={item.id} className="p-3 rounded-xl border border-slate-100 bg-slate-50 text-xs space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-800">{formatDate(item.date)}</span>
                       <span
-                        className={`rounded-md px-2 py-0.5 text-[11px] font-bold ${
-                          item.status === 'DONE'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : 'bg-rose-100 text-rose-800'
+                        className={`rounded px-2 py-0.5 text-[10px] font-bold ${
+                          item.status === 'DONE' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
                         }`}
                       >
                         {item.status === 'DONE' ? '✓ Done' : 'Missed'}
                       </span>
                     </div>
-
-                    {/* Time taken, and whether it was suspiciously fast or slow */}
-                    {item.durationMinutes !== null ? (
-                      <div className="mb-2 flex items-center gap-1.5">
-                        <span className="text-[11px] font-semibold text-slate-500">
-                          ⏱ Took {formatDurationMinutes(item.durationMinutes)}
-                        </span>
-                        {item.speedFlag ? (
-                          <span
-                            className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${
-                              item.speedFlag === 'fast'
-                                ? 'bg-amber-100 text-amber-800'
-                                : 'bg-rose-100 text-rose-800'
-                            }`}
-                            title={
-                              item.speedFlag === 'fast'
-                                ? 'Finished much faster than usual — check the photos'
-                                : 'Took much longer than usual'
-                            }
-                          >
-                            {item.speedFlag === 'fast' ? '⚡ Too fast' : '🐢 Too slow'}
-                          </span>
-                        ) : null}
-                      </div>
-                    ) : null}
-
-                    {/* Services done in that visit */}
-                    {item.servicesDone && item.servicesDone.length > 0 && (
-                      <div className="mb-2.5 flex flex-wrap gap-1">
-                        {item.servicesDone.map((s) => (
-                          <span
-                            key={s}
-                            className="inline-flex items-center gap-1 rounded-md bg-white border border-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-700 shadow-2xs"
-                          >
-                            <span className="text-emerald-600">✓</span> {s}
-                          </span>
-                        ))}
+                    {item.durationMinutes !== null && (
+                      <div className="text-[11px] text-slate-500">
+                        ⏱ Took {formatDurationMinutes(item.durationMinutes)}
                       </div>
                     )}
-
-                    {/* Photos from that past wash */}
-                    {(item.beforePhotoUrl || item.afterPhotoUrl) && (
-                      <div className="mt-2 grid grid-cols-2 gap-2 pt-2 border-t border-slate-200/60">
-                        {item.beforePhotoUrl ? (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setPreviewPhoto({ kind: 'before', url: item.beforePhotoUrl! })
-                            }
-                            className="group relative aspect-[4/3] w-full overflow-hidden rounded-lg border border-slate-200 bg-slate-200 shadow-2xs cursor-pointer"
-                          >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={item.beforePhotoUrl}
-                              alt="Before wash photo"
-                              className="h-full w-full object-cover transition-transform group-hover:scale-105"
-                            />
-                            <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-white backdrop-blur-xs">
-                              Before (Tap to view)
-                            </span>
-                          </button>
-                        ) : null}
-
-                        {item.afterPhotoUrl ? (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setPreviewPhoto({ kind: 'after', url: item.afterPhotoUrl! })
-                            }
-                            className="group relative aspect-[4/3] w-full overflow-hidden rounded-lg border border-slate-200 bg-slate-200 shadow-2xs cursor-pointer"
-                          >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={item.afterPhotoUrl}
-                              alt="After wash photo"
-                              className="h-full w-full object-cover transition-transform group-hover:scale-105"
-                            />
-                            <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-white backdrop-blur-xs">
-                              After (Tap to view)
-                            </span>
-                          </button>
-                        ) : null}
-                      </div>
-                    )}
-
-                    {/* Feedback / note */}
-                    {item.rating || item.ratingComment ? (
-                      <div className="mt-2 text-[11.5px] text-slate-600 bg-white p-2 rounded-lg border border-slate-200/60">
-                        <span className="mr-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">
-                          Customer
-                        </span>
-                        {item.rating ? (
-                          <span className="text-amber-500 font-bold mr-1.5">
-                            {'★'.repeat(item.rating)}
-                          </span>
-                        ) : null}
-                        {item.ratingComment ? <span>&ldquo;{item.ratingComment}&rdquo;</span> : null}
-                      </div>
-                    ) : null}
-
-                    {item.managerRating || item.managerRatingComment ? (
-                      <div className="mt-1.5 text-[11.5px] text-slate-600 bg-blue-50 p-2 rounded-lg border border-blue-200/60">
-                        <span className="mr-1.5 text-[10px] font-bold uppercase tracking-wide text-blue-500">
-                          Manager
-                        </span>
-                        {item.managerRating ? (
-                          <span className="text-amber-500 font-bold mr-1.5">
-                            {'★'.repeat(item.managerRating)}
-                          </span>
-                        ) : null}
-                        {item.managerRatingComment ? (
-                          <span>&ldquo;{item.managerRatingComment}&rdquo;</span>
-                        ) : null}
-                      </div>
-                    ) : null}
                   </div>
                 ))}
               </div>
@@ -593,37 +648,25 @@ export function WashFlow({
         )}
       </div>
 
-      {error ? (
+      {/* Error Message */}
+      {error && (
         <div className="mt-3">
           <Note tone="danger">{error}</Note>
         </div>
-      ) : null}
+      )}
 
-      {/* Action buttons sit cleanly below the cards */}
-      <div className="mt-4 space-y-2.5 pb-6">
-        <button
-          type="button"
-          disabled={!ready || pending}
-          onClick={closeWash}
-          className="flex w-full items-center justify-center rounded-xl bg-[#214f92] py-3.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[#1a3f75] active:scale-[0.99] disabled:opacity-50"
-        >
-          {pending
-            ? 'Saving…'
-            : ready
-              ? '✓ Mark Wash Completed'
-              : !before
-                ? '📷 Take Before Photo'
-                : '📷 Take After Photo'}
-        </button>
+      {/* 5. Safety Action: Missed / Skipped Wash */}
+      <div className="pt-2 text-center">
         <button
           type="button"
           onClick={() => setMissOpen(true)}
-          className="w-full rounded-xl border border-slate-200 bg-white py-3 text-xs font-semibold text-slate-700 shadow-2xs transition-colors hover:bg-slate-50"
+          className="text-xs font-bold text-rose-600 hover:text-rose-800 hover:underline py-2 cursor-pointer"
         >
-          Could not do this wash
+          ⚠️ Vehicle Not Available / Skip Wash
         </button>
       </div>
 
+      {/* Camera and Lightbox Modals */}
       {activeCamera && (
         <LiveCameraModal
           kind={activeCamera}
@@ -644,7 +687,7 @@ export function WashFlow({
           }}
         />
       )}
-    </>
+    </div>
   );
 }
 
@@ -677,12 +720,12 @@ function PhotoTile({
           }
         }}
         disabled={disabled || busy}
-        className={`relative flex h-full w-full flex-col items-center justify-center gap-1.5 overflow-hidden rounded-2xl border-2 text-xs font-bold transition-all shadow-2xs ${
+        className={`relative flex h-full w-full flex-col items-center justify-center gap-2 overflow-hidden rounded-2xl border-2 text-xs font-bold transition-all shadow-2xs ${
           url
             ? 'border-emerald-500 bg-emerald-50 text-emerald-700 active:opacity-85'
             : disabled
-              ? 'border-dashed border-slate-200 bg-slate-50 text-slate-400'
-              : 'border-dashed border-blue-300 bg-blue-50/60 text-blue-900 hover:bg-blue-50 active:scale-[0.98]'
+            ? 'border-dashed border-slate-200 bg-slate-50 text-slate-400'
+            : 'border-dashed border-blue-400 bg-blue-50/60 text-blue-900 hover:bg-blue-100/60 active:scale-[0.99] cursor-pointer'
         }`}
       >
         {url ? (
@@ -693,15 +736,18 @@ function PhotoTile({
               alt={`${label} photo`}
               className="h-full w-full object-cover"
             />
-            <span className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-emerald-600/90 py-1 text-[11px] font-bold text-white backdrop-blur-xs">
+            <span className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-slate-900/80 py-1.5 text-[11px] font-bold text-white backdrop-blur-xs">
               <IconCheck width={13} height={13} strokeWidth={3} />
               {label} · Tap to View
             </span>
           </>
         ) : (
           <>
-            <IconCamera width={26} height={26} className={disabled ? 'text-slate-300' : 'text-blue-700'} />
-            <span>{busy ? 'Saving…' : `${label} Photo`}</span>
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-blue-600">
+              <IconCamera width={24} height={24} />
+            </div>
+            <span className="text-xs font-bold text-slate-800">{busy ? 'Saving…' : label}</span>
+            <span className="text-[11px] font-normal text-slate-500">Tap to open camera</span>
           </>
         )}
       </button>
@@ -713,7 +759,7 @@ function PhotoTile({
             e.stopPropagation();
             onRetake();
           }}
-          className="absolute top-2 right-2 flex items-center gap-1 rounded-full bg-black/75 px-2.5 py-1 text-[10.5px] font-bold text-white shadow-md backdrop-blur-xs hover:bg-black/90 active:scale-95 transition-all cursor-pointer z-10"
+          className="absolute top-2.5 right-2.5 flex items-center gap-1 rounded-full bg-black/75 px-3 py-1 text-[11px] font-bold text-white shadow-md backdrop-blur-xs hover:bg-black/90 active:scale-95 transition-all cursor-pointer z-10"
         >
           📷 Retake
         </button>
@@ -735,7 +781,6 @@ function MissWashForm({
   const [pending, setPending] = useState<MissReason | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  /** One tap: choosing the reason is the submit. */
   async function submit(reason: MissReason) {
     setPending(reason);
     setError(null);
@@ -758,8 +803,8 @@ function MissWashForm({
       }
 
       if (result.queuedOffline) {
-        toast.info('Missed wash recorded offline. It will sync automatically as soon as network returns!', {
-          title: 'Saved Offline (Auto-Sync)',
+        toast.info('Missed wash recorded offline. It will sync automatically when reconnected.', {
+          title: 'Saved Offline',
         });
       } else {
         toast.success('Missed wash recorded.');
@@ -768,64 +813,61 @@ function MissWashForm({
       router.push('/staff');
       router.refresh();
     } catch {
-      setError('Something unexpected happened. Please try again.');
+      setError('Something unexpected happened.');
     } finally {
       setPending(null);
     }
   }
 
   return (
-    <>
-      <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-600 font-bold text-sm">
-            ⚠️
-          </div>
-          <div>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
-              Why was this wash missed?
-            </h3>
-            <p className="text-[11.5px] text-slate-500">Select a reason to reschedule the customer</p>
-          </div>
-        </div>
-
-        <div className="divide-y divide-slate-100">
-          {MISS_REASONS.filter((r) => r !== 'STAFF_ABSENT').map((reason) => (
-            <button
-              key={reason}
-              type="button"
-              disabled={pending !== null}
-              onClick={() => submit(reason)}
-              className="flex w-full items-center justify-between py-3.5 text-left text-[14px] font-semibold text-slate-800 hover:text-blue-700 transition-colors disabled:opacity-50"
-            >
-              <span>{MISS_REASON_LABEL[reason]}</span>
-              {pending === reason ? (
-                <span className="text-xs font-semibold text-blue-600">Saving…</span>
-              ) : (
-                <span className="text-slate-300 text-sm">›</span>
-              )}
-            </button>
-          ))}
-        </div>
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+      <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <h3 className="text-sm font-bold text-slate-900">
+          Why could this wash not be completed?
+        </h3>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="text-slate-400 hover:text-slate-700 font-bold p-1 cursor-pointer"
+        >
+          ✕
+        </button>
       </div>
 
-      <div className="mt-3 rounded-xl border border-blue-200/70 bg-blue-50/70 p-3.5 text-xs font-medium text-blue-900">
-        💡 The wash will automatically return to the customer&rsquo;s package quota and move to their next scheduled slot.
+      <p className="text-xs text-slate-600">
+        Select the reason below. This keeps customer records and compensation accurate.
+      </p>
+
+      <div className="space-y-2">
+        {MISS_REASONS.map((reason) => (
+          <button
+            key={reason}
+            type="button"
+            disabled={pending !== null}
+            onClick={() => submit(reason)}
+            className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 hover:bg-rose-50 hover:border-rose-200 p-3 text-left text-xs font-bold text-slate-800 transition-all cursor-pointer disabled:opacity-50"
+          >
+            <span>{MISS_REASON_LABEL[reason]}</span>
+            <span className="text-slate-400 font-bold">›</span>
+          </button>
+        ))}
       </div>
 
-      {error ? (
+      {error && (
         <div className="mt-3">
           <Note tone="danger">{error}</Note>
         </div>
-      ) : null}
+      )}
 
-      <button
-        type="button"
-        className="mt-3 w-full rounded-xl border border-slate-200 bg-white py-3 text-xs font-semibold text-slate-700 shadow-2xs transition-colors hover:bg-slate-50"
-        onClick={onCancel}
-      >
-        ← Cancel & Back to Wash
-      </button>
-    </>
+      <div className="pt-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="w-full py-2.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+        >
+          Cancel &amp; Back to Wash
+        </button>
+      </div>
+    </div>
   );
 }

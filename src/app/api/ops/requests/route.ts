@@ -42,12 +42,14 @@ export async function GET(request: Request) {
       customerWhere.areaId = areaId;
     }
 
-    const [allCustomers, allCars, allPackages, allStaff, allAreas] = await Promise.all([
+    const cycle = currentCycle();
+    const [allCustomers, allCars, allPackages, allStaff, allAreas, allVisits] = await Promise.all([
       store.customers.find({ where: customerWhere as never }),
       store.cars.find(),
       store.packages.find(),
       store.staff.find(),
       store.areas.find(),
+      store.visits.find(),
     ]);
 
     const customerMap = new Map(allCustomers.map((c) => [c.id, c]));
@@ -116,10 +118,87 @@ export async function GET(request: Request) {
     const data = paginated.map((r) => {
       const customer = customerMap.get(r.customerId);
       const car = r.carId ? carMap.get(r.carId) : null;
-      const currentPkg = r.currentPackageId ? packageMap.get(r.currentPackageId) : null;
+      const currentPkg = r.currentPackageId
+        ? packageMap.get(r.currentPackageId)
+        : car?.packageId
+        ? packageMap.get(car.packageId)
+        : null;
       const requestedPkg = r.requestedPackageId ? packageMap.get(r.requestedPackageId) : null;
       const assignedStaff = r.assignedStaffId ? staffMap.get(r.assignedStaffId) : null;
       const area = customer ? areaMap.get(customer.areaId) : null;
+
+      // Find all visits for this car (or customer)
+      const carVisits = r.carId
+        ? allVisits.filter((v) => v.carId === r.carId)
+        : allVisits.filter((v) => v.customerId === r.customerId);
+
+      // Find previous completed wash or most recent visit
+      const sortedVisits = [...carVisits].sort((a, b) => {
+        const dateA = a.completedAt || a.scheduledDate || '';
+        const dateB = b.completedAt || b.scheduledDate || '';
+        return dateB.localeCompare(dateA);
+      });
+
+      const lastDoneVisit = sortedVisits.find((v) => v.status === 'DONE');
+      const lastVisit = lastDoneVisit || sortedVisits[0] || null;
+
+      let previousWash = null;
+      if (lastVisit) {
+        const vStaff = lastVisit.staffId ? staffMap.get(lastVisit.staffId) : null;
+        const serviceName = lastVisit.servicesDone && lastVisit.servicesDone.length > 0
+          ? lastVisit.servicesDone.join(', ')
+          : lastVisit.plannedService || 'Regular Wash';
+
+        previousWash = {
+          id: lastVisit.id,
+          scheduledDate: lastVisit.scheduledDate,
+          completedAt: lastVisit.completedAt,
+          service: serviceName,
+          status: lastVisit.status,
+          staffName: vStaff?.name || null,
+          rating: lastVisit.rating ?? lastVisit.managerRating ?? null,
+          time: lastVisit.scheduledTime || null,
+        };
+      }
+
+      // Sub-services and quota calculations for package change
+      let packageAudit = null;
+      const cycleVisits = carVisits.filter((v) => v.cycle === cycle);
+      const washesDoneCount = cycleVisits.filter((v) => v.status === 'DONE').length;
+
+      if (r.type === 'PACKAGE_CHANGE' && (currentPkg || requestedPkg)) {
+        const currWashes = currentPkg?.washesPerMonth ?? 8;
+        const currPrice = currentPkg?.price ?? 0;
+        const reqWashes = requestedPkg?.washesPerMonth ?? 8;
+        const reqPrice = requestedPkg?.price ?? 0;
+
+        const currServices = currentPkg?.services ?? [];
+        const reqServices = requestedPkg?.services ?? [];
+
+        const washesRemaining = Math.max(0, currWashes - washesDoneCount);
+        const unusedCredit = Math.round((washesRemaining / Math.max(1, currWashes)) * currPrice);
+        const targetRemainingCost = Math.round((washesRemaining / Math.max(1, reqWashes)) * reqPrice);
+        const proratedDifference = targetRemainingCost - unusedCredit;
+        const fullDifference = reqPrice - unusedCredit;
+
+        packageAudit = {
+          currentPackageName: currentPkg?.name ?? '—',
+          currentPrice: currPrice,
+          currentWashesPerMonth: currWashes,
+          currentServices: currServices,
+          requestedPackageName: requestedPkg?.name ?? '—',
+          requestedPrice: reqPrice,
+          requestedWashesPerMonth: reqWashes,
+          requestedServices: reqServices,
+          washesDoneCount,
+          washesRemaining,
+          unusedCredit,
+          targetRemainingCost,
+          proratedDifference,
+          fullDifference,
+          isUpgrade: reqPrice >= currPrice,
+        };
+      }
 
       return {
         id: r.id,
@@ -144,6 +223,11 @@ export async function GET(request: Request) {
         assignedStaffName: assignedStaff?.name ?? null,
         notes: r.notes,
         adminRemarks: r.adminRemarks,
+        paymentStatus: r.paymentStatus ?? null,
+        paymentAmount: r.paymentAmount ?? null,
+        packageAudit,
+        previousWash,
+        washesDoneThisCycle: washesDoneCount,
         createdAt: r.createdAt,
         decidedAt: r.decidedAt,
         decidedByUserId: r.decidedByUserId,
@@ -167,6 +251,9 @@ const decisionSchema = z.object({
   adminRemarks: z.string().max(500).optional().nullable(),
   assignedStaffId: z.string().optional().nullable(),
   scheduledDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  activationMode: z.enum(['IMMEDIATE_PRORATED', 'IMMEDIATE_FULL', 'NEXT_CYCLE']).optional().nullable(),
+  adjustmentAmount: z.number().optional().nullable(),
+  applyFinancialAdjustment: z.boolean().optional().default(true),
 });
 
 export async function POST(request: Request) {
@@ -192,21 +279,83 @@ export async function POST(request: Request) {
     assertInScope(session, customer.areaId);
 
     if (parsed.data.decision === 'APPROVED') {
-      // 1. If Package Change: update the vehicle's package
+      let finalPaymentAmount: number | null = null;
+      let finalPaymentStatus: string | null = req.paymentStatus ?? null;
+
+      // 1. If Package Change: update the vehicle's package & handle financial adjustments
       if (req.type === 'PACKAGE_CHANGE' && req.requestedPackageId && req.carId) {
         const car = await store.cars.get(req.carId);
+        const requestedPkg = await store.packages.get(req.requestedPackageId);
+
         if (car) {
           await store.cars.update(car.id, {
             packageId: req.requestedPackageId,
           });
         }
+
+        const activationMode = parsed.data.activationMode || 'IMMEDIATE_PRORATED';
+        const adjustmentAmount = parsed.data.adjustmentAmount ?? 0;
+        const applyFinance = parsed.data.applyFinancialAdjustment !== false;
+
+        if (applyFinance && activationMode !== 'NEXT_CYCLE' && adjustmentAmount !== 0) {
+          finalPaymentAmount = Math.round(adjustmentAmount);
+
+          if (adjustmentAmount > 0) {
+            // UPGRADE: Customer owes extra money -> Generate open adjustment invoice
+            await store.invoices.create({
+              customerId: customer.id,
+              areaId: customer.areaId,
+              cycle: currentCycle(),
+              amount: Math.round(adjustmentAmount),
+              dueOn: todayISO(),
+              paidAmount: 0,
+              status: 'OPEN',
+              createdAt: new Date().toISOString(),
+            });
+            finalPaymentStatus = 'PENDING';
+          } else if (adjustmentAmount < 0) {
+            // DOWNGRADE: Customer is owed credit -> Record credit payment adjustment to ledger
+            const creditRupees = Math.abs(Math.round(adjustmentAmount));
+            await store.payments.create({
+              customerId: customer.id,
+              areaId: customer.areaId,
+              amount: creditRupees,
+              kind: 'ADJUSTMENT',
+              mode: 'MANUAL_UPI',
+              status: 'CONFIRMED',
+              cycle: currentCycle(),
+              recordedByUserId: session.user.id,
+              reference: `DOWNGRADE-CREDIT-${req.id.slice(-6).toUpperCase()}`,
+              note: `Credit for plan downgrade to ${requestedPkg?.name ?? 'new plan'}`,
+              createdAt: new Date().toISOString(),
+            });
+            finalPaymentStatus = 'CREDITED';
+          }
+        }
       }
 
-      // 2. If One Wash or Other Service: create scheduled wash visit if staff & date specified
+      // 2. If One Wash or Other Service: handle financial adjustment if set & create scheduled wash visit if staff & date specified
       if ((req.type === 'ONE_WASH' || req.type === 'OTHER_SERVICE') && req.carId) {
         const car = await store.cars.get(req.carId);
         const assignedStaffId = parsed.data.assignedStaffId || req.assignedStaffId || car?.assignedStaffId;
         const targetDate = parsed.data.scheduledDate || req.preferredDate || todayISO();
+        const adjustmentAmount = parsed.data.adjustmentAmount ?? 0;
+        const applyFinance = parsed.data.applyFinancialAdjustment !== false;
+
+        if (applyFinance && adjustmentAmount > 0) {
+          finalPaymentAmount = Math.round(adjustmentAmount);
+          await store.invoices.create({
+            customerId: customer.id,
+            areaId: customer.areaId,
+            cycle: currentCycle(),
+            amount: Math.round(adjustmentAmount),
+            dueOn: todayISO(),
+            paidAmount: 0,
+            status: 'OPEN',
+            createdAt: new Date().toISOString(),
+          });
+          finalPaymentStatus = 'PENDING';
+        }
 
         if (car && assignedStaffId) {
           await store.visits.create({
@@ -244,6 +393,8 @@ export async function POST(request: Request) {
         status: 'APPROVED',
         assignedStaffId: parsed.data.assignedStaffId || req.assignedStaffId || null,
         adminRemarks: parsed.data.adminRemarks || null,
+        paymentAmount: finalPaymentAmount,
+        paymentStatus: finalPaymentStatus,
         decidedAt: new Date().toISOString(),
         decidedByUserId: session.user.id,
       });

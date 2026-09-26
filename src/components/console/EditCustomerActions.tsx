@@ -14,6 +14,7 @@ import {
   type LeadSource,
   type ServicePackage,
   type Staff,
+  type WashVisit,
   type Weekday,
 } from '@/lib/data/types';
 import { LEAD_SOURCE_LABEL } from '@/lib/util/labels';
@@ -1157,6 +1158,143 @@ export function RescheduleVisitButton({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ==========================================
+// 6. CAR WASH HISTORY MODAL BUTTON
+// ==========================================
+import { CarWashHistoryModal } from './CarWashHistoryModal';
+import { resolvePublicPhotoUrl } from '@/lib/util/photoUrl';
+import Image from 'next/image';
+
+export function CarWashHistoryButton({
+  car,
+  customer,
+  visits,
+  staffList,
+}: {
+  car: {
+    id: string;
+    make: string;
+    model: string;
+    plate: string;
+    packageName?: string;
+    washesPerMonth?: number;
+  };
+  customer: {
+    id: string;
+    name: string;
+    phone: string;
+  };
+  visits: WashVisit[];
+  staffList: { id: string; name: string; phone?: string }[];
+}) {
+  const [open, setOpen] = useState(false);
+  const doneCount = visits.filter((v) => v.carId === car.id && v.status === 'DONE').length;
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-800 hover:bg-blue-100 hover:border-blue-300 transition cursor-pointer shadow-2xs"
+        title="View complete wash history and photos for this vehicle"
+      >
+        <span>🚿 Wash History</span>
+        {doneCount > 0 && (
+          <span className="rounded-full bg-blue-200/80 px-1.5 py-0.2 text-[10px] font-extrabold text-blue-900">
+            {doneCount}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <CarWashHistoryModal
+          car={car}
+          customer={customer}
+          visits={visits}
+          staffList={staffList}
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </>
+  );
+}
+
+// ==========================================
+// 7. VISIT PHOTO PREVIEW BUTTON
+// ==========================================
+export function VisitPhotoPreviewButton({
+  beforePhotoUrl,
+  afterPhotoUrl,
+  title,
+}: {
+  beforePhotoUrl?: string | null;
+  afterPhotoUrl?: string | null;
+  title: string;
+}) {
+  const [activePhoto, setActivePhoto] = useState<{ url: string; label: string } | null>(null);
+
+  const before = resolvePublicPhotoUrl(beforePhotoUrl);
+  const after = resolvePublicPhotoUrl(afterPhotoUrl);
+
+  if (!before && !after) return <span className="text-slate-400 text-xs">—</span>;
+
+  return (
+    <>
+      <div className="inline-flex items-center gap-1.5">
+        {before && (
+          <button
+            type="button"
+            onClick={() => setActivePhoto({ url: before, label: `Before Wash — ${title}` })}
+            className="rounded bg-blue-50 border border-blue-200 px-1.5 py-0.5 text-[10px] font-bold text-blue-700 hover:bg-blue-100 transition cursor-pointer"
+            title="Click to view Before Photo"
+          >
+            📸 Before
+          </button>
+        )}
+        {after && (
+          <button
+            type="button"
+            onClick={() => setActivePhoto({ url: after, label: `After Wash — ${title}` })}
+            className="rounded bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100 transition cursor-pointer"
+            title="Click to view After Photo"
+          >
+            📸 After
+          </button>
+        )}
+      </div>
+
+      {activePhoto && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md animate-in fade-in"
+          onClick={() => setActivePhoto(null)}
+        >
+          <div className="relative max-h-[85vh] max-w-3xl overflow-hidden rounded-2xl bg-navy-950 shadow-2xl p-2 border border-slate-700">
+            <div className="flex items-center justify-between p-3 text-white border-b border-slate-800">
+              <span className="text-sm font-semibold">{activePhoto.label}</span>
+              <button
+                type="button"
+                onClick={() => setActivePhoto(null)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="relative h-[65vh] w-[75vw] max-w-2xl">
+              <Image
+                src={activePhoto.url}
+                alt="Full photo"
+                fill
+                sizes="(max-width: 1200px) 100vw, 800px"
+                className="object-contain"
+              />
+            </div>
           </div>
         </div>
       )}

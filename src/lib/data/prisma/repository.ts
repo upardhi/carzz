@@ -335,7 +335,16 @@ export class PrismaRepository<T extends { id: Id }> implements Repository<T> {
   async delete(id: Id): Promise<void> {
     try {
       await this.delegate.delete({ where: { id } });
-    } catch (err) {
+    } catch (err: unknown) {
+      if (
+        typeof err === 'object' &&
+        err !== null &&
+        'code' in err &&
+        (err as { code: string }).code === 'P2025'
+      ) {
+        // Record was already deleted or does not exist — treat delete as completed.
+        return;
+      }
       if (this.fallbackRepo && isConnectionError(err)) {
         return this.fallbackRepo.delete(id);
       }

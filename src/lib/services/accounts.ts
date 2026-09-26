@@ -98,7 +98,11 @@ export async function loadCustomerAccount(
   );
   if (pastPending.length > 0) {
     for (const p of pastPending) {
-      await store.visits.delete(p.id);
+      try {
+        await store.visits.delete(p.id);
+      } catch {
+        // Silently continue if record was already deleted
+      }
     }
     effectiveVisits = effectiveVisits.filter(
       (v) => !pastPending.some((p) => p.id === v.id),
@@ -115,7 +119,11 @@ export async function loadCustomerAccount(
       const redundant = carPending.slice(1);
       for (const r of redundant) {
         prunedVisitIds.add(r.id);
-        await store.visits.delete(r.id);
+        try {
+          await store.visits.delete(r.id);
+        } catch {
+          // Silently continue if record was already deleted
+        }
       }
     }
   }
@@ -124,7 +132,8 @@ export async function loadCustomerAccount(
   // 3. Ensure cars with active service have their upcoming pending visit scheduled on or after today
   for (const car of cars) {
     const isStarted = car.serviceStarted ?? true;
-    if (!isStarted || !car.active) continue;
+    if (!isStarted || !car.active || customer.status === 'INACTIVE') continue;
+    if (customer.status === 'HOLD' && customer.holdUntil && customer.holdUntil >= today) continue;
 
     const carDoneThisCycle = effectiveVisits.filter(
       (v) => v.carId === car.id && v.cycle === cycle && v.status === 'DONE',

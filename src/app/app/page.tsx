@@ -14,6 +14,7 @@ import { getStore } from '@/lib/data';
 import { loadCustomerAccount } from '@/lib/services/accounts';
 import { WashActionControls } from './WashActionControls';
 import { CustomerSpecialRequestsModal } from './CustomerSpecialRequestsModal';
+import { WashRatingAction } from './WashRatingAction';
 import {
   currentCycle,
   formatDate,
@@ -34,7 +35,7 @@ export default async function CustomerHome() {
       session.user.customerId!,
       currentCycle(),
     ),
-    store.packages.find(),
+    store.packages.find({ where: { active: true } }),
   ]);
   if (!account) notFound();
 
@@ -56,17 +57,8 @@ export default async function CustomerHome() {
       ? Math.min(100, Math.round(((washesTotal - washesLeft) / washesTotal) * 100))
       : 0;
 
-  // Compile real recent bookings list
-  const recentBookings: {
-    id: string;
-    day: string;
-    yearOrMonth: string;
-    title: string;
-    subtitle: string;
-    status: 'Approved' | 'Cancelled' | 'Rescheduled' | 'Pending';
-  }[] = [];
-
-  for (const visit of account.visits.slice(0, 5)) {
+  // Compile real recent bookings list with exact wash details
+  const recentBookings = account.visits.slice(0, 6).map((visit) => {
     const d = new Date(visit.scheduledDate);
     const day = isNaN(d.getTime()) ? '' : String(d.getDate()).padStart(2, '0');
     const yearOrMonth = isNaN(d.getTime())
@@ -74,29 +66,35 @@ export default async function CustomerHome() {
       : d.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
     const car = account.cars.find((c) => c.id === visit.carId);
 
-    let subtitle = car ? `${car.make} ${car.model} · Routine Wash` : 'Routine Wash';
+    let subtitle = car ? `${car.make} ${car.model}` : 'Routine Wash';
     if (visit.missReason) {
       subtitle = `Missed: ${visit.missReason.replace(/_/g, ' ')}`;
     } else if (visit.missNote?.includes('[Free Compensatory Wash]')) {
-      subtitle = 'Free Compensatory Wash';
+      subtitle = `${car ? `${car.make} ${car.model} · ` : ''}🎁 Free Compensatory Wash`;
     }
 
-    recentBookings.push({
+    return {
       id: visit.id,
+      carId: visit.carId,
+      carLabel: car ? `${car.make} ${car.model}` : 'Vehicle',
+      dateLabel: formatDateFull(visit.scheduledDate),
       day,
       yearOrMonth,
       title: formatDateFull(visit.scheduledDate),
       subtitle,
+      rating: visit.rating,
+      ratingComment: visit.ratingComment,
+      isDone: visit.status === 'DONE',
       status:
         visit.status === 'DONE'
-          ? 'Approved'
+          ? 'Done'
           : visit.status === 'MISSED'
           ? visit.rescheduledToVisitId
             ? 'Rescheduled'
             : 'Cancelled'
           : 'Pending',
-    });
-  }
+    };
+  });
 
   const firstName = session.user.name.split(' ')[0] || 'Customer';
 
@@ -382,36 +380,65 @@ export default async function CustomerHome() {
           ) : (
             <div className="rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-2xs divide-y divide-slate-100">
               {recentBookings.map((b) => (
-                <div key={b.id} className="flex items-center justify-between py-2.5 px-1.5 gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="flex min-w-[3.5rem] shrink-0 flex-col items-center justify-center rounded-xl bg-sky-50 border border-sky-100/80 px-1 py-1.5 text-sky-900">
-                      <span className="text-xs font-bold leading-tight">{b.day}</span>
-                      <span className="text-[9px] font-bold text-sky-600 uppercase leading-tight text-center whitespace-nowrap">
-                        {b.yearOrMonth}
-                      </span>
-                    </div>
-                    <div className="min-w-0">
-                      <div className="truncate text-xs font-bold text-slate-900">{b.title}</div>
-                      <div className="truncate text-[11px] text-slate-500 font-medium mt-0.5">
-                        {b.subtitle}
+                <div key={b.id} className="py-2.5 px-1.5 space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex min-w-[3.5rem] shrink-0 flex-col items-center justify-center rounded-xl bg-sky-50 border border-sky-100/80 px-1 py-1.5 text-sky-900">
+                        <span className="text-xs font-bold leading-tight">{b.day}</span>
+                        <span className="text-[9px] font-bold text-sky-600 uppercase leading-tight text-center whitespace-nowrap">
+                          {b.yearOrMonth}
+                        </span>
+                      </div>
+                      <div className="min-w-0">
+                        <div className="truncate text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                          <span>{b.title}</span>
+                          {b.carId && (
+                            <Link
+                              href={`/app/cars/${b.carId}`}
+                              className="text-[11px] font-normal text-blue-600 hover:underline"
+                            >
+                              (View Car History →)
+                            </Link>
+                          )}
+                        </div>
+                        <div className="truncate text-[11px] text-slate-500 font-medium mt-0.5">
+                          {b.subtitle}
+                        </div>
                       </div>
                     </div>
+                    <div className="shrink-0 flex items-center gap-2">
+                      <span
+                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold border ${
+                          b.status === 'Cancelled'
+                            ? 'bg-slate-100 text-slate-600 border-slate-200'
+                            : b.status === 'Rescheduled'
+                            ? 'bg-amber-50 text-amber-700 border-amber-200'
+                            : b.status === 'Pending'
+                            ? 'bg-blue-50 text-blue-700 border-blue-200'
+                            : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        }`}
+                      >
+                        {b.status}
+                      </span>
+                      {(b.isDone || b.status === 'Cancelled' || b.status === 'Rescheduled') && (
+                        <WashRatingAction
+                          visitId={b.id}
+                          carId={b.carId}
+                          carLabel={b.carLabel}
+                          dateLabel={b.dateLabel}
+                          rating={b.rating}
+                          ratingComment={b.ratingComment}
+                          isMissed={!b.isDone}
+                          variant="compact"
+                        />
+                      )}
+                    </div>
                   </div>
-                  <div className="shrink-0">
-                    <span
-                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold border ${
-                        b.status === 'Cancelled'
-                          ? 'bg-slate-100 text-slate-600 border-slate-200'
-                          : b.status === 'Rescheduled'
-                          ? 'bg-amber-50 text-amber-700 border-amber-200'
-                          : b.status === 'Pending'
-                          ? 'bg-blue-50 text-blue-700 border-blue-200'
-                          : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                      }`}
-                    >
-                      {b.status}
-                    </span>
-                  </div>
+                  {b.ratingComment && (
+                    <p className="text-[11px] italic text-slate-500 pl-14">
+                      Review: &ldquo;{b.ratingComment}&rdquo;
+                    </p>
+                  )}
                 </div>
               ))}
             </div>

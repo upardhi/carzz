@@ -6,7 +6,6 @@ import {
   IconAlert,
   IconCar,
   IconClock,
-  IconMapPin,
   IconRefresh,
   IconSearch,
   IconStar,
@@ -99,7 +98,7 @@ export function FlaggedWashesModal({
   const [previewPhoto, setPreviewPhoto] = useState<{ url: string; title: string } | null>(null);
 
   const fetchFlaggedWashes = useCallback(
-    async (targetPage = page, filter = speedFilter, query = debouncedSearch) => {
+    async (targetPage: number, filter: 'ALL' | 'fast' | 'slow', query: string) => {
       setLoading(true);
       try {
         const params = new URLSearchParams({
@@ -110,22 +109,24 @@ export function FlaggedWashesModal({
         if (staffId) params.set('staffId', staffId);
         if (areaId) params.set('areaId', areaId);
         if (cycle) params.set('cycle', cycle);
-        if (query) params.set('search', query);
+        if (query.trim()) params.set('search', query.trim());
 
         const res = await fetch(`/api/ops/washes/flagged?${params.toString()}`);
         if (!res.ok) throw new Error('Failed to fetch flagged washes');
 
         const json = await res.json();
-        setItems(json.items || []);
-        if (json.stats) setStats(json.stats);
-        if (json.pagination) setPagination(json.pagination);
+        if (json.ok) {
+          setItems(json.items || []);
+          if (json.stats) setStats(json.stats);
+          if (json.pagination) setPagination(json.pagination);
+        }
       } catch (err) {
-        console.error(err);
+        console.error('Failed to load flagged washes:', err);
       } finally {
         setLoading(false);
       }
     },
-    [staffId, areaId, cycle, page, pageSize, speedFilter, debouncedSearch],
+    [staffId, areaId, cycle, pageSize],
   );
 
   useEffect(() => {

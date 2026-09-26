@@ -97,24 +97,35 @@ export default async function ManagerTeamAlerts() {
           missedToday.map((v) => {
             const customer = customerById.get(v.customerId);
             const car = carById.get(v.carId);
+            const washService = v.plannedService;
             return (
               <Card key={v.id} className="p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="font-bold text-slate-900">{customer?.name ?? 'Customer'}</span>
-                    <span className="ml-2 text-xs text-slate-500">
-                      {car ? `${car.make} ${car.model} · ${car.plate}` : ''}
-                    </span>
+                    {car ? (
+                      <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
+                        🚗 {car.make} {car.model} · <span className="font-mono text-slate-900">{car.plate}</span>
+                      </span>
+                    ) : null}
+                    {washService ? (
+                      <span className="inline-flex items-center rounded bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700">
+                        {washService}
+                      </span>
+                    ) : null}
                   </div>
                   <span className="text-xs font-semibold text-slate-600">
                     {v.staffId ? staffById.get(v.staffId)?.name ?? 'Unassigned' : 'Unassigned'}
                   </span>
                 </div>
                 {v.missReason ? (
-                  <p className="mt-1 text-xs text-rose-600">
+                  <p className="mt-1.5 text-xs text-rose-600 font-medium">
                     Reason: {v.missReason.replace(/_/g, ' ')}
                     {v.missNote ? ` — ${v.missNote}` : ''}
                   </p>
+                ) : null}
+                {customer?.address ? (
+                  <p className="mt-1 text-[11px] text-slate-400">📍 {customer.address}</p>
                 ) : null}
               </Card>
             );
@@ -129,25 +140,55 @@ export default async function ManagerTeamAlerts() {
         ) : (
           lowRatedVisits.map((v) => {
             const customer = customerById.get(v.customerId);
+            const car = carById.get(v.carId);
+            const washService =
+              v.plannedService ||
+              (v.servicesDone && v.servicesDone.length > 0
+                ? v.servicesDone.join(', ')
+                : 'Standard Wash');
+
             return (
               <Card key={v.id} className="p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="font-bold text-slate-900">
                       {v.staffId ? staffById.get(v.staffId)?.name ?? 'Wash boy' : '—'}
                     </span>
-                    <span className="ml-2 text-xs text-slate-500">
-                      {formatDateFull(v.completedAt || v.scheduledDate)}
+                    <span className="text-xs text-slate-500">
+                      • {formatDateFull(v.completedAt || v.scheduledDate)}
+                      {v.scheduledTime ? ` (${v.scheduledTime})` : ''}
                     </span>
+                    {car ? (
+                      <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
+                        🚗 {car.make} {car.model} · <span className="font-mono text-slate-900">{car.plate}</span>
+                        {car.colour ? <span className="text-slate-500 font-normal">({car.colour})</span> : null}
+                      </span>
+                    ) : null}
+                    {washService ? (
+                      <span className="inline-flex items-center rounded bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700">
+                        {washService}
+                      </span>
+                    ) : null}
                   </div>
-                  <span className="font-bold text-rose-600">{'★'.repeat(v.rating ?? 0)}</span>
+                  <span className="font-bold text-rose-600 text-sm">{'★'.repeat(v.rating ?? 0)}</span>
                 </div>
                 {v.ratingComment ? (
-                  <p className="mt-1 text-xs italic text-slate-500">&ldquo;{v.ratingComment}&rdquo;</p>
+                  <div className="mt-2 rounded border border-rose-100 bg-rose-50/50 p-2.5 text-xs text-slate-800">
+                    <span className="font-semibold text-rose-700">Feedback: </span>
+                    <span className="italic">&ldquo;{v.ratingComment}&rdquo;</span>
+                  </div>
                 ) : null}
-                <p className="mt-1 text-[11px] text-slate-400">
-                  Customer: {customer?.name ?? '—'} (name shown here only — never to the wash boy)
-                </p>
+                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-500">
+                  <span>
+                    Customer: <strong className="text-slate-700">{customer?.name ?? '—'}</strong>
+                    <span className="text-slate-400 ml-1">(shown to manager only)</span>
+                  </span>
+                  {customer?.address ? (
+                    <span>
+                      📍 <span className="text-slate-600">{customer.address}</span>
+                    </span>
+                  ) : null}
+                </div>
               </Card>
             );
           })
