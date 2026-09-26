@@ -157,10 +157,10 @@ export function WashRatingAction({
       {/* 1. BUTTONS ON THE WASH CARD                                               */}
       {/* ========================================================================= */}
       {variant === 'compact' ? (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 shrink-0">
           {!isMissed && (
             currentRating !== null ? (
-              <span className="inline-flex items-center gap-1 rounded-lg bg-amber-50 border border-amber-200/90 px-2.5 py-1 text-[11px] font-bold text-amber-800">
+              <span className="inline-flex items-center gap-1 rounded-lg bg-amber-50 border border-amber-200/90 px-2 py-0.5 text-[10.5px] font-bold text-amber-800 shadow-2xs">
                 <span>★</span>
                 <span>{currentRating} Rated</span>
               </span>
@@ -169,25 +169,25 @@ export function WashRatingAction({
                 type="button"
                 disabled
                 title="Review option is disabled after 7 days of wash completion"
-                className="inline-flex items-center gap-1 rounded-lg bg-slate-100 border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-400 cursor-not-allowed opacity-75"
+                className="inline-flex items-center gap-1 rounded-lg bg-slate-100 border border-slate-200 px-2 py-0.5 text-[10.5px] font-medium text-slate-400 cursor-not-allowed opacity-75"
               >
-                <span>⭐</span>
+                <span>★</span>
                 <span>Rate (Closed)</span>
               </button>
             ) : (
               <button
                 type="button"
                 onClick={() => setShowRateModal(true)}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 border border-amber-200/90 px-2.5 py-1 text-[11px] font-bold text-amber-800 transition-all cursor-pointer"
+                className="inline-flex items-center gap-1 rounded-lg bg-amber-50 hover:bg-amber-100 border border-amber-200/90 px-2 py-0.5 text-[10.5px] font-bold text-amber-800 transition-all cursor-pointer shadow-2xs"
               >
-                <span>⭐</span>
+                <span>★</span>
                 <span>Rate</span>
               </button>
             )
           )}
 
           {complaintSubmitted ? (
-            <span className="text-[10.5px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
+            <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-200">
               ✓ Reported
             </span>
           ) : isExpired ? (
@@ -195,9 +195,9 @@ export function WashRatingAction({
               type="button"
               disabled
               title="Issue reporting is disabled after 7 days of wash completion"
-              className="inline-flex items-center gap-1 rounded-lg bg-slate-100 border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-400 cursor-not-allowed opacity-75"
+              className="inline-flex items-center gap-1 rounded-lg bg-slate-100 border border-slate-200 px-2 py-0.5 text-[10.5px] font-medium text-slate-400 cursor-not-allowed opacity-75"
             >
-              <span>⚠️</span>
+              <span>⚠</span>
               <span>Issue (Closed)</span>
             </button>
           ) : (
@@ -205,9 +205,9 @@ export function WashRatingAction({
               type="button"
               onClick={() => setShowComplaintModal(true)}
               title="Report issue for this wash"
-              className="inline-flex items-center gap-1 rounded-lg bg-slate-50 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-600 transition-all cursor-pointer"
+              className="inline-flex items-center gap-1 rounded-lg bg-slate-50 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 border border-slate-200 px-2 py-0.5 text-[10.5px] font-semibold text-slate-600 transition-all cursor-pointer"
             >
-              <span>⚠️</span>
+              <span>⚠</span>
               <span>Issue</span>
             </button>
           )}

@@ -237,85 +237,75 @@ export function WashFlow({
       {/* ========================================================================= */}
       {/* 1. VISUAL 3-STEP PROGRESS STEPPER                                         */}
       {/* ========================================================================= */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex items-center justify-between">
-          {/* Step 1 */}
-          <div className="flex-1 flex flex-col items-center text-center">
-            <div
-              className={`flex h-9 w-9 items-center justify-center rounded-xl text-xs font-black transition-all ${
-                before
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'bg-blue-600 text-white ring-4 ring-blue-100 animate-pulse'
-              }`}
-            >
-              {before ? '✓' : '1'}
-            </div>
-            <span
-              className={`text-xs font-bold mt-1.5 ${
-                currentStep === 1 ? 'text-blue-700' : 'text-slate-700'
-              }`}
-            >
-              Before Photo
+      <div className="rounded-2xl border border-slate-200/90 bg-white p-3.5 sm:p-4 shadow-xs">
+        <div className="flex items-center justify-between mb-2.5">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center justify-center rounded-lg bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-700 border border-blue-200/80">
+              Step {currentStep} of 3
+            </span>
+            <span className="text-xs sm:text-sm font-bold text-slate-800">
+              {currentStep === 1 && 'Capture Before Photo'}
+              {currentStep === 2 && 'Wash & After Photo'}
+              {currentStep === 3 && 'Review & Complete'}
             </span>
           </div>
+          <span className="text-[11px] font-bold text-slate-500">
+            {currentStep === 1 ? 'Step 1' : currentStep === 2 ? 'Step 2' : 'Done'}
+          </span>
+        </div>
 
+        {/* 3 Progress Bars */}
+        <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
           <div
-            className={`h-1 flex-1 mx-2 rounded-full transition-colors ${
-              isWashStarted ? 'bg-emerald-500' : 'bg-slate-200'
+            className={`h-1.5 rounded-full transition-all duration-300 ${
+              before ? 'bg-emerald-500' : currentStep === 1 ? 'bg-blue-600' : 'bg-slate-200'
             }`}
           />
-
-          {/* Step 2 */}
-          <div className="flex-1 flex flex-col items-center text-center">
-            <div
-              className={`flex h-9 w-9 items-center justify-center rounded-xl text-xs font-black transition-all ${
-                after
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : isWashStarted
-                  ? 'bg-blue-600 text-white ring-4 ring-blue-100 animate-pulse'
-                  : 'bg-slate-100 text-slate-400 border border-slate-200'
-              }`}
-            >
-              {after ? '✓' : '2'}
-            </div>
-            <span
-              className={`text-xs font-bold mt-1.5 ${
-                currentStep === 2
-                  ? 'text-blue-700'
-                  : isWashStarted
-                  ? 'text-slate-700'
-                  : 'text-slate-400'
-              }`}
-            >
-              Wash &amp; After Photo
-            </span>
-          </div>
-
           <div
-            className={`h-1 flex-1 mx-2 rounded-full transition-colors ${
+            className={`h-1.5 rounded-full transition-all duration-300 ${
+              after ? 'bg-emerald-500' : currentStep === 2 ? 'bg-blue-600' : 'bg-slate-200'
+            }`}
+          />
+          <div
+            className={`h-1.5 rounded-full transition-all duration-300 ${
               before && after && isWashStarted ? 'bg-emerald-500' : 'bg-slate-200'
             }`}
           />
+        </div>
 
-          {/* Step 3 */}
-          <div className="flex-1 flex flex-col items-center text-center">
-            <div
-              className={`flex h-9 w-9 items-center justify-center rounded-xl text-xs font-black transition-all ${
-                before && after && isWashStarted
-                  ? 'bg-emerald-600 text-white ring-4 ring-emerald-100 animate-bounce'
-                  : 'bg-slate-100 text-slate-400 border border-slate-200'
-              }`}
-            >
-              3
-            </div>
-            <span
-              className={`text-xs font-bold mt-1.5 ${
-                currentStep === 3 ? 'text-emerald-700 font-extrabold' : 'text-slate-400'
-              }`}
-            >
-              Complete
-            </span>
-          </div>
+        {/* Step labels below */}
+        <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mt-2 text-center text-[10.5px] sm:text-xs font-semibold">
+          <span
+            className={
+              before
+                ? 'text-emerald-700 font-bold'
+                : currentStep === 1
+                ? 'text-blue-700 font-bold'
+                : 'text-slate-400'
+            }
+          >
+            {before ? '✓ Before' : '1. Before'}
+          </span>
+          <span
+            className={
+              after
+                ? 'text-emerald-700 font-bold'
+                : currentStep === 2
+                ? 'text-blue-700 font-bold'
+                : 'text-slate-400'
+            }
+          >
+            {after ? '✓ Wash & After' : '2. Wash & After'}
+          </span>
+          <span
+            className={
+              before && after && isWashStarted
+                ? 'text-emerald-700 font-bold'
+                : 'text-slate-400'
+            }
+          >
+            3. Complete
+          </span>
         </div>
       </div>
 
@@ -323,10 +313,10 @@ export function WashFlow({
       {/* 2. STEP 1: BEFORE PHOTO & START WASH (SHOWN BEFORE WASH STARTS)           */}
       {/* ========================================================================= */}
       {!isWashStarted && (
-        <div className="rounded-2xl border-2 border-blue-400 bg-white p-6 shadow-sm space-y-4">
+        <div className="rounded-2xl border border-blue-200/80 bg-white p-4 sm:p-6 shadow-xs space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <div className="flex items-center gap-2">
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-xs font-black text-white">
+              <span className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full bg-blue-600 text-xs font-black text-white shadow-2xs">
                 1
               </span>
               <h3 className="text-sm md:text-base font-bold text-slate-900">
@@ -334,27 +324,31 @@ export function WashFlow({
               </h3>
             </div>
             {before && (
-              <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
-                ✓ Photo Ready
+              <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 flex items-center gap-1">
+                <IconCheck width={12} height={12} strokeWidth={3} />
+                <span>Photo Ready</span>
               </span>
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-            <div className="space-y-4">
-              <p className="text-xs md:text-sm text-slate-600 leading-relaxed">
-                Capture a clear photo of the vehicle before cleaning begins. Once captured, tap <strong>&ldquo;START WASH&rdquo;</strong> to start the service timer.
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 items-center">
+            <div className="space-y-3.5">
+              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                Capture a clear photo of the vehicle before cleaning begins. Once captured, tap <strong>&ldquo;Start Wash&rdquo;</strong> to begin the timer.
               </p>
 
-              <div className="p-3.5 bg-blue-50/70 rounded-xl border border-blue-100 text-xs text-blue-900 space-y-1">
-                <div className="font-bold">📸 Photo Guidelines:</div>
-                <ul className="list-disc list-inside text-[11.5px] text-blue-800 space-y-0.5">
+              <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-100 text-xs text-blue-950 space-y-1">
+                <div className="font-bold flex items-center gap-1.5 text-blue-900">
+                  <IconCamera width={14} height={14} className="text-blue-600" />
+                  <span>Photo Guidelines</span>
+                </div>
+                <ul className="list-disc list-inside text-[11px] sm:text-[11.5px] text-blue-800 space-y-0.5 pl-0.5">
                   <li>Capture from front 45-degree angle</li>
-                  <li>Ensure license plate and car condition are visible</li>
+                  <li>Ensure license plate &amp; car condition are visible</li>
                 </ul>
               </div>
 
-              <div>
+              <div className="pt-1">
                 {!before ? (
                   <button
                     type="button"
@@ -377,7 +371,7 @@ export function WashFlow({
               </div>
             </div>
 
-            <div className="w-full max-w-sm mx-auto md:max-w-none">
+            <div className="w-full max-w-xs sm:max-w-sm mx-auto md:max-w-none">
               <PhotoTile
                 label="Before Wash Photo"
                 url={before}
@@ -426,13 +420,22 @@ export function WashFlow({
           </div>
 
           {/* Photos & Work Done Container */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center justify-between">
-              <span>📷 Proof Photos</span>
-              <span className="text-[11px] font-normal text-slate-500">Before &amp; After</span>
-            </h3>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-xs space-y-3.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="flex h-6 w-6 items-center justify-center rounded-md bg-blue-50 text-blue-600">
+                  <IconCamera width={14} height={14} />
+                </div>
+                <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-900">
+                  Proof Photos
+                </h3>
+              </div>
+              <span className="text-[11px] font-semibold text-slate-500">
+                {before && after ? '✓ 2 of 2 photos ready' : before ? '1 of 2 photos ready' : '0 of 2'}
+              </span>
+            </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
               <PhotoTile
                 label="Before Photo"
                 url={before}
@@ -833,60 +836,72 @@ function PhotoTile({
   onRetake?: () => void;
 }) {
   return (
-    <div className="relative aspect-[4/3] w-full">
-      <button
-        type="button"
-        onClick={() => {
-          if (url) {
-            onPreview(url);
-          } else {
-            onPick();
-          }
-        }}
-        disabled={disabled || busy}
-        className={`relative flex h-full w-full flex-col items-center justify-center gap-1.5 overflow-hidden rounded-xl border-2 text-xs font-bold transition-all shadow-2xs ${
-          url
-            ? 'border-emerald-500 bg-emerald-50 text-emerald-700 active:opacity-85'
-            : disabled
-            ? 'border-dashed border-slate-200 bg-slate-50 text-slate-400'
-            : 'border-dashed border-blue-400 bg-blue-50/50 text-blue-900 hover:bg-blue-100/60 active:scale-[0.99] cursor-pointer'
-        }`}
-      >
-        {url ? (
-          <>
+    <div className="relative aspect-[4/3] w-full rounded-xl overflow-hidden border border-slate-200 bg-slate-50 shadow-2xs group">
+      {url ? (
+        <>
+          <button
+            type="button"
+            onClick={() => onPreview(url)}
+            className="h-full w-full block cursor-pointer active:opacity-90 relative"
+          >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={url}
               alt={`${label} photo`}
               className="h-full w-full object-cover"
             />
-            <span className="absolute inset-x-1.5 bottom-1.5 flex items-center justify-center gap-1 rounded-lg bg-slate-900/85 py-1 text-[10.5px] font-bold text-white backdrop-blur-xs shadow-xs">
-              <IconCheck width={12} height={12} strokeWidth={3} />
-              <span>{label} · View</span>
-            </span>
-          </>
-        ) : (
-          <>
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-blue-600 shadow-2xs">
-              <IconCamera width={20} height={20} />
+            {/* Subtle bottom gradient & caption on hover/tap */}
+            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent p-2 pt-3 flex items-center justify-between text-white">
+              <span className="text-[10px] sm:text-[11px] font-bold tracking-tight truncate">
+                {label}
+              </span>
+              <span className="text-[9.5px] font-medium text-slate-200 shrink-0">
+                Tap to view
+              </span>
             </div>
-            <span className="text-xs font-bold text-slate-800">{busy ? 'Saving…' : label}</span>
-            <span className="text-[10.5px] font-medium text-blue-600">Tap to capture</span>
-          </>
-        )}
-      </button>
+          </button>
 
-      {url && onRetake && !disabled && (
+          {/* Top Left status badge */}
+          <div className="absolute top-1.5 left-1.5 flex items-center gap-1 rounded-md bg-emerald-900/80 backdrop-blur-xs px-1.5 py-0.5 text-[9.5px] sm:text-[10px] font-bold text-emerald-100 border border-emerald-400/30 z-10 pointer-events-none">
+            <IconCheck width={11} height={11} strokeWidth={3} />
+            <span>Verified</span>
+          </div>
+
+          {/* Top Right Retake button */}
+          {onRetake && !disabled && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRetake();
+              }}
+              className="absolute top-1.5 right-1.5 flex items-center gap-1 rounded-md bg-black/70 backdrop-blur-xs px-2 py-0.5 text-[10px] font-bold text-white border border-white/20 hover:bg-black active:scale-95 transition-all cursor-pointer z-10"
+            >
+              <IconCamera width={10} height={10} />
+              <span>Retake</span>
+            </button>
+          )}
+        </>
+      ) : (
         <button
           type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onRetake();
-          }}
-          className="absolute top-2 right-2 flex items-center gap-1 rounded-full bg-slate-900/85 border border-white/20 px-2.5 py-0.5 text-[10.5px] font-bold text-white shadow-md backdrop-blur-xs hover:bg-black active:scale-95 transition-all cursor-pointer z-10"
+          onClick={onPick}
+          disabled={disabled || busy}
+          className={`relative flex h-full w-full flex-col items-center justify-center p-2 text-center transition-all ${
+            disabled
+              ? 'border-dashed border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed'
+              : 'border-2 border-dashed border-blue-300 bg-blue-50/50 hover:bg-blue-100/50 active:scale-[0.98] cursor-pointer'
+          }`}
         >
-          <IconCamera width={11} height={11} />
-          <span>Retake</span>
+          <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-blue-100/90 text-blue-600 shadow-2xs mb-1">
+            <IconCamera width={18} height={18} />
+          </div>
+          <span className="text-[11.5px] sm:text-xs font-bold text-slate-900 leading-tight">
+            {busy ? 'Uploading…' : label}
+          </span>
+          <span className="text-[10px] font-semibold text-blue-600 mt-0.5">
+            Tap to capture
+          </span>
         </button>
       )}
     </div>

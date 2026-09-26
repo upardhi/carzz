@@ -77,11 +77,11 @@ export default async function CustomerHome() {
 
     let subtitle = car ? `${car.make} ${car.model}` : 'Routine Wash';
     if (visit.status === 'IN_PROGRESS') {
-      subtitle = `🚿 Live Wash In Progress · ${car ? `${car.make} ${car.model}` : 'Vehicle'}`;
+      subtitle = `Cleaning now · ${car ? `${car.make} ${car.model}` : 'Vehicle'}`;
     } else if (visit.missReason) {
       subtitle = `Missed: ${visit.missReason.replace(/_/g, ' ')}`;
     } else if (visit.missNote?.includes('[Free Compensatory Wash]')) {
-      subtitle = `${car ? `${car.make} ${car.model} · ` : ''}🎁 Free Compensatory Wash`;
+      subtitle = `${car ? `${car.make} ${car.model} · ` : ''}Free Compensatory Wash`;
     }
 
     return {
@@ -351,7 +351,7 @@ export default async function CustomerHome() {
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4">
             {account.cars.map((car) => {
               const isAltroz =
                 car.model?.toLowerCase().includes('altroz') ||
@@ -364,9 +364,9 @@ export default async function CustomerHome() {
 
               return (
                 <Link key={car.id} href={`/app/cars/${car.id}`} className="block group">
-                  <div className={`rounded-2xl border bg-white p-4 shadow-2xs transition-all group-hover:border-blue-300 group-hover:shadow-xs flex items-center justify-between gap-3 ${carInProgress ? 'border-blue-400 ring-1 ring-blue-200 bg-blue-50/20' : 'border-slate-200/80'}`}>
-                    <div className="flex items-center gap-3.5 min-w-0">
-                      <div className="flex h-14 w-20 shrink-0 items-center justify-center rounded-xl bg-slate-50 border border-slate-100/80 overflow-hidden p-1">
+                  <div className={`rounded-2xl border bg-white p-3.5 sm:p-4 shadow-2xs transition-all group-hover:border-blue-300 group-hover:shadow-xs flex items-center justify-between gap-2.5 ${carInProgress ? 'border-blue-400 ring-1 ring-blue-200 bg-blue-50/20' : 'border-slate-200/80'}`}>
+                    <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0 flex-1">
+                      <div className="flex h-12 w-16 sm:h-14 sm:w-20 shrink-0 items-center justify-center rounded-xl bg-slate-50 border border-slate-100/80 overflow-hidden p-1">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={carImgSrc}
@@ -374,33 +374,39 @@ export default async function CustomerHome() {
                           className="h-full w-full object-contain mix-blend-multiply"
                         />
                       </div>
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-xs sm:text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
                           {car.make} {car.model}
                         </div>
-                        <div className="text-[11px] font-mono uppercase text-slate-400 font-medium mt-0.5">
+                        <div className="text-[11px] font-mono uppercase text-slate-400 font-medium mt-0.5 truncate">
                           {car.plate}
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                       {carInProgress ? (
-                        <WashProgressTimer
-                          startedAt={carInProgress.startedAt}
-                          variant="badge"
-                          label="In Progress"
-                        />
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200 px-2 sm:px-2.5 py-0.5 text-[11px] font-bold text-blue-700">
+                          <span className="relative flex h-2 w-2 shrink-0">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-600" />
+                          </span>
+                          <span className="hidden sm:inline">In Progress</span>
+                          <WashProgressTimer
+                            startedAt={carInProgress.startedAt}
+                            variant="compact"
+                          />
+                        </span>
                       ) : !car.serviceStarted ? (
-                        <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-200/80 px-2.5 py-0.5 text-xs font-bold text-amber-700">
+                        <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-200/80 px-2 sm:px-2.5 py-0.5 text-[11px] font-bold text-amber-700">
                           Pending Start
                         </span>
                       ) : (
-                        <span className="inline-flex items-center rounded-full bg-emerald-50 border border-emerald-200/80 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
+                        <span className="inline-flex items-center rounded-full bg-emerald-50 border border-emerald-200/80 px-2 sm:px-2.5 py-0.5 text-[11px] font-bold text-emerald-700">
                           {car.tally.done} of {packageTotal || (car.tally.done + car.tally.remaining)}
                         </span>
                       )}
-                      <span className="text-slate-400 font-bold text-base">›</span>
+                      <span className="text-slate-400 font-bold text-sm sm:text-base">›</span>
                     </div>
                   </div>
                 </Link>
@@ -438,41 +444,44 @@ export default async function CustomerHome() {
               No wash history yet. Your completed and scheduled washes will appear here.
             </div>
           ) : (
-            <div className="rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-2xs divide-y divide-slate-100">
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-2.5 sm:p-3 shadow-2xs divide-y divide-slate-100">
               {recentBookings.map((b) => (
-                <div key={b.id} className="py-2.5 px-1.5 space-y-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="flex min-w-[3.5rem] shrink-0 flex-col items-center justify-center rounded-xl bg-sky-50 border border-sky-100/80 px-1 py-1.5 text-sky-900">
-                        <span className="text-xs font-bold leading-tight">{b.day}</span>
+                <div key={b.id} className="py-2.5 px-2 space-y-1.5">
+                  <div className="flex items-center justify-between gap-2.5">
+                    <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+                      {/* Date Badge */}
+                      <div className="flex min-w-[3.25rem] sm:min-w-[3.5rem] shrink-0 flex-col items-center justify-center rounded-xl bg-sky-50 border border-sky-100/80 px-1 py-1.5 text-sky-900">
+                        <span className="text-xs sm:text-sm font-bold leading-tight">{b.day}</span>
                         <span className="text-[9px] font-bold text-sky-600 uppercase leading-tight text-center whitespace-nowrap">
                           {b.yearOrMonth}
                         </span>
                       </div>
-                      <div className="min-w-0">
-                        <div className="truncate text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                          <span>{b.title}</span>
-                          {b.carId && (
-                            <Link
-                              href={`/app/cars/${b.carId}`}
-                              className="text-[11px] font-normal text-blue-600 hover:underline"
-                            >
-                              (View Car History →)
-                            </Link>
-                          )}
+
+                      {/* Title and Subtitle */}
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-xs sm:text-sm font-bold text-slate-900">
+                          {b.title}
                         </div>
                         <div className="truncate text-[11px] text-slate-500 font-medium mt-0.5">
                           {b.subtitle}
                         </div>
                       </div>
                     </div>
-                    <div className="shrink-0 flex items-center gap-2">
+
+                    {/* Status Pill on Right */}
+                    <div className="shrink-0 flex items-center">
                       {b.status === 'In Progress' ? (
-                        <WashProgressTimer
-                          startedAt={b.startedAt}
-                          variant="badge"
-                          label="In Progress"
-                        />
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200 px-2 sm:px-2.5 py-0.5 text-[11px] font-bold text-blue-700">
+                          <span className="relative flex h-2 w-2 shrink-0">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-600" />
+                          </span>
+                          <span className="hidden sm:inline">In Progress · </span>
+                          <WashProgressTimer
+                            startedAt={b.startedAt}
+                            variant="compact"
+                          />
+                        </span>
                       ) : (
                         <span
                           className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold border ${
@@ -488,6 +497,19 @@ export default async function CustomerHome() {
                           {b.status}
                         </span>
                       )}
+                    </div>
+                  </div>
+
+                  {/* Actions & Rating sub-row */}
+                  {(b.isDone || b.status === 'Cancelled' || b.status === 'Rescheduled' || b.ratingComment) && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 pl-12 sm:pl-14 pt-0.5">
+                      <div className="min-w-0 flex-1">
+                        {b.ratingComment && (
+                          <p className="text-[11px] italic text-slate-500 truncate">
+                            Review: &ldquo;{b.ratingComment}&rdquo;
+                          </p>
+                        )}
+                      </div>
                       {(b.isDone || b.status === 'Cancelled' || b.status === 'Rescheduled') && (
                         <WashRatingAction
                           visitId={b.id}
@@ -503,17 +525,14 @@ export default async function CustomerHome() {
                         />
                       )}
                     </div>
-                  </div>
-                  {b.ratingComment && (
-                    <p className="text-[11px] italic text-slate-500 pl-14">
-                      Review: &ldquo;{b.ratingComment}&rdquo;
-                    </p>
                   )}
                 </div>
               ))}
             </div>
           )}
         </section>
+
+        {/* Right Column: Quick Actions (2x2 Grid) */}
 
         {/* Right Column: Quick Actions (2x2 Grid) */}
         <section aria-labelledby="quick-actions-heading">

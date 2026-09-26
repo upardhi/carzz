@@ -60,36 +60,44 @@ export const VehicleCard: React.FC<VehicleCardProps> = ({
       )}
     >
       {/* Header Row with thumbnail, name/plate, active badge */}
-      <div className="flex items-center gap-3.5">
-        {imageSrc && (
-          <div className="flex h-[48px] w-[80px] shrink-0 items-center justify-center overflow-hidden rounded-md bg-slate-50">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={typeof imageSrc === 'string' ? imageSrc : imageSrc.src || ''}
-              alt={displayName}
-              className="h-[48px] w-[80px] object-contain"
-            />
-          </div>
-        )}
-
-        <div className="min-w-0 flex-1">
-          <h2 className="text-[16px] font-bold text-slate-900 leading-tight">
-            {displayName}
-          </h2>
-          {plate && (
-            <p className="text-[12px] text-slate-500 font-medium mt-0.5">
-              {plate}
-            </p>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          {imageSrc && (
+            <div className="flex h-11 w-16 sm:h-12 sm:w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-50 border border-slate-100 p-1">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={typeof imageSrc === 'string' ? imageSrc : imageSrc.src || ''}
+                alt={displayName}
+                className="h-full w-full object-contain"
+              />
+            </div>
           )}
+
+          <div className="min-w-0 flex-1">
+            <h2 className="text-sm sm:text-base font-bold text-slate-900 leading-snug truncate">
+              {displayName}
+            </h2>
+            {plate && (
+              <p className="text-[11px] sm:text-xs text-slate-500 font-mono uppercase mt-0.5 truncate">
+                {plate}
+              </p>
+            )}
+          </div>
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="shrink-0 flex items-center">
           {inProgress ? (
-            <WashProgressTimer
-              startedAt={inProgressStartedAt}
-              variant="badge"
-              label="In Progress"
-            />
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200 px-2 sm:px-2.5 py-0.5 text-[11px] font-bold text-blue-700">
+              <span className="relative flex h-2 w-2 shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-600" />
+              </span>
+              <span className="hidden sm:inline">In Progress</span>
+              <WashProgressTimer
+                startedAt={inProgressStartedAt}
+                variant="compact"
+              />
+            </span>
           ) : (
             <span
               className={clsx(
@@ -105,10 +113,10 @@ export const VehicleCard: React.FC<VehicleCardProps> = ({
         </div>
       </div>
 
-      <div className="my-3.5 border-b border-slate-100" />
+      <div className="my-3 border-b border-slate-100" />
 
       {/* Spec rows */}
-      <div className="space-y-1.5 text-[12.5px]">
+      <div className="space-y-1.5 text-[12px] sm:text-[12.5px]">
         {pkgName && (
           <div className="flex items-center justify-between border-b border-slate-50 py-1">
             <span className="font-medium text-slate-500">Package</span>
@@ -131,12 +139,17 @@ export const VehicleCard: React.FC<VehicleCardProps> = ({
         </div>
 
         {inProgress ? (
-          <div className="flex items-center justify-between py-1 bg-blue-50/80 px-2 rounded-lg border border-blue-200/60">
-            <span className="font-bold text-blue-900 flex items-center gap-1">
-              <span className="animate-pulse">🚿</span> Wash Status
+          <div className="flex items-center justify-between py-1.5 bg-blue-50/80 px-2.5 rounded-xl border border-blue-200/70">
+            <span className="font-bold text-blue-900 flex items-center gap-1.5 text-xs">
+              <span className="relative flex h-2 w-2 shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-600" />
+              </span>
+              <span>Wash Status</span>
             </span>
-            <span className="font-bold text-blue-700 flex items-center gap-1.5">
+            <span className="font-bold text-blue-700 flex items-center gap-1.5 text-xs">
               <span>Cleaning now</span>
+              <span className="text-blue-300">·</span>
               <WashProgressTimer
                 startedAt={inProgressStartedAt}
                 variant="compact"
@@ -151,12 +164,18 @@ export const VehicleCard: React.FC<VehicleCardProps> = ({
         ) : null}
       </div>
 
-      {/* Progress bar */}
-      <div className="my-3.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-        <div
-          className="h-full rounded-full bg-[#214f92] transition-all"
-          style={{ width: `${progressPercent}%` }}
-        />
+      {/* Progress bar with clear label */}
+      <div className="my-3 space-y-1">
+        <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium">
+          <span>Monthly wash progress</span>
+          <span className="font-semibold text-slate-600">{progressPercent}%</span>
+        </div>
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+          <div
+            className="h-full rounded-full bg-[#214f92] transition-all duration-500"
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
       </div>
 
       {/* Action button */}
