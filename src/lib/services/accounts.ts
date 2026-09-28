@@ -2,20 +2,21 @@ import 'server-only';
 import { cache } from 'react';
 
 import type { DataStore } from '../data/ports/store';
-import type {
-  Car,
-  Customer,
-  Id,
-  Invoice,
-  Payment,
-  Rupees,
-  ServicePackage,
-  WashVisit,
+import {
+  parsePackageServices,
+  type Car,
+  type Customer,
+  type Id,
+  type Invoice,
+  type Payment,
+  type Rupees,
+  type ServicePackage,
+  type WashVisit,
 } from '../data/types';
 import { tallyVisits, type VisitTally } from './visits';
 import { generateVisitsForCar, scheduleNextVisitForCar } from './schedule';
 import { resolvePublicPhotoUrl } from '../util/photoUrl';
-import { todayISO } from '../util/format';
+import { nextCycle, todayISO } from '../util/format';
 import { invalidateAreaPerformanceCache } from './reports';
 
 /** Everything the customer app and the manager's customer page both need. */
@@ -171,12 +172,17 @@ export async function loadCustomerAccount(
       ? userById.get(car.serviceStartedByUserId)
       : null;
     const pkg = packageById.get(car.packageId) ?? null;
+    const parsedServices = parsePackageServices(pkg?.services, pkg?.washesPerMonth ?? 8);
+    const effectiveQuota = parsedServices.length > 0
+      ? parsedServices.reduce((sum, s) => sum + s.washesPerMonth, 0)
+      : (pkg?.washesPerMonth ?? 8);
+
     return {
       ...car,
       package: pkg,
       tally: tallyVisits(
         effectiveCycleVisits.filter((v) => v.carId === car.id),
-        pkg?.washesPerMonth,
+        effectiveQuota,
       ),
       serviceStartedByUser: starterUser
         ? {
@@ -193,6 +199,43 @@ export async function loadCustomerAccount(
     .filter((c) => c.active)
     .reduce((sum, c) => sum + (packageById.get(c.packageId)?.price ?? 0), 0);
 
+  // Keep current cycle's invoice perfectly synchronized with active cars' monthly subscription total
+  let effectiveInvoices = invoices;
+  if (monthly > 0 && customer.status !== 'INACTIVE') {
+    const currentInvoiceIndex = effectiveInvoices.findIndex((inv) => inv.cycle === cycle);
+    if (currentInvoiceIndex >= 0) {
+      const currentInvoice = effectiveInvoices[currentInvoiceIndex];
+      if (currentInvoice.amount < monthly) {
+        try {
+          const updatedInvoice = await store.invoices.update(currentInvoice.id, {
+            amount: monthly,
+            status: currentInvoice.paidAmount >= monthly ? 'PAID' : currentInvoice.paidAmount > 0 ? 'PARTIAL' : 'OPEN',
+          });
+          effectiveInvoices[currentInvoiceIndex] = updatedInvoice;
+        } catch {
+          // ignore
+        }
+      }
+    } else {
+      const firstDueOn = `${cycle}-05` < today ? `${nextCycle(cycle)}-05` : `${cycle}-05`;
+      try {
+        const createdInvoice = await store.invoices.create({
+          customerId: customer.id,
+          areaId: customer.areaId,
+          cycle,
+          amount: monthly,
+          dueOn: firstDueOn,
+          paidAmount: 0,
+          status: 'OPEN',
+          createdAt: new Date().toISOString(),
+        });
+        effectiveInvoices = [createdInvoice, ...effectiveInvoices];
+      } catch {
+        // ignore
+      }
+    }
+  }
+
   // Balance/credit math must only ever count money that's actually landed —
   // a customer's own say-so (PENDING) cannot move these until a manager
   // confirms it, or the account would show credit for money never received.
@@ -203,14 +246,14 @@ export async function loadCustomerAccount(
   const totalPaid = confirmedPayments
     .filter((p) => p.kind !== 'REFUND')
     .reduce((sum, p) => sum + p.amount, 0);
-  const totalBilled = invoices.reduce((sum, i) => sum + i.amount, 0);
-  const outstanding = invoices.reduce(
+  const totalBilled = effectiveInvoices.reduce((sum, i) => sum + i.amount, 0);
+  const outstanding = effectiveInvoices.reduce(
     (sum, i) => sum + Math.max(0, i.amount - i.paidAmount),
     0,
   );
 
   const nextDue =
-    invoices
+    effectiveInvoices
       .filter((i) => i.status !== 'PAID' && i.status !== 'WRITTEN_OFF')
       .sort((a, b) => a.dueOn.localeCompare(b.dueOn))[0] ?? null;
 
@@ -237,10 +280,12 @@ export async function loadCustomerAccount(
       }
     : null;
 
-  const totalAccountQuota = cars.reduce(
-    (sum, c) => sum + (packageById.get(c.packageId)?.washesPerMonth ?? 8),
-    0,
-  );
+  const totalAccountQuota = cars.reduce((sum, c) => {
+    const pkg = packageById.get(c.packageId);
+    const parsed = parsePackageServices(pkg?.services, pkg?.washesPerMonth ?? 8);
+    const quota = parsed.length > 0 ? parsed.reduce((s, item) => s + item.washesPerMonth, 0) : (pkg?.washesPerMonth ?? 8);
+    return sum + quota;
+  }, 0);
 
   return {
     customer,

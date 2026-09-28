@@ -281,7 +281,7 @@ export default async function CarDetail({
           </div>
           <div className="flex items-center justify-between py-2">
             <span className="text-slate-500 font-medium">Monthly Quota</span>
-            <span className="font-semibold text-slate-900">{car.package?.washesPerMonth ?? 0} washes</span>
+            <span className="font-semibold text-slate-900">{car.tally.total} washes</span>
           </div>
           <div className="flex items-center justify-between py-2">
             <span className="text-slate-500 font-medium">Time Slot</span>

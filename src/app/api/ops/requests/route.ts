@@ -303,9 +303,10 @@ export async function POST(request: Request) {
 
           if (adjustmentAmount > 0) {
             // UPGRADE: Customer owes extra money -> Update existing cycle invoice or create if none exists
-            const existingInvoice = await store.invoices.findOne({
+            const invoices = await store.invoices.find({
               where: { customerId: customer.id, cycle: currentCycle() } as never,
             });
+            const existingInvoice = invoices[0];
             if (existingInvoice) {
               const newAmount = existingInvoice.amount + Math.round(adjustmentAmount);
               const newStatus =
@@ -362,9 +363,10 @@ export async function POST(request: Request) {
 
         if (applyFinance && adjustmentAmount > 0) {
           finalPaymentAmount = Math.round(adjustmentAmount);
-          const existingInvoice = await store.invoices.findOne({
+          const reqInvoices = await store.invoices.find({
             where: { customerId: customer.id, cycle: currentCycle() } as never,
           });
+          const existingInvoice = reqInvoices[0];
           if (existingInvoice) {
             const newAmount = existingInvoice.amount + Math.round(adjustmentAmount);
             const newStatus =

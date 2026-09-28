@@ -539,6 +539,30 @@ export async function POST(request: Request) {
         );
       }
 
+      // Sync customer invoice if package or active status changed
+      if (parsed.data.packageId !== undefined || parsed.data.active !== undefined) {
+        const cycle = currentCycle();
+        const allActiveCars = await store.cars.find({
+          where: { customerId: customer.id, active: true },
+        });
+        const allPackages = await store.packages.find();
+        const pkgMap = new Map(allPackages.map((p) => [p.id, p]));
+        const newMonthly = allActiveCars.reduce(
+          (sum, c) => sum + (pkgMap.get(c.packageId)?.price ?? 0),
+          0,
+        );
+        const invoices = await store.invoices.find({
+          where: { customerId: customer.id, cycle },
+        });
+        const existingInvoice = invoices[0];
+        if (existingInvoice) {
+          await store.invoices.update(existingInvoice.id, {
+            amount: newMonthly,
+            status: existingInvoice.paidAmount >= newMonthly ? 'PAID' : existingInvoice.paidAmount > 0 ? 'PARTIAL' : 'OPEN',
+          });
+        }
+      }
+
       revalidateCustomerPages();
       return NextResponse.json({
         ok: true,
@@ -581,6 +605,27 @@ export async function POST(request: Request) {
       const cycle = currentCycle();
       if (car.serviceStarted) {
         await generateVisitsForCar(store, car, customer, cycle, parsed.data.startDate ?? undefined);
+      }
+
+      // Sync customer invoice for current cycle
+      const allActiveCars = await store.cars.find({
+        where: { customerId: customer.id, active: true },
+      });
+      const allPackages = await store.packages.find();
+      const pkgMap = new Map(allPackages.map((p) => [p.id, p]));
+      const newMonthly = allActiveCars.reduce(
+        (sum, c) => sum + (pkgMap.get(c.packageId)?.price ?? 0),
+        0,
+      );
+      const invoices = await store.invoices.find({
+        where: { customerId: customer.id, cycle },
+      });
+      const existingInvoice = invoices[0];
+      if (existingInvoice) {
+        await store.invoices.update(existingInvoice.id, {
+          amount: newMonthly,
+          status: existingInvoice.paidAmount >= newMonthly ? 'PAID' : existingInvoice.paidAmount > 0 ? 'PARTIAL' : 'OPEN',
+        });
       }
 
       revalidateCustomerPages();

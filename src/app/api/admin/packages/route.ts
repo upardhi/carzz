@@ -59,12 +59,12 @@ function normalizeServices(
       const parsed = parsePackageServices([s], packageWashes)[0];
       return {
         name: parsed.name,
-        washesPerMonth: Math.min(parsed.washesPerMonth, packageWashes),
+        washesPerMonth: parsed.washesPerMonth,
       };
     }
     return {
       name: s.name.trim(),
-      washesPerMonth: Math.min(s.washesPerMonth, packageWashes),
+      washesPerMonth: s.washesPerMonth,
     };
   });
   return formatPackageServices(items);

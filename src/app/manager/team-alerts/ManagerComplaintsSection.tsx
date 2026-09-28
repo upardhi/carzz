@@ -196,7 +196,6 @@ export function ManagerComplaintsSection({
         <div className="space-y-3">
           {filteredComplaints.map((c) => {
             const isEscalated = c.status === 'ESCALATED';
-            const isResolved = c.status === 'RESOLVED';
             const isOpen = c.status === 'OPEN';
 
             return (

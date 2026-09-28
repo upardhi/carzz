@@ -155,21 +155,23 @@ export function RequestsClient({
 
     if (item.type === 'PACKAGE_CHANGE' && item.packageAudit) {
       const audit = item.packageAudit;
-      setActivationMode('IMMEDIATE_PRORATED');
-      const diff = audit.proratedDifference;
-      setAdjustmentAmount(diff);
-      setApplyFinancialAdjustment(diff !== 0);
-
-      if (diff > 0) {
+      if (!audit.isUpgrade) {
+        // Plan Downgrade: Customer finishes current plan; lower rate starts 1st of next month
+        setActivationMode('NEXT_CYCLE');
+        setAdjustmentAmount(0);
+        setApplyFinancialAdjustment(false);
+        setAdminRemarks(
+          `Approved: Downgrade to ${audit.requestedPackageName} will take effect from 1st of next month after completing current ${audit.currentPackageName} plan.`
+        );
+      } else {
+        // Plan Upgrade: Immediate prorated difference
+        setActivationMode('IMMEDIATE_PRORATED');
+        const diff = audit.proratedDifference;
+        setAdjustmentAmount(diff);
+        setApplyFinancialAdjustment(diff > 0);
         setAdminRemarks(
           `Approved: Upgraded to ${audit.requestedPackageName}. Prorated difference of ₹${diff} charged for ${audit.washesRemaining} remaining washes.`
         );
-      } else if (diff < 0) {
-        setAdminRemarks(
-          `Approved: Downgraded to ${audit.requestedPackageName}. ₹${Math.abs(diff)} credited to customer account balance for next cycle.`
-        );
-      } else {
-        setAdminRemarks(`Approved: Package updated to ${audit.requestedPackageName}.`);
       }
     } else if (item.type === 'ONE_WASH' || item.type === 'OTHER_SERVICE') {
       const defaultAmount = item.paymentAmount || 0;

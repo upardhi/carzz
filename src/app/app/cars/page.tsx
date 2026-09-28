@@ -117,7 +117,7 @@ export default async function CustomerCars() {
               : 'No upcoming scheduled wash';
 
             const doneCount = car.tally.done;
-            const totalCount = car.package?.washesPerMonth ?? (doneCount > 0 ? doneCount : 0);
+            const totalCount = car.tally.total;
 
             return (
               <VehicleCard
