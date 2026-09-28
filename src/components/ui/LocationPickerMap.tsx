@@ -34,6 +34,17 @@ interface LocationPickerMapProps {
 export function parseGoogleMapsUrl(input: string): { lat: number; lng: number } | null {
   if (!input || typeof input !== 'string') return null;
   const trimmed = input.trim();
+
+  // Pattern 0: Direct coordinates like "21.1458, 79.0882" or "21.1458,79.0882"
+  const directCoordMatch = trimmed.match(/^(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)$/);
+  if (directCoordMatch) {
+    const lat = parseFloat(directCoordMatch[1]);
+    const lng = parseFloat(directCoordMatch[2]);
+    if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+      return { lat, lng };
+    }
+  }
+
   if (!trimmed.includes('http') && !trimmed.includes('maps') && !trimmed.includes('goo.gl')) return null;
 
   // Pattern 1: @21.1458,79.0882
@@ -104,6 +115,14 @@ function loadLeaflet(): Promise<typeof window.L> {
 const FALLBACK_LAT = 21.1458;
 const FALLBACK_LNG = 79.0882;
 
+export interface GeoSearchResult {
+  display_name: string;
+  title: string;
+  subtitle?: string;
+  lat: number;
+  lng: number;
+}
+
 export function LocationPickerMap({
   address,
   lat,
@@ -121,11 +140,13 @@ export function LocationPickerMap({
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [searchError, setSearchError] = useState('');
+  const [searchResults, setSearchResults] = useState<GeoSearchResult[]>([]);
 
-  // Reverse Geocoding helper via Nominatim
+  // Reverse Geocoding helper via Nominatim & Photon
   const reverseGeocode = useCallback(
     async (latitude: number, longitude: number) => {
       setIsGeocoding(true);
@@ -138,6 +159,22 @@ export function LocationPickerMap({
           const data = await res.json();
           if (data && data.display_name) {
             onAddressChange(data.display_name);
+            return;
+          }
+        }
+
+        // Photon reverse geocode fallback
+        const photonRes = await fetch(
+          `https://photon.komoot.io/reverse?lat=${latitude}&lon=${longitude}`,
+        );
+        if (photonRes.ok) {
+          const pData = await photonRes.json();
+          if (pData?.features?.[0]?.properties) {
+            const p = pData.features[0].properties;
+            const parts = [p.name, p.street, p.district, p.city, p.state].filter(Boolean);
+            if (parts.length > 0) {
+              onAddressChange(parts.join(', '));
+            }
           }
         }
       } catch {
@@ -170,7 +207,7 @@ export function LocationPickerMap({
 
         const currentLat = lat ?? FALLBACK_LAT;
         const currentLng = lng ?? FALLBACK_LNG;
-        const zoomLevel = lat && lng ? 15 : 12;
+        const zoomLevel = lat && lng ? 16 : 13;
 
         if (!mapInstanceRef.current) {
           const map = L.map(mapContainerRef.current, {
@@ -239,7 +276,7 @@ export function LocationPickerMap({
             markerInstanceRef.current = newMarker;
           }
 
-          map.setView([lat, lng], Math.max(map.getZoom(), 14));
+          map.setView([lat, lng], Math.max(map.getZoom(), 15));
         } else if (markerInstanceRef.current) {
           map.removeLayer(markerInstanceRef.current);
           markerInstanceRef.current = null;
@@ -270,9 +307,43 @@ export function LocationPickerMap({
     };
   }, []);
 
-  const [searchResults, setSearchResults] = useState<Array<{ display_name: string; lat: string; lon: string }>>([]);
+  // GPS "Use Current Location" handler
+  const handleUseCurrentLocation = useCallback(() => {
+    if (typeof window === 'undefined' || !navigator.geolocation) {
+      setSearchError('Geolocation is not supported by your browser.');
+      return;
+    }
 
-  // Handle Search input or Google Maps Link search
+    setIsLocating(true);
+    setSearchError('');
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        setIsLocating(false);
+        const cLat = Number(position.coords.latitude.toFixed(6));
+        const cLng = Number(position.coords.longitude.toFixed(6));
+
+        onCoordinatesChange(cLat, cLng);
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.setView([cLat, cLng], 16);
+        }
+        await reverseGeocode(cLat, cLng);
+      },
+      (err) => {
+        setIsLocating(false);
+        if (err.code === 1) {
+          setSearchError('Location permission denied. Please enable GPS access or click on the map.');
+        } else if (err.code === 2) {
+          setSearchError('Position unavailable. Please search your apartment or tap on the map.');
+        } else {
+          setSearchError('Location request timed out. Please try searching.');
+        }
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
+    );
+  }, [onCoordinatesChange, reverseGeocode]);
+
+  // Multi-engine search supporting apartments, small societies, buildings, and landmarks
   async function handleSearch(e?: React.FormEvent) {
     if (e) e.preventDefault();
     const query = searchQuery.trim();
@@ -281,7 +352,7 @@ export function LocationPickerMap({
     setSearchError('');
     setSearchResults([]);
 
-    // Check if user pasted a Google Maps URL
+    // 1. Check if user typed or pasted raw coordinates / Google Maps URL
     const gmapsCoords = parseGoogleMapsUrl(query);
     if (gmapsCoords) {
       onCoordinatesChange(gmapsCoords.lat, gmapsCoords.lng);
@@ -293,60 +364,152 @@ export function LocationPickerMap({
       return;
     }
 
-    // Perform multi-result search supporting apartments, societies, landmarks
     setIsSearching(true);
     try {
-      // First try the query as typed (or with city if not already included)
-      const qEncoded = encodeURIComponent(query);
-      let res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${qEncoded}&limit=5&addressdetails=1`,
-        { headers: { 'User-Agent': 'CarzzWeb-App/1.0' } },
-      );
+      const candidates: GeoSearchResult[] = [];
+      const seenCoords = new Set<string>();
 
-      let results: Array<{ display_name: string; lat: string; lon: string }> = [];
-      if (res.ok) {
-        results = await res.json();
+      const addCandidate = (item: GeoSearchResult) => {
+        const key = `${item.lat.toFixed(4)},${item.lng.toFixed(4)}`;
+        if (!seenCoords.has(key)) {
+          seenCoords.add(key);
+          candidates.push(item);
+        }
+      };
+
+      const centerLat = lat ?? FALLBACK_LAT;
+      const centerLng = lng ?? FALLBACK_LNG;
+
+      // Engine 1: Photon OpenStreetMap Elastic Geocoder (great for apartments, small societies, buildings)
+      try {
+        const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=8&lat=${centerLat}&lon=${centerLng}`;
+        const pRes = await fetch(photonUrl);
+        if (pRes.ok) {
+          const pData = await pRes.json();
+          if (Array.isArray(pData?.features)) {
+            for (const f of pData.features) {
+              const coords = f.geometry?.coordinates;
+              if (Array.isArray(coords) && coords.length >= 2) {
+                const lon = Number(Number(coords[0]).toFixed(6));
+                const cLat = Number(Number(coords[1]).toFixed(6));
+                const p = f.properties || {};
+                const parts = [
+                  p.name,
+                  p.housenumber ? `No. ${p.housenumber}` : '',
+                  p.street,
+                  p.district || p.suburb || p.locality,
+                  p.city,
+                  p.state,
+                  p.postcode,
+                ].filter(Boolean);
+                const title = p.name || parts[0] || query;
+                const subtitle = parts.filter((s) => s !== title).join(', ');
+                addCandidate({
+                  display_name: parts.join(', ') || title,
+                  title,
+                  subtitle,
+                  lat: cLat,
+                  lng: lon,
+                });
+              }
+            }
+          }
+        }
+      } catch {
+        // Continue to next engine
       }
 
-      // If no results and city wasn't in query, try appending city
-      if ((!results || results.length === 0) && city && !query.toLowerCase().includes(city.toLowerCase())) {
-        const cityQuery = `${query}, ${city}`;
-        res = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cityQuery)}&limit=5&addressdetails=1`,
+      // Engine 2: OpenStreetMap Nominatim with direct query
+      try {
+        const nomRes = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=6&addressdetails=1`,
           { headers: { 'User-Agent': 'CarzzWeb-App/1.0' } },
         );
-        if (res.ok) {
-          results = await res.json();
+        if (nomRes.ok) {
+          const nData = await nomRes.json();
+          if (Array.isArray(nData)) {
+            for (const item of nData) {
+              const cLat = Number(parseFloat(item.lat).toFixed(6));
+              const cLng = Number(parseFloat(item.lon).toFixed(6));
+              const parts = (item.display_name || '').split(',');
+              const title = parts[0]?.trim() || item.display_name;
+              const subtitle = parts.slice(1).join(',').trim();
+              addCandidate({
+                display_name: item.display_name,
+                title,
+                subtitle,
+                lat: cLat,
+                lng: cLng,
+              });
+            }
+          }
+        }
+      } catch {
+        // Continue
+      }
+
+      // Engine 3: Fallback with city appended if no results and city wasn't in search text
+      if (candidates.length === 0 && city && !query.toLowerCase().includes(city.toLowerCase())) {
+        try {
+          const cityQuery = `${query}, ${city}`;
+          const photonCityUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(cityQuery)}&limit=6&lat=${centerLat}&lon=${centerLng}`;
+          const pRes = await fetch(photonCityUrl);
+          if (pRes.ok) {
+            const pData = await pRes.json();
+            if (Array.isArray(pData?.features)) {
+              for (const f of pData.features) {
+                const coords = f.geometry?.coordinates;
+                if (Array.isArray(coords) && coords.length >= 2) {
+                  const lon = Number(Number(coords[0]).toFixed(6));
+                  const cLat = Number(Number(coords[1]).toFixed(6));
+                  const p = f.properties || {};
+                  const parts = [
+                    p.name,
+                    p.street,
+                    p.district || p.suburb,
+                    p.city,
+                    p.state,
+                  ].filter(Boolean);
+                  addCandidate({
+                    display_name: parts.join(', ') || p.name,
+                    title: p.name || parts[0] || cityQuery,
+                    subtitle: parts.slice(1).join(', '),
+                    lat: cLat,
+                    lng: lon,
+                  });
+                }
+              }
+            }
+          }
+        } catch {
+          // Continue
         }
       }
 
-      if (results && results.length > 0) {
-        if (results.length === 1) {
-          selectSearchResult(results[0]);
+      if (candidates.length > 0) {
+        if (candidates.length === 1) {
+          selectSearchResult(candidates[0]);
         } else {
-          setSearchResults(results);
+          setSearchResults(candidates);
         }
       } else {
-        setSearchError('Location not found. Try typing a nearby landmark, society, or click directly on the map.');
+        setSearchError('Location not found. Try searching a nearby landmark/road or click directly on the map.');
       }
     } catch {
-      setSearchError('Could not search location. Please tap/click directly on the map.');
+      setSearchError('Could not search location. Please click directly on the map.');
     } finally {
       setIsSearching(false);
     }
   }
 
-  function selectSearchResult(item: { display_name: string; lat: string; lon: string }) {
-    const sLat = Number(parseFloat(item.lat).toFixed(6));
-    const sLng = Number(parseFloat(item.lon).toFixed(6));
-
-    onCoordinatesChange(sLat, sLng);
+  function selectSearchResult(item: GeoSearchResult) {
+    onCoordinatesChange(item.lat, item.lng);
     if (item.display_name) {
       onAddressChange(item.display_name);
     }
 
     if (mapInstanceRef.current) {
-      mapInstanceRef.current.setView([sLat, sLng], 16);
+      mapInstanceRef.current.setView([item.lat, item.lng], 16);
     }
     setSearchResults([]);
     setSearchQuery('');
@@ -432,9 +595,20 @@ export function LocationPickerMap({
               size="sm"
               onClick={() => handleSearch()}
               disabled={isSearching || !searchQuery.trim()}
-              className="w-full sm:w-auto justify-center"
+              className="w-full sm:w-auto justify-center shrink-0 font-semibold"
             >
-              {isSearching ? 'Searching…' : 'Search / Locate'}
+              {isSearching ? 'Searching…' : 'Search'}
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={handleUseCurrentLocation}
+              disabled={isLocating}
+              className="w-full sm:w-auto justify-center shrink-0 font-semibold bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100"
+              title="Detect your device GPS coordinates"
+            >
+              {isLocating ? 'Locating GPS…' : '📍 Current Location'}
             </Button>
           </div>
 
