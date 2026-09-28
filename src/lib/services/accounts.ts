@@ -6,6 +6,7 @@ import {
   parsePackageServices,
   type Car,
   type Customer,
+  type CustomerRequest,
   type Id,
   type Invoice,
   type Payment,
@@ -26,10 +27,15 @@ export interface CustomerAccount {
     package: ServicePackage | null;
     tally: VisitTally;
     serviceStartedByUser?: { id: Id; name: string; role: string; email?: string } | null;
+    pendingRequest?: (CustomerRequest & {
+      requestedPackage?: ServicePackage | null;
+      currentPackage?: ServicePackage | null;
+    }) | null;
   })[];
   visits: WashVisit[];
   payments: Payment[];
   invoices: Invoice[];
+  pendingRequests?: CustomerRequest[];
   /** Monthly charge across every active car on the account. */
   monthly: Rupees;
   advanceDeposited: Rupees;
@@ -59,7 +65,7 @@ export async function loadCustomerAccount(
   const customer = await store.customers.get(customerId);
   if (!customer) return null;
 
-  const [cars, visits, payments, invoices, packages] = await Promise.all([
+  const [cars, visits, payments, invoices, packages, customerRequests] = await Promise.all([
     store.cars.find({ where: { customerId } }),
     store.visits.find({
       where: { customerId },
@@ -78,9 +84,14 @@ export async function loadCustomerAccount(
       orderBy: [{ field: 'cycle', dir: 'desc' }],
     }),
     store.packages.find(),
+    store.customerRequests.find({
+      where: { customerId },
+      orderBy: [{ field: 'createdAt', dir: 'desc' }],
+    }),
   ]);
 
   const packageById = new Map(packages.map((p) => [p.id, p]));
+  const pendingRequests = (customerRequests ?? []).filter((r) => r.status === 'PENDING');
 
   const starterUserIds = Array.from(
     new Set(cars.map((c) => c.serviceStartedByUserId).filter(Boolean) as string[]),
@@ -177,9 +188,23 @@ export async function loadCustomerAccount(
       ? parsedServices.reduce((sum, s) => sum + s.washesPerMonth, 0)
       : (pkg?.washesPerMonth ?? 8);
 
+    const carPending = pendingRequests.find((r) => r.carId === car.id);
+    const pendingRequest = carPending
+      ? {
+          ...carPending,
+          requestedPackage: carPending.requestedPackageId
+            ? packageById.get(carPending.requestedPackageId) ?? null
+            : null,
+          currentPackage: carPending.currentPackageId
+            ? packageById.get(carPending.currentPackageId) ?? null
+            : pkg,
+        }
+      : null;
+
     return {
       ...car,
       package: pkg,
+      pendingRequest,
       tally: tallyVisits(
         effectiveCycleVisits.filter((v) => v.carId === car.id),
         effectiveQuota,
@@ -293,6 +318,7 @@ export async function loadCustomerAccount(
     visits: resolvedVisits,
     payments,
     invoices,
+    pendingRequests,
     monthly,
     advanceDeposited,
     totalPaid,

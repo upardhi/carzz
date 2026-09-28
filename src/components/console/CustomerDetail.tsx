@@ -90,6 +90,30 @@ export async function ConsoleCustomerDetail({
         }
       />
 
+      {account.pendingRequests && account.pendingRequests.length > 0 && (
+        <div className="mb-4 rounded-xl border border-amber-300 bg-gradient-to-r from-amber-50 to-orange-50 p-4 text-xs text-amber-950 shadow-xs flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <span className="text-xl">⏳</span>
+            <div>
+              <div className="font-bold text-sm text-amber-900">
+                {account.pendingRequests.length} Pending Special Request{account.pendingRequests.length > 1 ? 's' : ''} for this Customer
+              </div>
+              <div className="text-amber-800 text-[11.5px] mt-0.5">
+                Review package change and special wash requests in the Requests panel.
+              </div>
+            </div>
+          </div>
+          <ButtonLink
+            href={`${base}/requests`}
+            variant="primary"
+            size="sm"
+            className="bg-amber-600 hover:bg-amber-700 text-white font-bold"
+          >
+            Go to Requests ({account.pendingRequests.length}) →
+          </ButtonLink>
+        </div>
+      )}
+
       <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
         <Card className="p-4 min-w-0">
           <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
@@ -285,6 +309,55 @@ export async function ConsoleCustomerDetail({
                     />
                   </div>
                 </div>
+
+                {/* Pending Request Alert for this vehicle */}
+                {car.pendingRequest && (
+                  <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50/90 p-3 text-xs text-amber-950 shadow-2xs">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="text-base shrink-0">⏳</span>
+                        <div className="min-w-0">
+                          <div className="font-bold text-amber-900">
+                            {car.pendingRequest.type === 'PACKAGE_CHANGE'
+                              ? 'Package Change Pending Approval'
+                              : `Special Request Pending (${car.pendingRequest.washType || car.pendingRequest.type})`}
+                          </div>
+                          <div className="text-[11.5px] text-amber-800 mt-0.5">
+                            {car.pendingRequest.type === 'PACKAGE_CHANGE' ? (
+                              <>
+                                Change:{' '}
+                                <span className="font-medium text-slate-700">
+                                  {car.package?.name ?? 'Current Plan'}
+                                </span>{' '}
+                                →{' '}
+                                <span className="font-bold text-amber-950">
+                                  {car.pendingRequest.requestedPackage?.name ?? 'New Plan'}
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                {car.pendingRequest.preferredDate
+                                  ? `Preferred: ${formatDateFull(car.pendingRequest.preferredDate)} · `
+                                  : ''}
+                                {car.pendingRequest.notes
+                                  ? `"${car.pendingRequest.notes}"`
+                                  : ''}
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <ButtonLink
+                        href={`${base}/requests`}
+                        variant="secondary"
+                        size="sm"
+                        className="shrink-0 border-amber-300 bg-white text-amber-900 hover:bg-amber-100 font-semibold shadow-xs"
+                      >
+                        Review in Requests →
+                      </ButtonLink>
+                    </div>
+                  </div>
+                )}
 
                 <Row label="Package" value={car.package?.name ?? '—'} />
                 <Row
