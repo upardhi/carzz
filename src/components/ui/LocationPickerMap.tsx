@@ -159,7 +159,6 @@ export function LocationPickerMap({
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
-  const [isLocating, setIsLocating] = useState(false);
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [searchError, setSearchError] = useState('');
@@ -343,64 +342,6 @@ export function LocationPickerMap({
       }
     };
   }, []);
-
-  // Quick City Jump helper
-  const handleQuickJumpCity = (targetCity: string) => {
-    const center = getCityCenter(targetCity);
-    if (mapInstanceRef.current) {
-      mapInstanceRef.current.setView([center.lat, center.lng], 14);
-    }
-    if (onCityChange) {
-      onCityChange(targetCity);
-    }
-  };
-
-  // GPS "Use Current Location" handler
-  const handleUseCurrentLocation = useCallback(() => {
-    if (typeof window === 'undefined' || !navigator.geolocation) {
-      setSearchError('Geolocation is not supported by your browser.');
-      return;
-    }
-
-    setIsLocating(true);
-    setSearchError('');
-
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        setIsLocating(false);
-        const cLat = Number(position.coords.latitude.toFixed(6));
-        const cLng = Number(position.coords.longitude.toFixed(6));
-        const accuracy = Math.round(position.coords.accuracy || 0);
-
-        onCoordinatesChange(cLat, cLng);
-        if (mapInstanceRef.current) {
-          if (mapInstanceRef.current.flyTo) {
-            mapInstanceRef.current.flyTo([cLat, cLng], 17, { duration: 1.2 });
-          } else {
-            mapInstanceRef.current.setView([cLat, cLng], 17);
-          }
-        }
-        await reverseGeocode(cLat, cLng);
-
-        if (accuracy > 3000) {
-          setSearchError(
-            `📍 Browser reported ~${(accuracy / 1000).toFixed(1)}km accuracy radius (broadband IP). Search your exact colony or tap map to refine pin.`,
-          );
-        }
-      },
-      (err) => {
-        setIsLocating(false);
-        if (err.code === 1) {
-          setSearchError('Location permission denied. Please allow GPS access in your browser or click directly on the map.');
-        } else if (err.code === 2) {
-          setSearchError('Position unavailable. Please search your apartment name or tap on the map.');
-        } else {
-          setSearchError('Location request timed out. Please try searching or tapping the map.');
-        }
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
-    );
-  }, [onCoordinatesChange, reverseGeocode]);
 
   // Multi-engine search supporting apartments, small societies, buildings, and landmarks
   async function handleSearch(e?: React.FormEvent) {
@@ -700,48 +641,8 @@ export function LocationPickerMap({
               disabled={isSearching || !searchQuery.trim()}
               className="w-full sm:w-auto justify-center shrink-0 font-semibold"
             >
-              {isSearching ? 'Searching…' : 'Search'}
+              {isSearching ? 'Searching…' : 'Search / Locate'}
             </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={handleUseCurrentLocation}
-              disabled={isLocating}
-              className="w-full sm:w-auto justify-center shrink-0 font-semibold bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100"
-              title="Detect your device GPS coordinates"
-            >
-              {isLocating ? 'Locating GPS…' : '📍 Current Location'}
-            </Button>
-          </div>
-
-          {/* Quick City Jumps */}
-          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-0.5">
-              Quick Jump:
-            </span>
-            {[
-              { name: 'Wardha', label: '📍 Wardha' },
-              { name: 'Nagpur', label: 'Nagpur' },
-              { name: 'Pune', label: 'Pune' },
-              { name: 'Mumbai', label: 'Mumbai' },
-              { name: 'Amravati', label: 'Amravati' },
-              { name: 'Yavatmal', label: 'Yavatmal' },
-              { name: 'Chandrapur', label: 'Chandrapur' },
-            ].map((c) => (
-              <button
-                key={c.name}
-                type="button"
-                onClick={() => handleQuickJumpCity(c.name)}
-                className={`text-[10.5px] px-2 py-0.5 rounded-md font-medium transition-colors border cursor-pointer ${
-                  (city || '').toLowerCase() === c.name.toLowerCase()
-                    ? 'bg-blue-50 text-blue-700 border-blue-200 font-bold'
-                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                }`}
-              >
-                {c.label}
-              </button>
-            ))}
           </div>
 
           {/* Search Result Suggestions Dropdown */}
@@ -792,25 +693,13 @@ export function LocationPickerMap({
             </div>
           )}
 
-          {/* Floating Live GPS & Geocode Status Controls */}
-          <div className="absolute top-2.5 right-2.5 z-10 flex flex-col items-end gap-1.5 pointer-events-auto">
-            {isGeocoding && (
-              <div className="bg-white/95 backdrop-blur-xs border border-line px-2.5 py-1 rounded-lg text-[11px] font-semibold text-navy-900 shadow-md flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-blue-600 animate-ping" />
-                <span>Updating address…</span>
-              </div>
-            )}
-            <button
-              type="button"
-              onClick={handleUseCurrentLocation}
-              disabled={isLocating}
-              className="flex items-center gap-1.5 bg-white/95 backdrop-blur-xs hover:bg-white text-slate-800 hover:text-blue-700 font-bold text-xs px-3 py-1.5 rounded-lg border border-slate-300 shadow-md transition-all active:scale-95 cursor-pointer"
-              title="Detect your device GPS live location"
-            >
-              <span className={`text-sm ${isLocating ? 'animate-spin' : 'text-blue-600'}`}>🎯</span>
-              <span>{isLocating ? 'Locating GPS…' : 'My Live Location'}</span>
-            </button>
-          </div>
+          {/* Geocode Status Indicator */}
+          {isGeocoding && (
+            <div className="absolute top-2.5 right-2.5 z-10 bg-white/95 backdrop-blur-xs border border-line px-2.5 py-1 rounded-lg text-[11px] font-semibold text-navy-900 shadow-md flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-blue-600 animate-ping" />
+              <span>Updating address…</span>
+            </div>
+          )}
         </div>
 
         {/* Selected Location Details & Clear Action */}
