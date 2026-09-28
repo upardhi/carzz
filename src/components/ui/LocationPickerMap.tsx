@@ -374,24 +374,28 @@ export function LocationPickerMap({
 
         onCoordinatesChange(cLat, cLng);
         if (mapInstanceRef.current) {
-          mapInstanceRef.current.setView([cLat, cLng], 16);
+          if (mapInstanceRef.current.flyTo) {
+            mapInstanceRef.current.flyTo([cLat, cLng], 17, { duration: 1.2 });
+          } else {
+            mapInstanceRef.current.setView([cLat, cLng], 17);
+          }
         }
         await reverseGeocode(cLat, cLng);
 
         if (accuracy > 3000) {
           setSearchError(
-            `📍 Browser reported ~${(accuracy / 1000).toFixed(1)}km accuracy radius (common on desktop broadband). Search your colony or tap map to refine.`,
+            `📍 Browser reported ~${(accuracy / 1000).toFixed(1)}km accuracy radius (broadband IP). Search your exact colony or tap map to refine pin.`,
           );
         }
       },
       (err) => {
         setIsLocating(false);
         if (err.code === 1) {
-          setSearchError('Location permission denied. Please enable GPS access or click on the map.');
+          setSearchError('Location permission denied. Please allow GPS access in your browser or click directly on the map.');
         } else if (err.code === 2) {
-          setSearchError('Position unavailable. Please search your apartment or tap on the map.');
+          setSearchError('Position unavailable. Please search your apartment name or tap on the map.');
         } else {
-          setSearchError('Location request timed out. Please try searching.');
+          setSearchError('Location request timed out. Please try searching or tapping the map.');
         }
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
@@ -407,7 +411,7 @@ export function LocationPickerMap({
     setSearchError('');
     setSearchResults([]);
 
-    // 1. Check if user typed or pasted raw coordinates / Google Maps URL
+    // 1. Check if user typed or pasted raw coordinates / direct Google Maps URL
     const gmapsCoords = parseGoogleMapsUrl(query);
     if (gmapsCoords) {
       onCoordinatesChange(gmapsCoords.lat, gmapsCoords.lng);
@@ -417,6 +421,28 @@ export function LocationPickerMap({
       setSearchQuery('');
       await reverseGeocode(gmapsCoords.lat, gmapsCoords.lng);
       return;
+    }
+
+    // 1b. Check if user pasted a Google Maps shortlink (maps.app.goo.gl, goo.gl, etc.)
+    if (query.includes('maps.app.goo.gl') || query.includes('goo.gl/maps') || (query.startsWith('http') && query.includes('google.com/maps'))) {
+      setIsSearching(true);
+      try {
+        const res = await fetch(`/api/geocode/expand-link?url=${encodeURIComponent(query)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && typeof data.lat === 'number' && typeof data.lng === 'number') {
+            onCoordinatesChange(data.lat, data.lng);
+            if (mapInstanceRef.current) {
+              mapInstanceRef.current.setView([data.lat, data.lng], 17);
+            }
+            setSearchQuery('');
+            await reverseGeocode(data.lat, data.lng);
+            return;
+          }
+        }
+      } catch {
+        // Fallback to text search
+      }
     }
 
     setIsSearching(true);
@@ -507,7 +533,7 @@ export function LocationPickerMap({
 
       // Engine 3: Fallback with city or state appended if no results
       if (candidates.length === 0) {
-        const appendedCity = city && city !== 'Nagpur' ? city : 'Wardha';
+        const appendedCity = city || 'Wardha';
         if (!query.toLowerCase().includes(appendedCity.toLowerCase())) {
           try {
             const cityQuery = `${query}, ${appendedCity}`;
@@ -547,8 +573,21 @@ export function LocationPickerMap({
         }
       }
 
+      // Engine 4: If still no map results (e.g. unindexed small building like "Shivshakti apartment"),
+      // provide instant 1-click fallback to pin at current city center and set address
+      const targetCity = city || 'Wardha';
+      const cityCenterCoords = getCityCenter(targetCity);
+      candidates.push({
+        display_name: `${query}, ${targetCity}`,
+        title: query,
+        subtitle: `📍 Place pin in ${targetCity} with this address (Click to select)`,
+        city: targetCity,
+        lat: cityCenterCoords.lat,
+        lng: cityCenterCoords.lng,
+      });
+
       if (candidates.length > 0) {
-        if (candidates.length === 1) {
+        if (candidates.length === 1 && !candidates[0].subtitle?.includes('Place pin')) {
           selectSearchResult(candidates[0]);
         } else {
           setSearchResults(candidates);
@@ -745,19 +784,33 @@ export function LocationPickerMap({
         ) : null}
 
         {/* Leaflet Map Canvas */}
-        <div className="relative rounded-lg overflow-hidden border border-line bg-slate-100 h-56">
+        <div className="relative rounded-lg overflow-hidden border border-line bg-slate-100 h-64">
           <div ref={mapContainerRef} className="w-full h-full z-0" suppressHydrationWarning />
           {!mapLoaded && (
             <div className="absolute inset-0 flex items-center justify-center bg-slate-100 text-xs text-ink-mute font-medium">
               Loading map view…
             </div>
           )}
-          {isGeocoding && (
-            <div className="absolute top-2 right-2 z-10 bg-white/90 backdrop-blur-xs border border-line px-2.5 py-1 rounded-md text-[11px] font-semibold text-navy-900 shadow-xs flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-blue-600 animate-ping" />
-              <span>Updating address…</span>
-            </div>
-          )}
+
+          {/* Floating Live GPS & Geocode Status Controls */}
+          <div className="absolute top-2.5 right-2.5 z-10 flex flex-col items-end gap-1.5 pointer-events-auto">
+            {isGeocoding && (
+              <div className="bg-white/95 backdrop-blur-xs border border-line px-2.5 py-1 rounded-lg text-[11px] font-semibold text-navy-900 shadow-md flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-blue-600 animate-ping" />
+                <span>Updating address…</span>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={handleUseCurrentLocation}
+              disabled={isLocating}
+              className="flex items-center gap-1.5 bg-white/95 backdrop-blur-xs hover:bg-white text-slate-800 hover:text-blue-700 font-bold text-xs px-3 py-1.5 rounded-lg border border-slate-300 shadow-md transition-all active:scale-95 cursor-pointer"
+              title="Detect your device GPS live location"
+            >
+              <span className={`text-sm ${isLocating ? 'animate-spin' : 'text-blue-600'}`}>🎯</span>
+              <span>{isLocating ? 'Locating GPS…' : 'My Live Location'}</span>
+            </button>
+          </div>
         </div>
 
         {/* Selected Location Details & Clear Action */}
