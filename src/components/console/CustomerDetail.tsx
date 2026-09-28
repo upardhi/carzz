@@ -450,12 +450,21 @@ export async function ConsoleCustomerDetail({
             value={money(Math.max(0, account.balance))}
             tone="success"
           />
-          <Row
-            label="Outstanding"
-            value={money(account.outstanding)}
-            tone={account.outstanding > 0 ? 'danger' : undefined}
-          />
-          {account.nextDue ? (
+          {cars.some((c) => c.serviceStarted) || visits.some((v) => v.cycle === cycle && v.status === 'DONE') ? (
+            <Row
+              label="Outstanding"
+              value={money(account.outstanding)}
+              tone={account.outstanding > 0 ? 'danger' : undefined}
+            />
+          ) : (
+            <Row
+              label="Service status"
+              value={
+                <Tag tone="warn">First Wash Pending · Service Not Started</Tag>
+              }
+            />
+          )}
+          {account.nextDue && (cars.some((c) => c.serviceStarted) || visits.some((v) => v.cycle === cycle && v.status === 'DONE')) ? (
             <Row
               label="Next due"
               value={`${formatDateFull(account.nextDue.dueOn)} · ${money(
@@ -468,7 +477,11 @@ export async function ConsoleCustomerDetail({
             <RecordPaymentForm
               customerId={customerId}
               suggested={account.outstanding || account.monthly}
-              outstanding={account.outstanding}
+              outstanding={
+                cars.some((c) => c.serviceStarted) || visits.some((v) => v.cycle === cycle && v.status === 'DONE')
+                  ? account.outstanding
+                  : 0
+              }
               monthly={account.monthly}
               invoices={invoices}
             />
