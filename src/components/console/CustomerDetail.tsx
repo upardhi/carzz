@@ -291,7 +291,7 @@ export async function ConsoleCustomerDetail({
                   label="Washes this month"
                   value={
                     isStarted
-                      ? `${car.tally.done} of ${car.package?.washesPerMonth ?? 0}`
+                      ? `${car.tally.done} of ${car.tally.total}`
                       : 'Washes not started yet'
                   }
                 />

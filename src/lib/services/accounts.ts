@@ -2,15 +2,16 @@ import 'server-only';
 import { cache } from 'react';
 
 import type { DataStore } from '../data/ports/store';
-import type {
-  Car,
-  Customer,
-  Id,
-  Invoice,
-  Payment,
-  Rupees,
-  ServicePackage,
-  WashVisit,
+import {
+  parsePackageServices,
+  type Car,
+  type Customer,
+  type Id,
+  type Invoice,
+  type Payment,
+  type Rupees,
+  type ServicePackage,
+  type WashVisit,
 } from '../data/types';
 import { tallyVisits, type VisitTally } from './visits';
 import { generateVisitsForCar, scheduleNextVisitForCar } from './schedule';
@@ -171,12 +172,17 @@ export async function loadCustomerAccount(
       ? userById.get(car.serviceStartedByUserId)
       : null;
     const pkg = packageById.get(car.packageId) ?? null;
+    const parsedServices = parsePackageServices(pkg?.services, pkg?.washesPerMonth ?? 8);
+    const effectiveQuota = parsedServices.length > 0
+      ? parsedServices.reduce((sum, s) => sum + s.washesPerMonth, 0)
+      : (pkg?.washesPerMonth ?? 8);
+
     return {
       ...car,
       package: pkg,
       tally: tallyVisits(
         effectiveCycleVisits.filter((v) => v.carId === car.id),
-        pkg?.washesPerMonth,
+        effectiveQuota,
       ),
       serviceStartedByUser: starterUser
         ? {
@@ -274,10 +280,12 @@ export async function loadCustomerAccount(
       }
     : null;
 
-  const totalAccountQuota = cars.reduce(
-    (sum, c) => sum + (packageById.get(c.packageId)?.washesPerMonth ?? 8),
-    0,
-  );
+  const totalAccountQuota = cars.reduce((sum, c) => {
+    const pkg = packageById.get(c.packageId);
+    const parsed = parsePackageServices(pkg?.services, pkg?.washesPerMonth ?? 8);
+    const quota = parsed.length > 0 ? parsed.reduce((s, item) => s + item.washesPerMonth, 0) : (pkg?.washesPerMonth ?? 8);
+    return sum + quota;
+  }, 0);
 
   return {
     customer,
