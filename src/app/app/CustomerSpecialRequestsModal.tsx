@@ -296,6 +296,15 @@ export function CustomerSpecialRequestsModal({
                       )}
                     </div>
                   )}
+
+                  {requestedPkg && currentPkg && requestedPkg.price < currentPkg.price && (
+                    <div className="mt-2 rounded-lg bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-900 flex items-start gap-2">
+                      <span className="text-sm shrink-0">ℹ️</span>
+                      <div>
+                        <span className="font-bold">Plan Downgrade Notice:</span> You will continue to receive the full washes and benefits of your current <span className="font-bold">{currentPkg.name}</span> plan until the end of this month. Your new <span className="font-bold">{requestedPkg.name}</span> plan will automatically take effect from the 1st of next month.
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div>
