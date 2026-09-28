@@ -401,6 +401,7 @@ export function FlaggedWashesModal({
                               src={item.beforePhotoUrl}
                               alt="Before wash"
                               fill
+                              unoptimized
                               sizes="80px"
                               className="object-cover group-hover:scale-105 transition duration-200"
                             />
@@ -431,6 +432,7 @@ export function FlaggedWashesModal({
                               src={item.afterPhotoUrl}
                               alt="After wash"
                               fill
+                              unoptimized
                               sizes="80px"
                               className="object-cover group-hover:scale-105 transition duration-200"
                             />
@@ -506,6 +508,7 @@ export function FlaggedWashesModal({
                 src={previewPhoto.url}
                 alt="Full photo"
                 fill
+                unoptimized
                 sizes="(max-width: 1200px) 100vw, 800px"
                 className="object-contain"
               />

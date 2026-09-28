@@ -174,6 +174,32 @@ export default async function CarDetail({
         </div>
       )}
 
+      {/* Pending Request Alert */}
+      {car.pendingRequest && (
+        <div className="rounded-2xl border border-amber-300/80 bg-amber-50/90 p-4 text-xs text-amber-950 shadow-2xs flex items-start gap-3">
+          <span className="text-xl shrink-0">⏳</span>
+          <div>
+            <div className="font-bold text-sm text-amber-900">
+              {car.pendingRequest.type === 'PACKAGE_CHANGE'
+                ? 'Package Change Request Under Review'
+                : `Special Service Request Under Review (${car.pendingRequest.washType || car.pendingRequest.type})`}
+            </div>
+            <div className="text-amber-800 text-xs mt-1 leading-relaxed">
+              {car.pendingRequest.type === 'PACKAGE_CHANGE' ? (
+                <>
+                  You requested to change this vehicle&apos;s plan from <span className="font-semibold text-slate-800">{car.package?.name ?? 'Current'}</span> to <span className="font-bold text-amber-950">{car.pendingRequest.requestedPackage?.name ?? 'New Plan'}</span>. Your current package remains active until approved by our team.
+                </>
+              ) : (
+                <>
+                  {car.pendingRequest.preferredDate ? `Preferred date: ${formatDateFull(car.pendingRequest.preferredDate)}. ` : ''}
+                  Our operations team is reviewing your request and will schedule it shortly.
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 2. Top Stats Grid */}
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-2xs">
