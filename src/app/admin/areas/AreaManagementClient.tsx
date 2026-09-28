@@ -1061,6 +1061,7 @@ export function AreaManagementClient({
                 lat={areaLat}
                 lng={areaLng}
                 city={areaCity || 'Nagpur'}
+                onCityChange={(newCity) => setAreaCity(newCity)}
                 onAddressChange={(newAddress) => setAreaAddress(newAddress)}
                 onCoordinatesChange={(newLat, newLng) => {
                   setAreaLat(newLat);
@@ -1171,6 +1172,7 @@ export function AreaManagementClient({
                 lat={editLat}
                 lng={editLng}
                 city={editCity || 'Nagpur'}
+                onCityChange={(newCity) => setEditCity(newCity)}
                 onAddressChange={(newAddress) => setEditAddress(newAddress)}
                 onCoordinatesChange={(newLat, newLng) => {
                   setEditLat(newLat);

@@ -27,6 +27,7 @@ interface LocationPickerMapProps {
   /** Hides the address text input if we want to render it outside */
   hideAddressInput?: boolean;
   onAddressChange: (address: string) => void;
+  onCityChange?: (city: string) => void;
   onCoordinatesChange: (lat: number | null, lng: number | null) => void;
 }
 
@@ -111,14 +112,31 @@ function loadLeaflet(): Promise<typeof window.L> {
   });
 }
 
-// Default fallback coordinates: Nagpur, India center
-const FALLBACK_LAT = 21.1458;
-const FALLBACK_LNG = 79.0882;
+// Known city center coordinates across Maharashtra & key hubs
+const CITY_CENTERS: Record<string, { lat: number; lng: number }> = {
+  wardha: { lat: 20.7453, lng: 78.6022 },
+  nagpur: { lat: 21.1458, lng: 79.0882 },
+  pune: { lat: 18.5204, lng: 73.8567 },
+  mumbai: { lat: 19.076, lng: 72.8777 },
+  amravati: { lat: 20.9374, lng: 77.7796 },
+  yavatmal: { lat: 20.3888, lng: 78.1204 },
+  chandrapur: { lat: 19.9615, lng: 79.2961 },
+  nashik: { lat: 19.9975, lng: 73.7898 },
+  aurangabad: { lat: 19.8762, lng: 75.3433 },
+  chhatrapatisambhajinagar: { lat: 19.8762, lng: 75.3433 },
+};
+
+function getCityCenter(cityName?: string): { lat: number; lng: number } {
+  if (!cityName) return CITY_CENTERS.wardha;
+  const key = cityName.toLowerCase().replace(/[^a-z]/g, '');
+  return CITY_CENTERS[key] || CITY_CENTERS.wardha;
+}
 
 export interface GeoSearchResult {
   display_name: string;
   title: string;
   subtitle?: string;
+  city?: string;
   lat: number;
   lng: number;
 }
@@ -127,11 +145,12 @@ export function LocationPickerMap({
   address,
   lat,
   lng,
-  city = 'Nagpur',
+  city = 'Wardha',
   addressRequired = false,
   addressLabel,
   hideAddressInput = false,
   onAddressChange,
+  onCityChange,
   onCoordinatesChange,
 }: LocationPickerMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -159,6 +178,19 @@ export function LocationPickerMap({
           const data = await res.json();
           if (data && data.display_name) {
             onAddressChange(data.display_name);
+            const addr = data.address || {};
+            const detectedCity =
+              addr.city ||
+              addr.town ||
+              addr.village ||
+              addr.municipality ||
+              addr.suburb ||
+              addr.district ||
+              addr.county ||
+              addr.state_district;
+            if (detectedCity && onCityChange) {
+              onCityChange(detectedCity);
+            }
             return;
           }
         }
@@ -175,6 +207,10 @@ export function LocationPickerMap({
             if (parts.length > 0) {
               onAddressChange(parts.join(', '));
             }
+            const detectedCity = p.city || p.district;
+            if (detectedCity && onCityChange) {
+              onCityChange(detectedCity);
+            }
           }
         }
       } catch {
@@ -183,7 +219,7 @@ export function LocationPickerMap({
         setIsGeocoding(false);
       }
     },
-    [onAddressChange],
+    [onAddressChange, onCityChange],
   );
 
   // Initialize or update Leaflet Map
@@ -205,8 +241,9 @@ export function LocationPickerMap({
           shadowSize: [41, 41],
         });
 
-        const currentLat = lat ?? FALLBACK_LAT;
-        const currentLng = lng ?? FALLBACK_LNG;
+        const fallbackCoords = getCityCenter(city);
+        const currentLat = lat ?? fallbackCoords.lat;
+        const currentLng = lng ?? fallbackCoords.lng;
         const zoomLevel = lat && lng ? 16 : 13;
 
         if (!mapInstanceRef.current) {
@@ -294,7 +331,7 @@ export function LocationPickerMap({
     return () => {
       isMounted = false;
     };
-  }, [lat, lng, onCoordinatesChange, reverseGeocode]);
+  }, [lat, lng, city, onCoordinatesChange, reverseGeocode]);
 
   // Cleanup map instance on unmount
   useEffect(() => {
@@ -306,6 +343,17 @@ export function LocationPickerMap({
       }
     };
   }, []);
+
+  // Quick City Jump helper
+  const handleQuickJumpCity = (targetCity: string) => {
+    const center = getCityCenter(targetCity);
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.setView([center.lat, center.lng], 14);
+    }
+    if (onCityChange) {
+      onCityChange(targetCity);
+    }
+  };
 
   // GPS "Use Current Location" handler
   const handleUseCurrentLocation = useCallback(() => {
@@ -322,12 +370,19 @@ export function LocationPickerMap({
         setIsLocating(false);
         const cLat = Number(position.coords.latitude.toFixed(6));
         const cLng = Number(position.coords.longitude.toFixed(6));
+        const accuracy = Math.round(position.coords.accuracy || 0);
 
         onCoordinatesChange(cLat, cLng);
         if (mapInstanceRef.current) {
           mapInstanceRef.current.setView([cLat, cLng], 16);
         }
         await reverseGeocode(cLat, cLng);
+
+        if (accuracy > 3000) {
+          setSearchError(
+            `📍 Browser reported ~${(accuracy / 1000).toFixed(1)}km accuracy radius (common on desktop broadband). Search your colony or tap map to refine.`,
+          );
+        }
       },
       (err) => {
         setIsLocating(false);
@@ -339,7 +394,7 @@ export function LocationPickerMap({
           setSearchError('Location request timed out. Please try searching.');
         }
       },
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
     );
   }, [onCoordinatesChange, reverseGeocode]);
 
@@ -377,12 +432,9 @@ export function LocationPickerMap({
         }
       };
 
-      const centerLat = lat ?? FALLBACK_LAT;
-      const centerLng = lng ?? FALLBACK_LNG;
-
-      // Engine 1: Photon OpenStreetMap Elastic Geocoder (great for apartments, small societies, buildings)
+      // Engine 1: Photon OpenStreetMap Elastic Geocoder (Unbiased general search across India)
       try {
-        const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=8&lat=${centerLat}&lon=${centerLng}`;
+        const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=10&lang=en`;
         const pRes = await fetch(photonUrl);
         if (pRes.ok) {
           const pData = await pRes.json();
@@ -393,6 +445,7 @@ export function LocationPickerMap({
                 const lon = Number(Number(coords[0]).toFixed(6));
                 const cLat = Number(Number(coords[1]).toFixed(6));
                 const p = f.properties || {};
+                const detectedItemCity = p.city || p.district || p.state;
                 const parts = [
                   p.name,
                   p.housenumber ? `No. ${p.housenumber}` : '',
@@ -408,6 +461,7 @@ export function LocationPickerMap({
                   display_name: parts.join(', ') || title,
                   title,
                   subtitle,
+                  city: detectedItemCity,
                   lat: cLat,
                   lng: lon,
                 });
@@ -419,10 +473,10 @@ export function LocationPickerMap({
         // Continue to next engine
       }
 
-      // Engine 2: OpenStreetMap Nominatim with direct query
+      // Engine 2: OpenStreetMap Nominatim with India countrycode
       try {
         const nomRes = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=6&addressdetails=1`,
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=in&limit=8&addressdetails=1`,
           { headers: { 'User-Agent': 'CarzzWeb-App/1.0' } },
         );
         if (nomRes.ok) {
@@ -431,6 +485,8 @@ export function LocationPickerMap({
             for (const item of nData) {
               const cLat = Number(parseFloat(item.lat).toFixed(6));
               const cLng = Number(parseFloat(item.lon).toFixed(6));
+              const addr = item.address || {};
+              const detectedItemCity = addr.city || addr.town || addr.village || addr.district;
               const parts = (item.display_name || '').split(',');
               const title = parts[0]?.trim() || item.display_name;
               const subtitle = parts.slice(1).join(',').trim();
@@ -438,6 +494,7 @@ export function LocationPickerMap({
                 display_name: item.display_name,
                 title,
                 subtitle,
+                city: detectedItemCity,
                 lat: cLat,
                 lng: cLng,
               });
@@ -448,41 +505,45 @@ export function LocationPickerMap({
         // Continue
       }
 
-      // Engine 3: Fallback with city appended if no results and city wasn't in search text
-      if (candidates.length === 0 && city && !query.toLowerCase().includes(city.toLowerCase())) {
-        try {
-          const cityQuery = `${query}, ${city}`;
-          const photonCityUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(cityQuery)}&limit=6&lat=${centerLat}&lon=${centerLng}`;
-          const pRes = await fetch(photonCityUrl);
-          if (pRes.ok) {
-            const pData = await pRes.json();
-            if (Array.isArray(pData?.features)) {
-              for (const f of pData.features) {
-                const coords = f.geometry?.coordinates;
-                if (Array.isArray(coords) && coords.length >= 2) {
-                  const lon = Number(Number(coords[0]).toFixed(6));
-                  const cLat = Number(Number(coords[1]).toFixed(6));
-                  const p = f.properties || {};
-                  const parts = [
-                    p.name,
-                    p.street,
-                    p.district || p.suburb,
-                    p.city,
-                    p.state,
-                  ].filter(Boolean);
-                  addCandidate({
-                    display_name: parts.join(', ') || p.name,
-                    title: p.name || parts[0] || cityQuery,
-                    subtitle: parts.slice(1).join(', '),
-                    lat: cLat,
-                    lng: lon,
-                  });
+      // Engine 3: Fallback with city or state appended if no results
+      if (candidates.length === 0) {
+        const appendedCity = city && city !== 'Nagpur' ? city : 'Wardha';
+        if (!query.toLowerCase().includes(appendedCity.toLowerCase())) {
+          try {
+            const cityQuery = `${query}, ${appendedCity}`;
+            const photonCityUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(cityQuery)}&limit=6&lang=en`;
+            const pRes = await fetch(photonCityUrl);
+            if (pRes.ok) {
+              const pData = await pRes.json();
+              if (Array.isArray(pData?.features)) {
+                for (const f of pData.features) {
+                  const coords = f.geometry?.coordinates;
+                  if (Array.isArray(coords) && coords.length >= 2) {
+                    const lon = Number(Number(coords[0]).toFixed(6));
+                    const cLat = Number(Number(coords[1]).toFixed(6));
+                    const p = f.properties || {};
+                    const parts = [
+                      p.name,
+                      p.street,
+                      p.district || p.suburb,
+                      p.city,
+                      p.state,
+                    ].filter(Boolean);
+                    addCandidate({
+                      display_name: parts.join(', ') || p.name,
+                      title: p.name || parts[0] || cityQuery,
+                      subtitle: parts.slice(1).join(', '),
+                      city: p.city || appendedCity,
+                      lat: cLat,
+                      lng: lon,
+                    });
+                  }
                 }
               }
             }
+          } catch {
+            // Continue
           }
-        } catch {
-          // Continue
         }
       }
 
@@ -506,6 +567,9 @@ export function LocationPickerMap({
     onCoordinatesChange(item.lat, item.lng);
     if (item.display_name) {
       onAddressChange(item.display_name);
+    }
+    if (item.city && onCityChange) {
+      onCityChange(item.city);
     }
 
     if (mapInstanceRef.current) {
@@ -612,6 +676,35 @@ export function LocationPickerMap({
             </Button>
           </div>
 
+          {/* Quick City Jumps */}
+          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-0.5">
+              Quick Jump:
+            </span>
+            {[
+              { name: 'Wardha', label: '📍 Wardha' },
+              { name: 'Nagpur', label: 'Nagpur' },
+              { name: 'Pune', label: 'Pune' },
+              { name: 'Mumbai', label: 'Mumbai' },
+              { name: 'Amravati', label: 'Amravati' },
+              { name: 'Yavatmal', label: 'Yavatmal' },
+              { name: 'Chandrapur', label: 'Chandrapur' },
+            ].map((c) => (
+              <button
+                key={c.name}
+                type="button"
+                onClick={() => handleQuickJumpCity(c.name)}
+                className={`text-[10.5px] px-2 py-0.5 rounded-md font-medium transition-colors border cursor-pointer ${
+                  (city || '').toLowerCase() === c.name.toLowerCase()
+                    ? 'bg-blue-50 text-blue-700 border-blue-200 font-bold'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+
           {/* Search Result Suggestions Dropdown */}
           {searchResults.length > 0 && (
             <div className="absolute top-full left-0 right-0 z-30 mt-1 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl max-h-48 overflow-y-auto divide-y divide-slate-100">
@@ -634,13 +727,25 @@ export function LocationPickerMap({
         </div>
 
         {searchError ? (
-          <p className="text-[11px] font-medium text-rose-600 bg-rose-50 border border-rose-200 p-2 rounded-md">
-            ⚠️ {searchError}
-          </p>
+          <div className="text-[11px] font-medium text-amber-900 bg-amber-50 border border-amber-200 p-2 rounded-md flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
+            <span>⚠️ {searchError}</span>
+            {searchQuery.trim() ? (
+              <button
+                type="button"
+                onClick={() => {
+                  onAddressChange(searchQuery.trim());
+                  setSearchError('');
+                }}
+                className="text-[10.5px] font-bold text-blue-700 hover:underline shrink-0 text-left"
+              >
+                Use &quot;{searchQuery.trim()}&quot; as address
+              </button>
+            ) : null}
+          </div>
         ) : null}
 
         {/* Leaflet Map Canvas */}
-        <div className="relative rounded-lg overflow-hidden border border-line bg-slate-100 h-52">
+        <div className="relative rounded-lg overflow-hidden border border-line bg-slate-100 h-56">
           <div ref={mapContainerRef} className="w-full h-full z-0" suppressHydrationWarning />
           {!mapLoaded && (
             <div className="absolute inset-0 flex items-center justify-center bg-slate-100 text-xs text-ink-mute font-medium">
