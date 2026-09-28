@@ -52,7 +52,7 @@ export default async function CustomerCars() {
 
       {/* 2. Registered Cars Section */}
       <div className="space-y-4">
-        <div className="flex items-start sm:items-center justify-between gap-3">
+        <div className="flex flex-wrap items-start sm:items-center justify-between gap-3">
           <div className="flex items-start sm:items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-blue-100 bg-blue-50 text-blue-600">
               <IconCar width={20} height={20} />
@@ -63,9 +63,22 @@ export default async function CustomerCars() {
             </div>
           </div>
 
-          <span className="shrink-0 whitespace-nowrap rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700 border border-slate-200/60">
-            {account.cars.length} {account.cars.length === 1 ? 'vehicle' : 'vehicles'}
-          </span>
+          <div className="flex items-center gap-2.5 shrink-0">
+            <span className="shrink-0 whitespace-nowrap rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700 border border-slate-200/60">
+              {account.cars.length} {account.cars.length === 1 ? 'vehicle' : 'vehicles'}
+            </span>
+
+            <AddCarModal
+              packages={packages.map((p) => ({
+                id: p.id,
+                name: p.name,
+                price: p.price,
+                washesPerMonth: p.washesPerMonth,
+                billingPeriod: p.billingPeriod,
+                washesPerPeriod: p.washesPerPeriod,
+              }))}
+            />
+          </div>
         </div>
 
         <div className="space-y-3.5">
@@ -133,18 +146,6 @@ export default async function CustomerCars() {
             <b>Shared account info:</b> All vehicles share one payment ledger. Each car maintains its own independent wash count, photos and daily schedule.
           </div>
         </div>
-
-        {/* Add another car modal */}
-        <AddCarModal
-          packages={packages.map((p) => ({
-            id: p.id,
-            name: p.name,
-            price: p.price,
-            washesPerMonth: p.washesPerMonth,
-            billingPeriod: p.billingPeriod,
-            washesPerPeriod: p.washesPerPeriod,
-          }))}
-        />
       </div>
     </div>
   );

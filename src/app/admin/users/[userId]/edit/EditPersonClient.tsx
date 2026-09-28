@@ -63,7 +63,7 @@ export function EditPersonClient({
   const [role, setRole] = useState<Role>(user.role);
   const [name, setName] = useState(user.name);
   const [email, setEmail] = useState(user.email);
-  const [phone, setPhone] = useState(user.phone);
+  const [phone, setPhone] = useState((user.phone || '').replace(/\D/g, '').slice(-10));
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [regionId, setRegionId] = useState(user.regionId ?? regions[0]?.id ?? '');
@@ -75,7 +75,7 @@ export function EditPersonClient({
   const [kycDocType, setKycDocType] = useState<'aadhaar' | 'pan'>(
     hasExistingPan && !hasExistingAadhaar ? 'pan' : 'aadhaar'
   );
-  const [aadharNumber, setAadharNumber] = useState(user.aadharNumber || staff?.aadharNumber || '');
+  const [aadharNumber, setAadharNumber] = useState((user.aadharNumber || staff?.aadharNumber || '').replace(/\D/g, '').slice(0, 12));
   const [aadharCardUrl, setAadharCardUrl] = useState<string | null>(user.aadharCardUrl || staff?.aadharCardUrl || null);
   const [aadharFile, setAadharFile] = useState<File | null>(null);
 
@@ -88,7 +88,7 @@ export function EditPersonClient({
   const [lat, setLat] = useState<number | null>(null);
   const [lng, setLng] = useState<number | null>(null);
   const [emergencyContactName, setEmergencyContactName] = useState(user.emergencyContactName || staff?.emergencyContactName || '');
-  const [emergencyPhone, setEmergencyPhone] = useState(user.emergencyPhone || staff?.emergencyPhone || '');
+  const [emergencyPhone, setEmergencyPhone] = useState((user.emergencyPhone || staff?.emergencyPhone || '').replace(/\D/g, '').slice(-10));
   const [dob, setDob] = useState(user.dob || staff?.dob || '');
 
   // 4. Banking & Payout
@@ -103,10 +103,16 @@ export function EditPersonClient({
   const needsArea = role === 'MANAGER' || role === 'EMPLOYEE';
   const needsRegion = role === 'AREA_ADMIN';
 
+  const phoneValid = /^\d{10}$/.test(phone.trim());
+  const emergencyPhoneInvalid = emergencyPhone.trim().length > 0 && !/^\d{10}$/.test(emergencyPhone.trim());
+  const aadharInvalid = aadharNumber.trim().length > 0 && !/^\d{12}$/.test(aadharNumber.trim());
+
   const valid =
     name.trim().length > 1 &&
     /.+@.+\..+/.test(email) &&
-    phone.trim().length > 5 &&
+    phoneValid &&
+    !emergencyPhoneInvalid &&
+    !aadharInvalid &&
     (password.length === 0 || password.length >= 6) &&
     (!needsArea || areaId) &&
     (!needsRegion || regionId);
@@ -300,11 +306,14 @@ export function EditPersonClient({
                 <input
                   id="edit-phone"
                   type="tel"
+                  inputMode="numeric"
+                  pattern="\d{10}"
+                  maxLength={10}
                   required
                   placeholder="10-digit mobile (e.g. 9876543210)"
                   className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs text-slate-800 focus:border-blue-600 focus:outline-none"
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                 />
               </div>
 
@@ -496,11 +505,13 @@ export function EditPersonClient({
                   <input
                     id="edit-aadhar-num"
                     type="text"
-                    placeholder="12-digit number (e.g. 5421 8901 2345)"
-                    maxLength={14}
+                    inputMode="numeric"
+                    pattern="\d{12}"
+                    placeholder="12-digit number (e.g. 542189012345)"
+                    maxLength={12}
                     className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-mono text-navy-950 placeholder:text-slate-400 focus:border-blue-600 focus:outline-none shadow-xs"
                     value={aadharNumber}
-                    onChange={(e) => setAadharNumber(e.target.value)}
+                    onChange={(e) => setAadharNumber(e.target.value.replace(/\D/g, '').slice(0, 12))}
                   />
                 </div>
 
@@ -622,10 +633,13 @@ export function EditPersonClient({
                       <input
                         id="edit-emg-phone"
                         type="tel"
+                        inputMode="numeric"
+                        pattern="\d{10}"
+                        maxLength={10}
                         placeholder="10-digit emergency phone"
                         className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs text-slate-800 focus:border-blue-600 focus:outline-none"
                         value={emergencyPhone}
-                        onChange={(e) => setEmergencyPhone(e.target.value)}
+                        onChange={(e) => setEmergencyPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                       />
                     </div>
                   </div>

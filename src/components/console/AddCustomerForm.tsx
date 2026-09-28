@@ -181,7 +181,9 @@ export function AddCustomerForm({
   const [directMode, setDirectMode] = useState(false);
   const [directStaffId, setDirectStaffId] = useState('');
   const [name, setName] = useState(initialEnquiry?.name ?? '');
-  const [phone, setPhone] = useState(initialEnquiry?.phone ?? '');
+  const [phone, setPhone] = useState(
+    initialEnquiry?.phone ? initialEnquiry.phone.replace(/\D/g, '').slice(-10) : '',
+  );
   const [altPhone, setAltPhone] = useState('');
   const [address, setAddress] = useState(initialEnquiry?.locality ?? '');
   const [lat, setLat] = useState<number | null>(null);
@@ -258,8 +260,12 @@ export function AddCustomerForm({
       setError('Enter the customer\'s full name.');
       return;
     }
-    if (phone.trim().length < 6) {
-      setError('Enter a valid WhatsApp number.');
+    if (!/^\d{10}$/.test(phone.trim())) {
+      setError('Enter a valid 10-digit WhatsApp / mobile number.');
+      return;
+    }
+    if (altPhone.trim() && !/^\d{10}$/.test(altPhone.trim())) {
+      setError('Enter a valid 10-digit alternate mobile number.');
       return;
     }
     if (address.trim().length < 4) {
@@ -548,10 +554,13 @@ export function AddCustomerForm({
                   </div>
                   <input
                     className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                    inputMode="tel"
+                    type="tel"
+                    inputMode="numeric"
+                    pattern="\d{10}"
+                    maxLength={10}
                     placeholder="e.g. 9876543210"
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                   />
                 </div>
               </div>
@@ -569,10 +578,13 @@ export function AddCustomerForm({
                   </div>
                   <input
                     className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                    inputMode="tel"
+                    type="tel"
+                    inputMode="numeric"
+                    pattern="\d{10}"
+                    maxLength={10}
                     placeholder="e.g. 9876543210"
                     value={altPhone}
-                    onChange={(e) => setAltPhone(e.target.value)}
+                    onChange={(e) => setAltPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                   />
                 </div>
               </div>

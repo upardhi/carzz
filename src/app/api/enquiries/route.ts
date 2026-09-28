@@ -4,7 +4,7 @@ import { getStore } from '@/lib/data';
 
 const schema = z.object({
   name: z.string().trim().min(2, 'Please tell us your name'),
-  phone: z.string().trim().min(8, 'Please give a number we can call'),
+  phone: z.string().trim().regex(/^\d{10}$/, 'Please enter a valid 10-digit mobile number'),
   email: z.string().trim().email().optional().or(z.literal('')),
   areaId: z.string().optional(),
   locality: z.string().trim().max(200).optional(),

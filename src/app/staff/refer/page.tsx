@@ -86,44 +86,135 @@ export default async function StaffReferPage() {
         <ReferralForm />
       </div>
 
-      <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-2xs">
-        <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
-          <h3 className="text-base font-bold text-slate-900">Your Referrals</h3>
+      <div className="rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-6 shadow-2xs">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 border border-blue-100 text-base">
+              📋
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-900 leading-tight">
+                Your Referrals
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Track the review status and bonus payout for every referral you&apos;ve submitted
+              </p>
+            </div>
+          </div>
+          <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700 border border-slate-200">
+            {referrals.length} {referrals.length === 1 ? 'Referral' : 'Referrals'}
+          </span>
         </div>
+
         {referrals.length === 0 ? (
-          <div className="mt-4 rounded-xl bg-slate-50 p-6 text-center text-xs text-slate-500">
-            You haven&apos;t submitted any referrals yet.
+          <div className="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50/70 p-8 text-center">
+            <div className="mx-auto mb-2 flex h-11 w-11 items-center justify-center rounded-full bg-white text-lg shadow-2xs border border-slate-200/80">
+              🎁
+            </div>
+            <p className="text-sm font-bold text-slate-700">
+              No referrals submitted yet
+            </p>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Submit a customer or wash boy referral above to earn a joining bonus.
+            </p>
           </div>
         ) : (
           <div className="mt-4 space-y-3">
-            {referrals.map((r) => (
-              <div
-                key={r.id}
-                className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-3.5 text-xs"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <span className="font-bold text-slate-900">{r.name}</span>
-                    <span className="ml-2 text-slate-500">{r.phone}</span>
+            {referrals.map((r) => {
+              const isCustomer = r.type === 'CUSTOMER';
+              const bonusAmount = isCustomer
+                ? rules.carReferralBonus
+                : rules.staffReferralBonus;
+
+              return (
+                <div
+                  key={r.id}
+                  className="rounded-xl border border-slate-200/90 bg-white p-4 shadow-2xs transition-all hover:border-slate-300"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                    {/* Left: Avatar + Person Info */}
+                    <div className="flex items-start gap-3.5 min-w-0 flex-1">
+                      <div
+                        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border text-lg ${
+                          isCustomer
+                            ? 'bg-blue-50 border-blue-100 text-blue-600'
+                            : 'bg-emerald-50 border-emerald-100 text-emerald-600'
+                        }`}
+                      >
+                        {isCustomer ? '🚗' : '👷'}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h4 className="text-sm font-bold text-slate-900">
+                            {r.name}
+                          </h4>
+                          <span
+                            className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-bold ${
+                              isCustomer
+                                ? 'border-blue-200 bg-blue-50/70 text-blue-700'
+                                : 'border-emerald-200 bg-emerald-50/70 text-emerald-700'
+                            }`}
+                          >
+                            {isCustomer ? 'Customer' : 'Wash Boy'}
+                          </span>
+                          <span className="inline-flex items-center rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
+                            +₹{bonusAmount} Bonus
+                          </span>
+                        </div>
+
+                        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                          <span className="inline-flex items-center gap-1.5 font-mono font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200/80">
+                            <span>📞</span>
+                            <span>{r.phone}</span>
+                          </span>
+                          <span className="text-slate-300 hidden sm:inline">•</span>
+                          <span className="inline-flex items-center gap-1 text-[11.5px] font-medium text-slate-500">
+                            <span>📅</span>
+                            <span>Submitted {formatDateFull(r.createdAt)}</span>
+                          </span>
+                        </div>
+
+                        {r.note ? (
+                          <div className="mt-2.5 flex items-start gap-2 rounded-lg border border-slate-200/70 bg-slate-50/80 px-3 py-2 text-xs text-slate-600">
+                            <span className="font-bold text-slate-500 shrink-0">
+                              Note:
+                            </span>
+                            <span className="text-slate-700 break-words">
+                              {r.note}
+                            </span>
+                          </div>
+                        ) : null}
+
+                        {r.status === 'REJECTED' && r.rejectionReason ? (
+                          <div className="mt-2.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700">
+                            <span className="font-bold">Rejection reason:</span>{' '}
+                            {r.rejectionReason}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    {/* Right: Status Pill */}
+                    <div className="flex sm:flex-col items-center sm:items-end justify-between gap-1.5 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold shadow-2xs ${STATUS_TONE[r.status]}`}
+                      >
+                        <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                        <span>{STATUS_LABEL[r.status]}</span>
+                      </span>
+                      <span className="text-[11px] font-medium text-slate-400">
+                        {r.status === 'APPROVED'
+                          ? 'Bonus credited'
+                          : r.status === 'REJECTED'
+                            ? 'Not eligible'
+                            : 'Paid upon joining'}
+                      </span>
+                    </div>
                   </div>
-                  <span
-                    className={`rounded-md border px-2 py-0.5 text-[10.5px] font-bold ${STATUS_TONE[r.status]}`}
-                  >
-                    {STATUS_LABEL[r.status]}
-                  </span>
                 </div>
-                <div className="mt-1.5 flex items-center gap-2 text-[11px] text-slate-400">
-                  <span className="rounded-md bg-white border border-slate-200 px-1.5 py-0.5 font-semibold text-slate-600">
-                    {r.type === 'CUSTOMER' ? 'Customer' : 'Wash boy'}
-                  </span>
-                  <span>Submitted {formatDateFull(r.createdAt)}</span>
-                </div>
-                {r.note ? <p className="mt-1.5 text-slate-500 italic">&ldquo;{r.note}&rdquo;</p> : null}
-                {r.status === 'REJECTED' && r.rejectionReason ? (
-                  <p className="mt-1.5 text-rose-600">Reason: {r.rejectionReason}</p>
-                ) : null}
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

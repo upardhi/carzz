@@ -928,10 +928,6 @@ export function UserDetailClient({
                   <span>Phone:</span>
                   <span className="font-mono font-medium text-slate-800">{user.phone}</span>
                 </div>
-                <div className="flex items-center justify-between text-slate-500">
-                  <span>Language:</span>
-                  <span className="font-bold text-slate-800 uppercase">{user.language}</span>
-                </div>
               </div>
 
               {/* KYC Status Checklist */}

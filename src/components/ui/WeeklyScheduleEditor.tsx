@@ -45,35 +45,41 @@ export function WeeklyScheduleEditor({
   return (
     <div className="space-y-4">
       {/* Header section */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1">
-        <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 border border-blue-100">
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
+      <div className="flex flex-col gap-2.5 pb-1 text-left">
+        <div className="flex flex-wrap items-start justify-between gap-2.5">
+          <div className="flex items-start gap-3 min-w-[220px] flex-1">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 border border-blue-100">
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <div className="min-w-0 flex-1">
+              <label className="block text-sm font-bold text-slate-800 leading-tight">
+                Weekly Wash Days *
+              </label>
+              <p className="mt-0.5 text-xs text-slate-500 leading-relaxed">
+                Pick which days this car gets washed — it repeats every week on its own.
+              </p>
+            </div>
           </div>
-          <div>
-            <label className="block text-sm font-bold text-slate-800">Weekly Wash Days *</label>
-            <p className="text-xs text-slate-500">Pick which days this car gets washed — it repeats every week on its own.</p>
-          </div>
-        </div>
 
-        {pkg && (
-          <div className="inline-flex items-center gap-2 self-start sm:self-auto rounded-xl sm:rounded-full bg-blue-50/90 px-3.5 py-1.5 text-xs font-medium text-blue-700 border border-blue-200/80 shadow-2xs shrink-0">
-            <svg className="h-3.5 w-3.5 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            <span className="leading-snug">
-              {isExactWeekly
-                ? `This package is billed ${pkg.washesPerPeriod || 1} wash${(pkg.washesPerPeriod || 1) === 1 ? '' : 'es'}/week — pick ${maxDays} day${maxDays === 1 ? '' : 's'}.`
-                : `This package (${pkg.washesPerMonth}/month) allows up to ${maxDays} day${maxDays === 1 ? '' : 's'} per week.`}
-            </span>
-          </div>
-        )}
+          {pkg && (
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-50/90 px-3 py-1 text-[11px] font-semibold text-blue-700 border border-blue-200/80 shadow-2xs shrink-0">
+              <svg className="h-3.5 w-3.5 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <span>
+                {isExactWeekly
+                  ? `${pkg.washesPerPeriod || 1} wash${(pkg.washesPerPeriod || 1) === 1 ? '' : 'es'}/wk · pick ${maxDays} day${maxDays === 1 ? '' : 's'}`
+                  : `${pkg.washesPerMonth}/month · up to ${maxDays} day${maxDays === 1 ? '' : 's'}/week`}
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* 7-Day Responsive Cards with Flex Wrap */}
-      <div className="flex flex-wrap gap-2.5 sm:gap-3">
+      {/* 7-Day Uniform Responsive Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 text-left">
         {WEEKDAYS.map((day) => {
           const checked = weeklyDays.includes(day);
           const disabled = !checked && atLimit;
@@ -85,7 +91,7 @@ export function WeeklyScheduleEditor({
               onClick={() => {
                 if (!disabled) toggleDay(day);
               }}
-              className={`group flex flex-1 min-w-[130px] sm:min-w-[140px] flex-col justify-between rounded-xl border p-3 transition-all ${
+              className={`group flex flex-col justify-between rounded-xl border p-2.5 transition-all ${
                 checked
                   ? 'border-blue-500 bg-blue-50/40 shadow-xs ring-1 ring-blue-500/20'
                   : disabled
