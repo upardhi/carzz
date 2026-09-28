@@ -696,13 +696,23 @@ export function ScheduleClient({
             align: 'center',
             render: (visit) =>
               visit.rating ? (
-                <span
-                  className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-700 border border-amber-200"
-                  title={visit.ratingComment || `${visit.rating} Stars by Customer`}
+                <button
+                  type="button"
+                  onClick={() => openRatingModal(visit)}
+                  className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors cursor-pointer"
+                  title={visit.ratingComment || `${visit.rating} Stars by Customer (Click to inspect)`}
                 >
                   <span>★</span>
                   <span>{visit.rating}</span>
-                </span>
+                </button>
+              ) : visit.status === 'DONE' ? (
+                <button
+                  type="button"
+                  onClick={() => openRatingModal(visit)}
+                  className="text-[11px] font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                >
+                  Inspect
+                </button>
               ) : (
                 <span className="text-slate-300 text-xs">—</span>
               ),

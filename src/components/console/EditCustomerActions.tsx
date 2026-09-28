@@ -1207,7 +1207,6 @@ export function RescheduleVisitButton({
 // ==========================================
 import { CarWashHistoryModal } from './CarWashHistoryModal';
 import { resolvePublicPhotoUrl } from '@/lib/util/photoUrl';
-import Image from 'next/image';
 
 export function CarWashHistoryButton({
   car,

@@ -1,5 +1,4 @@
 import { AddPersonClient } from '@/app/admin/users/new/AddPersonClient';
-import { scopeAreaFilter } from '@/lib/auth/rbac';
 import { requirePermission } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 
@@ -8,7 +7,6 @@ export const metadata = { title: 'Add Wash Staff' };
 export default async function AreaAddStaffPage() {
   const session = await requirePermission('staff:create');
   const store = await getStore();
-  const areaFilter = scopeAreaFilter(session.scope);
 
   const [regions, allAreas, rules, pendingReferrals, staff] = await Promise.all([
     store.regions.find({ orderBy: [{ field: 'name' }] }),

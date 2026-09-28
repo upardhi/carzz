@@ -935,7 +935,6 @@ export function InventoryClient({
                       {group.rows.map((row) => {
                         const isOut = row.status === 'OUT';
                         const isLow = row.status === 'LOW' || row.status === 'CRITICAL';
-                        const hasActiveRequest = checkHasActiveRequest(group.area.id, row.item.id);
                         const activeReq = getActiveRequest(group.area.id, row.item.id);
                         return (
                           <tr key={row.item.id} className="hover:bg-slate-50/60 transition-colors">
