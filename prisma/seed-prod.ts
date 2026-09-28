@@ -1,7 +1,8 @@
 /**
  * Clean production seeder.
  *
- * Initializes a fresh production database with only the required configuration:
+ * Clears every table, then initializes a fresh database with only the
+ * required configuration:
  *   - 1 Initial Super Admin user
  *   - Default service packages
  *   - Default application settings
@@ -9,6 +10,11 @@
  *   - Default website content
  *
  * No fake customers, staff, visits, or mock data are inserted.
+ *
+ * This CLEARS every table first, so run it only against a database you are
+ * deliberately resetting — `prisma/setup.ts`'s automatic build-time path
+ * never calls this unless the database has no accounts in it yet, so a real
+ * deployment's data is never touched by that path.
  */
 import type { Prisma, PrismaClient } from '@prisma/client';
 import { hashPassword } from '../src/lib/auth/password';
@@ -22,12 +28,35 @@ export async function seedProdData(prisma: PrismaClient): Promise<void> {
   const adminPhone = process.env.ADMIN_PHONE || '9800000001';
   const adminPassword = process.env.ADMIN_PASSWORD || 'Admin@123456';
 
-  process.stdout.write('Checking existing users…\n');
-  const existingCount = await prisma.user.count();
-  if (existingCount > 0) {
-    process.stdout.write(`Database already has ${existingCount} users. Skipping production seed.\n`);
-    return;
-  }
+  process.stdout.write('Clearing existing rows…\n');
+  // Children first, so foreign keys never block a delete.
+  await prisma.$transaction([
+    prisma.notification.deleteMany(),
+    prisma.stockIssue.deleteMany(),
+    prisma.purchaseRequest.deleteMany(),
+    prisma.stockLevel.deleteMany(),
+    prisma.inventoryItem.deleteMany(),
+    prisma.complaint.deleteMany(),
+    prisma.staffPayout.deleteMany(),
+    prisma.expense.deleteMany(),
+    prisma.invoice.deleteMany(),
+    prisma.payment.deleteMany(),
+    prisma.washVisit.deleteMany(),
+    prisma.car.deleteMany(),
+    prisma.servicePackage.deleteMany(),
+    prisma.customer.deleteMany(),
+    prisma.pocketMoneyRequest.deleteMany(),
+    prisma.attendance.deleteMany(),
+    prisma.staff.deleteMany(),
+    prisma.area.deleteMany(),
+    prisma.region.deleteMany(),
+    prisma.userCredential.deleteMany(),
+    prisma.user.deleteMany(),
+    prisma.appSettings.deleteMany(),
+    prisma.payoutSettings.deleteMany(),
+    prisma.enquiry.deleteMany(),
+    prisma.siteContent.deleteMany(),
+  ]);
 
   process.stdout.write('Bootstrapping production configuration…\n');
 
