@@ -157,16 +157,31 @@ export async function POST(request: Request) {
     }
 
     if (parsed.data.action === 'create') {
-      const washesPerMonth = washesPerMonthFor(parsed.data.billingPeriod, parsed.data.washesPerPeriod);
-      const normalizedServices = normalizeServices(parsed.data.services, washesPerMonth);
+      const createData = parsed.data;
+      const allPackages = await store.packages.find();
+      const duplicate = allPackages.find(
+        (p) => p.name.trim().toLowerCase() === createData.name.trim().toLowerCase(),
+      );
+      if (duplicate) {
+        return NextResponse.json(
+          {
+            error:
+              'A package with the same name already exists. Please use a different package name.',
+          },
+          { status: 409 },
+        );
+      }
+
+      const washesPerMonth = washesPerMonthFor(createData.billingPeriod, createData.washesPerPeriod);
+      const normalizedServices = normalizeServices(createData.services, washesPerMonth);
 
       const created = await store.packages.create({
-        name: parsed.data.name,
+        name: createData.name.trim(),
         washesPerMonth,
-        billingPeriod: parsed.data.billingPeriod,
-        washesPerPeriod: parsed.data.washesPerPeriod,
-        price: parsed.data.price,
-        costToDeliver: parsed.data.costToDeliver,
+        billingPeriod: createData.billingPeriod,
+        washesPerPeriod: createData.washesPerPeriod,
+        price: createData.price,
+        costToDeliver: createData.costToDeliver,
         services: normalizedServices,
         active: true,
       });
@@ -184,6 +199,24 @@ export async function POST(request: Request) {
     const existing = await store.packages.get(packageId);
     if (!existing) throw new HttpError(404, 'Package not found.');
 
+    if (patch.name !== undefined) {
+      const allPackages = await store.packages.find();
+      const duplicate = allPackages.find(
+        (p) =>
+          p.id !== packageId &&
+          p.name.trim().toLowerCase() === patch.name!.trim().toLowerCase(),
+      );
+      if (duplicate) {
+        return NextResponse.json(
+          {
+            error:
+              'A package with the same name already exists. Please use a different package name.',
+          },
+          { status: 409 },
+        );
+      }
+    }
+
     const nextBillingPeriod = patch.billingPeriod ?? existing.billingPeriod;
     const nextWashesPerPeriod = patch.washesPerPeriod ?? existing.washesPerPeriod;
     const washesChanged = patch.billingPeriod !== undefined || patch.washesPerPeriod !== undefined;
@@ -200,7 +233,7 @@ export async function POST(request: Request) {
     }
 
     const updated = await store.packages.update(packageId, {
-      ...(patch.name !== undefined ? { name: patch.name } : {}),
+      ...(patch.name !== undefined ? { name: patch.name.trim() } : {}),
       ...(patch.price !== undefined ? { price: patch.price } : {}),
       ...(washesChanged
         ? { washesPerMonth: targetWashes, billingPeriod: nextBillingPeriod, washesPerPeriod: nextWashesPerPeriod }

@@ -124,14 +124,22 @@ export function AddPersonClient({
   const needsRegion = role === 'AREA_ADMIN';
 
   // KYC Validation check: Aadhaar and PAN are individually optional, but at least ONE must be supplied
-  const hasAadhaar = Boolean(aadharNumber.trim().length >= 4 || aadharFile);
+  const aadharClean = aadharNumber.trim();
+  const aadharValid = /^\d{12}$/.test(aadharClean);
+  const aadharInvalid = aadharClean.length > 0 && !aadharValid;
+  const hasAadhaar = Boolean(aadharValid || (aadharFile && !aadharInvalid));
   const hasPan = Boolean(panNumber.trim().length >= 4 || panFile);
   const hasKyc = hasAadhaar || hasPan;
+
+  const phoneValid = /^\d{10}$/.test(phone.trim());
+  const emergencyPhoneInvalid = emergencyPhone.trim().length > 0 && !/^\d{10}$/.test(emergencyPhone.trim());
 
   const valid =
     name.trim().length > 1 &&
     /.+@.+\..+/.test(email) &&
-    phone.trim().length > 5 &&
+    phoneValid &&
+    !emergencyPhoneInvalid &&
+    !aadharInvalid &&
     password.length >= 6 &&
     (!needsArea || areaId) &&
     (!needsRegion || regionId) &&
@@ -330,11 +338,14 @@ export function AddPersonClient({
                   </div>
                   <input
                     id="new-phone"
-                    inputMode="tel"
+                    type="tel"
+                    inputMode="numeric"
+                    pattern="\d{10}"
+                    maxLength={10}
                     className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-xs sm:text-sm text-navy-950 placeholder:text-slate-400 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600 shadow-xs"
                     placeholder="e.g. 9822100001"
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                     required
                   />
                 </div>
@@ -655,11 +666,14 @@ export function AddPersonClient({
                   </label>
                   <input
                     id="new-aadhar"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="\d{12}"
+                    maxLength={12}
                     className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-mono text-navy-950 placeholder:text-slate-400 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600 shadow-xs"
-                    placeholder="e.g. 5421 8901 2345"
-                    maxLength={14}
+                    placeholder="e.g. 542189012345"
                     value={aadharNumber}
-                    onChange={(e) => setAadharNumber(e.target.value)}
+                    onChange={(e) => setAadharNumber(e.target.value.replace(/\D/g, '').slice(0, 12))}
                   />
                 </div>
 
@@ -773,11 +787,14 @@ export function AddPersonClient({
                       </label>
                       <input
                         id="new-emer-phone"
-                        inputMode="tel"
+                        type="tel"
+                        inputMode="numeric"
+                        pattern="\d{10}"
+                        maxLength={10}
                         className="w-full rounded-xl border border-slate-200 bg-white py-2.5 px-3 text-xs sm:text-sm text-navy-950 placeholder:text-slate-400 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600 shadow-xs"
                         placeholder="e.g. 9822100099"
                         value={emergencyPhone}
-                        onChange={(e) => setEmergencyPhone(e.target.value)}
+                        onChange={(e) => setEmergencyPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                       />
                     </div>
                   </div>
@@ -912,11 +929,13 @@ export function AddPersonClient({
               Before you can save: {[
                 name.trim().length <= 1 && 'enter their full name',
                 !/.+@.+\..+/.test(email) && 'enter a valid email',
-                phone.trim().length <= 5 && 'enter a valid mobile number',
+                !phoneValid && 'enter a valid 10-digit mobile number',
+                emergencyPhoneInvalid && 'enter a valid 10-digit emergency phone number',
+                aadharInvalid && 'enter a valid 12-digit Aadhaar number',
                 password.length < 6 && 'set a password of at least 6 characters',
                 needsArea && !areaId && 'choose their area',
                 needsRegion && !regionId && 'choose their region',
-                !hasKyc && 'add an Aadhaar or PAN number',
+                !hasKyc && !aadharInvalid && 'add a 12-digit Aadhaar or PAN number',
               ].filter(Boolean).join(', ')}.
             </p>
           ) : null}
@@ -1019,8 +1038,8 @@ export function AddPersonClient({
                   <span className="text-slate-600 flex items-center gap-1.5 font-medium">
                     <span>📱</span> Valid Mobile
                   </span>
-                  <span className={phone.trim().length > 5 ? 'text-emerald-600 font-bold' : 'text-slate-400 font-medium'}>
-                    {phone.trim().length > 5 ? '✓ Valid' : 'Required'}
+                  <span className={phoneValid ? 'text-emerald-600 font-bold' : 'text-slate-400 font-medium'}>
+                    {phoneValid ? '✓ Valid (10 digits)' : 'Required (10 digits)'}
                   </span>
                 </div>
 

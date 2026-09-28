@@ -140,12 +140,14 @@ export default async function StaffEarnings() {
                 AVERAGE RATING
               </div>
               <div className="mt-0.5 text-2xl font-black tracking-tight text-amber-600">
-                {rated.length
+                {rated.length > 0
                   ? `${(rated.reduce((s, v) => s + (v.rating ?? 0), 0) / rated.length).toFixed(1)} ★`
-                  : '5.0 ★'}
+                  : '—'}
               </div>
               <div className="mt-0.5 text-xs font-medium text-slate-500">
-                From customer reviews
+                {rated.length > 0
+                  ? `From ${rated.length} customer ${rated.length === 1 ? 'review' : 'reviews'}`
+                  : 'No customer reviews yet'}
               </div>
             </div>
           </div>

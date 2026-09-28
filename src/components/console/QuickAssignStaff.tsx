@@ -100,13 +100,13 @@ export function QuickAssignStaff({
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex w-full items-center justify-between gap-2">
       {assignedStaff ? (
-        <span className="font-semibold text-slate-900 text-xs">
+        <span className="font-bold text-slate-900 text-sm truncate">
           {assignedStaff.name}
         </span>
       ) : (
-        <span className="inline-flex items-center rounded-full bg-rose-50 border border-rose-200 px-2 py-0.5 text-[10.5px] font-bold text-rose-700">
+        <span className="inline-flex items-center rounded-full bg-rose-50 border border-rose-200 px-2.5 py-0.5 text-xs font-bold text-rose-700">
           Unassigned
         </span>
       )}
@@ -114,10 +114,10 @@ export function QuickAssignStaff({
       <button
         type="button"
         onClick={() => setIsEditing(true)}
-        className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700 hover:bg-blue-100 hover:border-blue-300 transition-colors shadow-2xs cursor-pointer"
+        className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 hover:bg-blue-100 hover:border-blue-300 transition-colors shadow-2xs cursor-pointer shrink-0"
       >
         <span>⚡</span>
-        <span>{assignedStaff ? 'Change' : 'Assign Wash Boy'}</span>
+        <span>{assignedStaff ? 'Change' : 'Assign'}</span>
       </button>
     </div>
   );

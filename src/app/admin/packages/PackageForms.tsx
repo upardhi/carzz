@@ -92,13 +92,19 @@ function Feedback({ state }: { state: { ok?: string; error?: string } }) {
   return null;
 }
 
-export function CreatePackageForm() {
+export function CreatePackageForm({
+  existingNames = [],
+}: {
+  existingNames?: string[];
+}) {
   const { save, pending, state } = useSave();
+  const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>('MONTHLY');
   const [washes, setWashes] = useState('8');
   const [price, setPrice] = useState('');
   const [cost, setCost] = useState('');
+  const [duplicateError, setDuplicateError] = useState<string | null>(null);
 
   // Selected services with their individual washes/month
   const [serviceItems, setServiceItems] = useState<PackageServiceItem[]>([
@@ -113,6 +119,28 @@ export function CreatePackageForm() {
 
   const washesPerPeriod = Number(washes) || 8;
   const maxWashes = washesPerMonthFor(billingPeriod, washesPerPeriod);
+
+  function resetForm() {
+    setName('');
+    setBillingPeriod('MONTHLY');
+    setWashes('8');
+    setPrice('');
+    setCost('');
+    setServiceItems([
+      { name: 'Exterior wash', washesPerMonth: 8 },
+      { name: 'Interior vacuum', washesPerMonth: 8 },
+    ]);
+    setShowAddCustom(false);
+    setCustomName('');
+    setCustomWashes('8');
+    setDuplicateError(null);
+  }
+
+  function isDuplicatePackageName(candidate: string) {
+    const normalized = candidate.trim().toLowerCase();
+    if (!normalized) return false;
+    return existingNames.some((n) => n.trim().toLowerCase() === normalized);
+  }
 
   function toggleService(serviceName: string) {
     const exists = serviceItems.some((s) => s.name.toLowerCase() === serviceName.toLowerCase());
@@ -154,6 +182,31 @@ export function CreatePackageForm() {
     setServiceItems((cur) => cur.map((s) => ({ ...s, washesPerMonth: Math.min(s.washesPerMonth, newMax) })));
   }
 
+  async function handleCreate() {
+    if (isDuplicatePackageName(name)) {
+      const msg = 'A package with the same name already exists. Please use a different package name.';
+      setDuplicateError(msg);
+      toast.error(msg);
+      return;
+    }
+    setDuplicateError(null);
+
+    const res = await save({
+      action: 'create',
+      name: name.trim(),
+      billingPeriod,
+      washesPerPeriod: Number(washes),
+      price: Number(price),
+      costToDeliver: Number(cost) || 0,
+      services: serviceItems,
+    });
+
+    if (res.ok) {
+      resetForm();
+      setOpen(false);
+    }
+  }
+
   const valid =
     name.trim().length > 1 &&
     Number(price) > 0 &&
@@ -166,187 +219,302 @@ export function CreatePackageForm() {
   );
 
   return (
-    <div>
-      <label className="field-label" htmlFor="pk-name">Package Name</label>
-      <input id="pk-name" className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Premium Monthly Wash" />
+    <>
+      <button
+        type="button"
+        onClick={() => {
+          setDuplicateError(null);
+          setOpen(true);
+        }}
+        className="inline-flex items-center gap-2 rounded-xl bg-navy-800 hover:bg-navy-700 px-4 py-2.5 text-[13px] font-bold text-white transition-all shadow-xs cursor-pointer whitespace-nowrap"
+      >
+        <span className="text-base leading-none">+</span>
+        <span>Create New Package</span>
+      </button>
 
-      <div className="mt-2">
-        <label className="field-label">Billing period</label>
-        <div className="grid grid-cols-3 gap-2">
-          {BILLING_PERIODS.map((period) => (
-            <button
-              key={period}
-              type="button"
-              onClick={() => handlePeriodChange(period)}
-              className={`rounded-lg border px-3 py-1.5 text-xs font-bold capitalize transition-colors ${
-                billingPeriod === period
-                  ? 'border-blue-600 bg-blue-600 text-white'
-                  : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              {period.toLowerCase()}
-            </button>
-          ))}
-        </div>
-      </div>
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/55 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150 text-left font-normal">
+          <div className="relative w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden my-auto text-left">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/70 px-6 py-4">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 border border-blue-100 text-lg">
+                  📦
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-base font-bold text-slate-900">
+                    Create New Package
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Define main monthly wash limit and assign custom wash frequencies for each service.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="text-slate-400 hover:text-slate-600 rounded-lg p-1 text-lg font-bold cursor-pointer shrink-0"
+              >
+                ✕
+              </button>
+            </div>
 
-      <div className="mt-2 grid grid-cols-3 gap-2">
-        <div>
-          <label className="field-label">Washes {PERIOD_UNIT[billingPeriod]}</label>
-          <input
-            className="field"
-            type="number"
-            min="1"
-            max={getPeriodWashLimit(billingPeriod)}
-            inputMode="numeric"
-            value={washes}
-            onChange={(e) => {
-              const maxAllowed = getPeriodWashLimit(billingPeriod);
-              const num = Number(e.target.value);
-              if (num > maxAllowed) {
-                handleMainWashesChange(String(maxAllowed));
-              } else {
-                handleMainWashesChange(e.target.value);
-              }
-            }}
-          />
-          {billingPeriod !== 'MONTHLY' && (
-            <p className="mt-0.5 text-[10.5px] text-slate-400">≈ {maxWashes} washes/month</p>
-          )}
-        </div>
-        <div>
-          <label className="field-label">Price (₹)</label>
-          <input className="field" type="number" inputMode="numeric" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="2400" />
-        </div>
-        <div>
-          <label className="field-label">Cost to deliver (₹)</label>
-          <input className="field" type="number" inputMode="numeric" value={cost} onChange={(e) => setCost(e.target.value)} placeholder="900" />
-        </div>
-      </div>
+            {/* Scrollable Body */}
+            <div className="p-6 max-h-[78vh] overflow-y-auto space-y-4">
+              <div>
+                <label className="field-label" htmlFor="pk-name">
+                  Package Name *
+                </label>
+                <input
+                  id="pk-name"
+                  className={`field ${duplicateError ? 'border-rose-400 focus:border-rose-500' : ''}`}
+                  value={name}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setName(val);
+                    if (isDuplicatePackageName(val)) {
+                      setDuplicateError(
+                        'A package with the same name already exists. Please use a different package name.',
+                      );
+                    } else {
+                      setDuplicateError(null);
+                    }
+                  }}
+                  placeholder="e.g. Premium Monthly Wash"
+                />
+                {duplicateError && (
+                  <p className="mt-1.5 text-xs font-semibold text-rose-600">
+                    {duplicateError}
+                  </p>
+                )}
+              </div>
 
-      <div className="mt-4 flex items-center justify-between">
-        <span className="field-label mb-0 block">
-          Services included &amp; {billingPeriod.toLowerCase()} frequency
-        </span>
-        <button
-          type="button"
-          onClick={() => setShowAddCustom(!showAddCustom)}
-          className="text-xs font-bold text-blue-600 hover:text-blue-700"
-        >
-          {showAddCustom ? 'Cancel' : '+ Add custom service'}
-        </button>
-      </div>
+              <div>
+                <label className="field-label">Billing period</label>
+                <div className="grid grid-cols-3 gap-2.5">
+                  {BILLING_PERIODS.map((period) => (
+                    <button
+                      key={period}
+                      type="button"
+                      onClick={() => handlePeriodChange(period)}
+                      className={`rounded-xl border px-3 py-2 text-xs font-bold capitalize transition-colors cursor-pointer ${
+                        billingPeriod === period
+                          ? 'border-blue-600 bg-blue-600 text-white'
+                          : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      {period.toLowerCase()}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-      {showAddCustom && (
-        <div className="mt-2 rounded-xl border border-blue-200 bg-blue-50/60 p-3 space-y-2">
-          <div className="text-xs font-bold text-slate-800">Add Custom Service</div>
-          <div className="grid grid-cols-3 gap-2">
-            <input
-              type="text"
-              placeholder="e.g. Engine Bay Degreasing"
-              value={customName}
-              onChange={(e) => setCustomName(e.target.value)}
-              className="col-span-2 field bg-white"
-            />
-            <input
-              type="number"
-              min="1"
-              max={maxWashes}
-              value={customWashes}
-              onChange={(e) => setCustomWashes(e.target.value)}
-              placeholder={`Washes${PERIOD_UNIT[billingPeriod]}`}
-              className="field bg-white"
-            />
-          </div>
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={addCustomService}
-              disabled={!customName.trim()}
-              className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50"
-            >
-              Add to list
-            </button>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="field-label">
+                    Washes {PERIOD_UNIT[billingPeriod]}
+                  </label>
+                  <input
+                    className="field"
+                    type="number"
+                    min="1"
+                    max={getPeriodWashLimit(billingPeriod)}
+                    inputMode="numeric"
+                    value={washes}
+                    onChange={(e) => {
+                      const maxAllowed = getPeriodWashLimit(billingPeriod);
+                      const num = Number(e.target.value);
+                      if (num > maxAllowed) {
+                        handleMainWashesChange(String(maxAllowed));
+                      } else {
+                        handleMainWashesChange(e.target.value);
+                      }
+                    }}
+                  />
+                  {billingPeriod !== 'MONTHLY' && (
+                    <p className="mt-0.5 text-[10.5px] text-slate-400">
+                      ≈ {maxWashes} washes/month
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="field-label">Price (₹) *</label>
+                  <input
+                    className="field"
+                    type="number"
+                    inputMode="numeric"
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                    placeholder="2400"
+                  />
+                </div>
+                <div>
+                  <label className="field-label">Cost to deliver (₹)</label>
+                  <input
+                    className="field"
+                    type="number"
+                    inputMode="numeric"
+                    value={cost}
+                    onChange={(e) => setCost(e.target.value)}
+                    placeholder="900"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="field-label mb-0 block">
+                    Services included &amp; {billingPeriod.toLowerCase()} frequency
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddCustom(!showAddCustom)}
+                    className="text-xs font-bold text-blue-600 hover:text-blue-700 cursor-pointer"
+                  >
+                    {showAddCustom ? 'Cancel' : '+ Add custom service'}
+                  </button>
+                </div>
+
+                {showAddCustom && (
+                  <div className="mb-3 rounded-xl border border-blue-200 bg-blue-50/60 p-3 space-y-2">
+                    <div className="text-xs font-bold text-slate-800">
+                      Add Custom Service
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <input
+                        type="text"
+                        placeholder="e.g. Engine Bay Degreasing"
+                        value={customName}
+                        onChange={(e) => setCustomName(e.target.value)}
+                        className="col-span-2 field bg-white"
+                      />
+                      <input
+                        type="number"
+                        min="1"
+                        max={maxWashes}
+                        value={customWashes}
+                        onChange={(e) => setCustomWashes(e.target.value)}
+                        placeholder={`Washes${PERIOD_UNIT[billingPeriod]}`}
+                        className="field bg-white"
+                      />
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={addCustomService}
+                        disabled={!customName.trim()}
+                        className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50 cursor-pointer"
+                      >
+                        Add to list
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-slate-50/50 p-2.5 text-xs">
+                  {allServicesList.map((serviceName) => {
+                    const selected = serviceItems.find(
+                      (s) => s.name.toLowerCase() === serviceName.toLowerCase(),
+                    );
+                    const on = Boolean(selected);
+
+                    return (
+                      <div
+                        key={serviceName}
+                        className="flex items-center justify-between py-2 px-1.5 text-slate-800 gap-2"
+                      >
+                        <button
+                          type="button"
+                          aria-pressed={on}
+                          onClick={() => toggleService(serviceName)}
+                          className="flex items-center gap-2.5 text-left font-semibold text-xs flex-1 cursor-pointer"
+                        >
+                          <span
+                            className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                              on
+                                ? 'border-blue-600 bg-blue-600 text-white'
+                                : 'border-slate-300 bg-white'
+                            }`}
+                          >
+                            {on ? (
+                              <IconCheck width={11} height={11} strokeWidth={3} />
+                            ) : null}
+                          </span>
+                          <span
+                            className={
+                              on ? 'text-slate-900 font-bold' : 'text-slate-500'
+                            }
+                          >
+                            {serviceName}
+                          </span>
+                        </button>
+
+                        {on ? (
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <input
+                              type="number"
+                              min="1"
+                              max={maxWashes}
+                              value={selected?.washesPerMonth ?? maxWashes}
+                              onChange={(e) =>
+                                updateServiceWashes(
+                                  serviceName,
+                                  Number(e.target.value),
+                                )
+                              }
+                              className="w-14 rounded-lg border border-slate-300 bg-white px-2 py-1 text-center text-xs font-bold text-slate-900 focus:outline-none focus:border-blue-500"
+                            />
+                            <span className="text-[11px] text-slate-500 font-medium">
+                              {PERIOD_UNIT[billingPeriod]}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-[11px] text-slate-400">—</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <p className="mt-1.5 text-[11px] text-slate-400">
+                  Each service can run up to {maxWashes} washes per month (the package limit).
+                </p>
+              </div>
+
+              <Note tone="brand">
+                A price or service change applies to customers added afterwards. Invoices
+                already raised are left as they are, so nobody is re-billed for a
+                month they have already paid.
+              </Note>
+
+              <Feedback state={state} />
+
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  disabled={pending}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={!valid || pending || Boolean(duplicateError)}
+                  onClick={handleCreate}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-navy-800 hover:bg-navy-700 px-5 py-2.5 text-xs font-bold text-white transition-colors disabled:opacity-50 cursor-pointer shadow-xs"
+                >
+                  {pending && (
+                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  )}
+                  <span>{pending ? 'Creating…' : 'Create Package'}</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
-
-      <div className="mt-2 divide-y divide-slate-100 rounded-xl border border-slate-200 bg-slate-50/50 p-2 text-xs">
-        {allServicesList.map((serviceName) => {
-          const selected = serviceItems.find((s) => s.name.toLowerCase() === serviceName.toLowerCase());
-          const on = Boolean(selected);
-
-          return (
-            <div
-              key={serviceName}
-              className="flex items-center justify-between py-2 px-1 text-slate-800 gap-2"
-            >
-              <button
-                type="button"
-                aria-pressed={on}
-                onClick={() => toggleService(serviceName)}
-                className="flex items-center gap-2.5 text-left font-semibold text-xs flex-1 cursor-pointer"
-              >
-                <span
-                  className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
-                    on ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300 bg-white'
-                  }`}
-                >
-                  {on ? <IconCheck width={11} height={11} strokeWidth={3} /> : null}
-                </span>
-                <span className={on ? 'text-slate-900 font-bold' : 'text-slate-500'}>
-                  {serviceName}
-                </span>
-              </button>
-
-              {on ? (
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <input
-                    type="number"
-                    min="1"
-                    max={maxWashes}
-                    value={selected?.washesPerMonth ?? maxWashes}
-                    onChange={(e) => updateServiceWashes(serviceName, Number(e.target.value))}
-                    className="w-14 rounded-lg border border-slate-300 bg-white px-2 py-1 text-center text-xs font-bold text-slate-900 focus:outline-none focus:border-blue-500"
-                  />
-                  <span className="text-[11px] text-slate-500 font-medium">{PERIOD_UNIT[billingPeriod]}</span>
-                </div>
-              ) : (
-                <span className="text-[11px] text-slate-400">—</span>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      <p className="mt-1 text-[11px] text-slate-400">
-        Each service can run up to {maxWashes} washes per month (the package limit).
-      </p>
-
-      <Button
-        block
-        className="mt-4 inline-flex items-center justify-center gap-2"
-        disabled={!valid || pending}
-        onClick={() =>
-          save({
-            action: 'create',
-            name,
-            billingPeriod,
-            washesPerPeriod: Number(washes),
-            price: Number(price),
-            costToDeliver: Number(cost) || 0,
-            services: serviceItems,
-          })
-        }
-      >
-        {pending && (
-          <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-        )}
-        <span>{pending ? 'Creating…' : 'Create package'}</span>
-      </Button>
-
-      <Feedback state={state} />
-    </div>
+    </>
   );
 }
 
@@ -553,7 +721,7 @@ export function EditPackageForm({
       {/* EDIT MODAL */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-in fade-in duration-150">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto space-y-4">
+          <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-base font-bold text-slate-900">
                 Edit {packageName}

@@ -52,7 +52,7 @@ export function EnquiryForm({
   const selectedArea = areas.find((a) => a.id === areaId);
   const selectedPackage = packages.find((p) => p.id === packageId);
 
-  const valid = name.trim().length > 1 && phone.replace(/\D/g, '').length >= 8;
+  const valid = name.trim().length > 1 && /^\d{10}$/.test(phone.trim());
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -386,8 +386,8 @@ export function EnquiryForm({
       </div>
       <div>
         <label className="block text-xs font-bold text-slate-700 mb-1.5" htmlFor="e-phone">Mobile number</label>
-        <input id="e-phone" className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 py-2.5 text-sm font-medium text-slate-900 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all" inputMode="tel" required value={phone}
-          onChange={(e) => setPhone(e.target.value)} placeholder="98xxxxxxxx" />
+        <input id="e-phone" className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 py-2.5 text-sm font-medium text-slate-900 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all" type="tel" inputMode="numeric" pattern="\d{10}" maxLength={10} required value={phone}
+          onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="98xxxxxxxx" />
       </div>
 
       <div>

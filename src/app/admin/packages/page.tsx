@@ -1,5 +1,5 @@
 import { PageHeader } from '@/components/shell/ConsoleShell';
-import { Card, CardHeading, Note, Row, Tag } from '@/components/ui/primitives';
+import { Card, Row, Tag } from '@/components/ui/primitives';
 import { IconCheck } from '@/components/shell/icons';
 import { requirePermission } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
@@ -27,10 +27,41 @@ export default async function AdminPackages() {
       <PageHeader
         title="Packages"
         description="Change your own rates, services & frequencies — no developer needed"
+        actions={
+          <CreatePackageForm existingNames={packages.map((pkg) => pkg.name)} />
+        }
       />
 
-      <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-        {packages.map((pkg) => {
+      {packages.length === 0 ? (
+        <Card className="flex flex-col items-center justify-center px-6 py-16 text-center">
+          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-500 border border-slate-200/80 shadow-2xs">
+            <svg
+              className="h-8 w-8 text-slate-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={1.6}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+              />
+            </svg>
+          </div>
+          <h3 className="text-lg font-bold text-slate-900">
+            No Packages Created Yet
+          </h3>
+          <p className="mt-1.5 max-w-md text-xs text-slate-500 leading-relaxed">
+            Set up your first wash package with custom pricing, billing cycles, and included services to start subscribing customer vehicles.
+          </p>
+          <div className="mt-5">
+            <CreatePackageForm existingNames={[]} />
+          </div>
+        </Card>
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+          {packages.map((pkg) => {
           const cars = countByPackage.get(pkg.id) ?? 0;
           const parsedServices = parsePackageServices(pkg.services, pkg.washesPerMonth);
 
@@ -107,22 +138,8 @@ export default async function AdminPackages() {
             </Card>
           );
         })}
-
-        <Card accent="brand" className="p-5">
-          <CardHeading>Create a package</CardHeading>
-          <p className="text-xs text-slate-500 mb-3">
-            Define main monthly wash limit and assign custom wash frequencies for each service.
-          </p>
-          <CreatePackageForm />
-          <div className="mt-4">
-            <Note tone="brand">
-              A price or service change applies to customers added afterwards. Invoices
-              already raised are left as they are, so nobody is re-billed for a
-              month they have already paid.
-            </Note>
-          </div>
-        </Card>
-      </div>
+        </div>
+      )}
     </>
   );
 }
