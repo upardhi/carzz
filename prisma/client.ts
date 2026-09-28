@@ -1,6 +1,9 @@
-import 'dotenv/config';
+import { config } from 'dotenv';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
+
+// Same files Next reads, so a script sees the app's own DATABASE_URL.
+config({ path: ['.env.local', '.env'], quiet: true });
 
 /**
  * The Prisma client used by the Node-side scripts (seeding and setup).

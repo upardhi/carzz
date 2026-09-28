@@ -13,7 +13,10 @@ import { seedProdData } from './seed-prod';
 
 const prisma = createPrismaClient();
 
-const isProd = process.env.SEED_MODE === 'production' || process.env.PROD_SEED === 'true';
+const isProd =
+  process.argv.includes('--prod') ||
+  process.env.SEED_MODE === 'production' ||
+  process.env.PROD_SEED === 'true';
 
 const run = isProd ? seedProdData(prisma) : seedDemoData(prisma);
 
