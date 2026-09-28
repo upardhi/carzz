@@ -370,7 +370,12 @@ export async function POST(request: Request) {
       assertCanActOnRole(session, user.role);
       assertAreaInScope(session, user.areaId);
       if (data.role) assertCanActOnRole(session, data.role);
-      if (data.areaId !== undefined) assertAreaInScope(session, data.areaId);
+      if (data.areaId !== undefined) {
+        assertAreaInScope(session, data.areaId);
+        if (data.areaId !== user.areaId && session.user.role !== 'SUPER_ADMIN') {
+          throw new HttpError(403, 'Only Super Admin can reassign a staff member to a different area.');
+        }
+      }
 
       if (data.email && data.email.toLowerCase() !== user.email.toLowerCase()) {
         const existing = await store.users.findOne({

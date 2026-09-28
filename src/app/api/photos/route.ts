@@ -13,7 +13,7 @@ import { getSession } from '@/lib/auth/server';
 export async function GET(request: NextRequest) {
   const session = await getSession();
   const { searchParams } = new URL(request.url);
-  const url = decodeURIComponent(searchParams.get('url') || '');
+  const url = searchParams.get('url') || '';
   return servePhoto(url, session);
 }
 

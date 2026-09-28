@@ -78,7 +78,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    await requireApiSession('area:manage');
+    const session = await requireApiSession('area:manage');
     const parsed = schema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) {
       return NextResponse.json(
@@ -89,7 +89,25 @@ export async function POST(request: Request) {
     const store = await getStore();
     const data = parsed.data;
 
+    function revalidateAllAreaPages() {
+      invalidateAreaPerformanceCache();
+      try {
+        revalidatePath('/admin/areas');
+        revalidatePath('/admin/regions');
+        revalidatePath('/area/areas');
+        revalidatePath('/admin/users');
+        revalidatePath('/manager/schedule');
+        revalidatePath('/admin/schedule');
+        revalidatePath('/area/schedule');
+      } catch {
+        // ignore
+      }
+    }
+
     if (data.action === 'createRegion') {
+      if (session.user.role !== 'SUPER_ADMIN') {
+        throw new HttpError(403, 'Only Super Admin can create regions.');
+      }
       const region = await store.regions.create({
         name: data.name,
         areaAdminId: data.areaAdminId ?? null,
@@ -101,9 +119,7 @@ export async function POST(request: Request) {
         await store.users.update(data.areaAdminId, { regionId: region.id });
       }
 
-      revalidatePath('/admin/areas');
-      revalidatePath('/admin/regions');
-      revalidatePath('/admin/users');
+      revalidateAllAreaPages();
       return NextResponse.json({
         ok: true,
         region,
@@ -112,6 +128,9 @@ export async function POST(request: Request) {
     }
 
     if (data.action === 'updateRegion') {
+      if (session.user.role !== 'SUPER_ADMIN') {
+        throw new HttpError(403, 'Only Super Admin can update regions.');
+      }
       const existing = await store.regions.get(data.regionId);
       if (!existing) throw new HttpError(404, 'Region not found.');
 
@@ -129,14 +148,7 @@ export async function POST(request: Request) {
         await store.users.update(nextAreaAdminId, { regionId: updated.id });
       }
 
-      try {
-        revalidatePath('/admin/areas');
-        revalidatePath('/admin/regions');
-        revalidatePath('/admin/users');
-      } catch {
-        // ignore
-      }
-
+      revalidateAllAreaPages();
       return NextResponse.json({
         ok: true,
         region: updated,
@@ -145,6 +157,9 @@ export async function POST(request: Request) {
     }
 
     if (data.action === 'deleteRegion') {
+      if (session.user.role !== 'SUPER_ADMIN') {
+        throw new HttpError(403, 'Only Super Admin can delete regions.');
+      }
       const existing = await store.regions.get(data.regionId);
       if (!existing) throw new HttpError(404, 'Region not found.');
 
@@ -171,14 +186,7 @@ export async function POST(request: Request) {
       }
 
       await store.regions.delete(data.regionId);
-
-      try {
-        revalidatePath('/admin/areas');
-        revalidatePath('/admin/regions');
-        revalidatePath('/admin/users');
-      } catch {
-        // ignore
-      }
+      revalidateAllAreaPages();
 
       return NextResponse.json({
         ok: true,
@@ -187,6 +195,9 @@ export async function POST(request: Request) {
     }
 
     if (data.action === 'setRegionActive') {
+      if (session.user.role !== 'SUPER_ADMIN') {
+        throw new HttpError(403, 'Only Super Admin can update region status.');
+      }
       const existing = await store.regions.get(data.regionId);
       if (!existing) throw new HttpError(404, 'Region not found.');
 
@@ -194,12 +205,7 @@ export async function POST(request: Request) {
         active: data.active,
       });
 
-      try {
-        revalidatePath('/admin/areas');
-        revalidatePath('/admin/regions');
-      } catch {
-        // ignore
-      }
+      revalidateAllAreaPages();
 
       return NextResponse.json({
         ok: true,
@@ -211,6 +217,13 @@ export async function POST(request: Request) {
     }
 
     if (data.action === 'create') {
+      // Area Admin can only create areas in their assigned region
+      if (session.user.role === 'AREA_ADMIN') {
+        if (session.user.regionId && data.regionId !== session.user.regionId) {
+          throw new HttpError(403, 'You can only create areas in your assigned region.');
+        }
+      }
+
       const existing = await store.areas.findOne({
         where: { name: data.name, city: data.city },
       });
@@ -242,14 +255,7 @@ export async function POST(request: Request) {
         }
       }
 
-      invalidateAreaPerformanceCache();
-      try {
-        revalidatePath('/admin/areas');
-      revalidatePath('/admin/regions');
-        revalidatePath('/admin/users');
-      } catch {
-        // ignore cache revalidation error if run outside valid context
-      }
+      revalidateAllAreaPages();
 
       return NextResponse.json({
         ok: true,
@@ -261,6 +267,16 @@ export async function POST(request: Request) {
     if (data.action === 'update') {
       const existing = await store.areas.get(data.areaId);
       if (!existing) throw new HttpError(404, 'Area not found.');
+
+      // Area Admin can only update areas in their assigned region
+      if (session.user.role === 'AREA_ADMIN') {
+        if (session.user.regionId && existing.regionId !== session.user.regionId) {
+          throw new HttpError(403, 'You can only update areas in your assigned region.');
+        }
+        if (session.user.regionId && data.regionId && data.regionId !== session.user.regionId) {
+          throw new HttpError(403, 'You cannot move an area outside your assigned region.');
+        }
+      }
 
       const nextManagerId =
         data.managerId !== undefined
@@ -288,14 +304,7 @@ export async function POST(request: Request) {
         }
       }
 
-      invalidateAreaPerformanceCache();
-      try {
-        revalidatePath('/admin/areas');
-      revalidatePath('/admin/regions');
-        revalidatePath('/admin/users');
-      } catch {
-        // ignore
-      }
+      revalidateAllAreaPages();
 
       return NextResponse.json({
         ok: true,
@@ -308,17 +317,15 @@ export async function POST(request: Request) {
       const existing = await store.areas.get(data.areaId);
       if (!existing) throw new HttpError(404, 'Area not found.');
 
+      if (session.user.role === 'AREA_ADMIN' && session.user.regionId && existing.regionId !== session.user.regionId) {
+        throw new HttpError(403, 'You can only manage areas in your assigned region.');
+      }
+
       const updated = await store.areas.update(data.areaId, {
         active: data.active,
       });
 
-      invalidateAreaPerformanceCache();
-      try {
-        revalidatePath('/admin/areas');
-        revalidatePath('/admin/regions');
-      } catch {
-        // ignore
-      }
+      revalidateAllAreaPages();
 
       return NextResponse.json({
         ok: true,
@@ -332,6 +339,10 @@ export async function POST(request: Request) {
     if (data.action === 'deleteArea') {
       const existing = await store.areas.get(data.areaId);
       if (!existing) throw new HttpError(404, 'Area not found.');
+
+      if (session.user.role === 'AREA_ADMIN' && session.user.regionId && existing.regionId !== session.user.regionId) {
+        throw new HttpError(403, 'You can only manage areas in your assigned region.');
+      }
 
       const [customerCount, staffCount] = await Promise.all([
         store.customers.count({ areaId: data.areaId }),
@@ -347,14 +358,7 @@ export async function POST(request: Request) {
       }
 
       await store.areas.delete(data.areaId);
-
-      invalidateAreaPerformanceCache();
-      try {
-        revalidatePath('/admin/areas');
-        revalidatePath('/admin/regions');
-      } catch {
-        // ignore
-      }
+      revalidateAllAreaPages();
 
       return NextResponse.json({
         ok: true,

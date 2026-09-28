@@ -604,6 +604,27 @@ export async function ConsoleCustomerDetail({
                 render: (payment) => PAYMENT_MODE_LABEL[payment.mode],
               },
               {
+                id: 'reference',
+                header: 'REF / NOTE',
+                render: (payment) => (
+                  <div className="text-xs">
+                    {payment.reference ? (
+                      <span className="font-mono text-[11px] font-semibold text-slate-700 block">
+                        #{payment.reference}
+                      </span>
+                    ) : null}
+                    {payment.note ? (
+                      <span className="text-[11px] text-slate-500 italic block">
+                        {payment.note}
+                      </span>
+                    ) : null}
+                    {!payment.reference && !payment.note ? (
+                      <span className="text-slate-300">—</span>
+                    ) : null}
+                  </div>
+                ),
+              },
+              {
                 id: 'status',
                 header: 'STATUS',
                 align: 'right',

@@ -48,6 +48,9 @@ export interface ScheduleItem {
   ratingComment?: string | null;
   managerRating?: number | null;
   managerRatingComment?: string | null;
+  customerDueAmount?: number;
+  customerDueStatus?: 'PAID' | 'DUE' | 'OVERDUE' | null;
+  customerDueOn?: string | null;
 }
 
 interface ScheduleClientProps {
@@ -567,7 +570,30 @@ export function ScheduleClient({
             id: 'customer',
             header: 'CUSTOMER',
             className: 'font-semibold text-navy-950',
-            render: (visit) => visit.customerName,
+            render: (visit) => (
+              <div className="flex flex-col gap-1">
+                <span>{visit.customerName}</span>
+                {visit.customerDueStatus === 'OVERDUE' ? (
+                  <span
+                    className="inline-flex items-center gap-1 rounded bg-rose-50 px-1.5 py-0.5 text-[10px] font-bold text-rose-700 border border-rose-200 w-fit"
+                    title={`Overdue since ${visit.customerDueOn || 'month-end'}`}
+                  >
+                    ⚠️ Overdue: ₹{visit.customerDueAmount}
+                  </span>
+                ) : visit.customerDueStatus === 'DUE' ? (
+                  <span
+                    className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 border border-amber-200 w-fit"
+                    title={`Due date: ${visit.customerDueOn || 'cycle due'}`}
+                  >
+                    Due: ₹{visit.customerDueAmount}
+                  </span>
+                ) : visit.customerDueStatus === 'PAID' ? (
+                  <span className="inline-flex items-center gap-1 rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200 w-fit">
+                    ✓ Paid
+                  </span>
+                ) : null}
+              </div>
+            ),
           },
           {
             id: 'car',
@@ -665,23 +691,20 @@ export function ScheduleClient({
               ),
           },
           {
-            id: 'rate',
-            header: 'RATE THIS WASH',
+            id: 'customerRating',
+            header: 'CUSTOMER RATING',
+            align: 'center',
             render: (visit) =>
-              visit.status === 'DONE' ? (
-                <button
-                  type="button"
-                  onClick={() => openRatingModal(visit)}
-                  className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700 hover:bg-blue-100 transition-colors cursor-pointer"
+              visit.rating ? (
+                <span
+                  className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-700 border border-amber-200"
+                  title={visit.ratingComment || `${visit.rating} Stars by Customer`}
                 >
-                  {visit.managerRating ? (
-                    <span className="text-amber-500">{'★'.repeat(visit.managerRating)}</span>
-                  ) : (
-                    <span>Rate</span>
-                  )}
-                </button>
+                  <span>★</span>
+                  <span>{visit.rating}</span>
+                </span>
               ) : (
-                <span className="text-slate-300">—</span>
+                <span className="text-slate-300 text-xs">—</span>
               ),
           },
         ]}

@@ -5,6 +5,8 @@ import { formatDateFull } from '@/lib/util/format';
 import { ReferralForm } from './ReferralForm';
 
 export const metadata = { title: 'Refer & Earn' };
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 const STATUS_LABEL: Record<string, string> = {
   PENDING: 'Waiting for review',

@@ -6,17 +6,10 @@ import { scopeAreaFilter } from '@/lib/auth/rbac';
 import { requirePermission } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { currentCycle, formatDateFull } from '@/lib/util/format';
+import { ManagerComplaintsSection } from './ManagerComplaintsSection';
 
 export const metadata = { title: 'Team Alerts' };
 
-/**
- * A manager's version of "red alerts" — not money, but the three things a
- * manager is actually judged on: washes done, quality of washes, and
- * whether the team shows up. Complaints and payment-chasing moved to area
- * admin and up; this page needs only permissions a manager already has
- * (visit:view, leave:view), so it stays reachable even without complaint
- * or inventory access.
- */
 export default async function ManagerTeamAlerts() {
   const session = await requirePermission('visit:view');
   const store = await getStore();
@@ -24,7 +17,7 @@ export default async function ManagerTeamAlerts() {
   const cycle = currentCycle();
   const today = new Date().toISOString().slice(0, 10);
 
-  const [missedToday, lowRatedVisits, staff, uninformedLeaves] = await Promise.all([
+  const [missedToday, lowRatedVisits, staff, uninformedLeaves, rawComplaints] = await Promise.all([
     store.visits.find({
       where: { scheduledDate: today, status: 'MISSED', ...areaFilter } as never,
       orderBy: [{ field: 'scheduledTime' }],
@@ -40,34 +33,67 @@ export default async function ManagerTeamAlerts() {
       orderBy: [{ field: 'appliedAt', dir: 'desc' }],
       limit: 50,
     }),
+    store.complaints.find({
+      where: areaFilter as never,
+      orderBy: [{ field: 'createdAt', dir: 'desc' }],
+      limit: 100,
+    }),
   ]);
 
   const staffIds = new Set(staff.map((s) => s.id));
   const staffById = new Map(staff.map((s) => [s.id, s]));
   const scopedUninformedLeaves = uninformedLeaves.filter((l) => staffIds.has(l.staffId));
 
-  const customerIds = [
-    ...new Set([...missedToday, ...lowRatedVisits].map((v) => v.customerId)),
+  const allCustomerIds = [
+    ...new Set([
+      ...missedToday.map((v) => v.customerId),
+      ...lowRatedVisits.map((v) => v.customerId),
+      ...rawComplaints.map((c) => c.customerId),
+    ]),
   ];
   const carIds = [...new Set([...missedToday, ...lowRatedVisits].map((v) => v.carId))];
   const [customers, cars] = await Promise.all([
-    customerIds.length
-      ? store.customers.find({ where: { id: { in: customerIds } } as never })
+    allCustomerIds.length
+      ? store.customers.find({ where: { id: { in: allCustomerIds } } as never })
       : Promise.resolve([]),
     carIds.length ? store.cars.find({ where: { id: { in: carIds } } as never }) : Promise.resolve([]),
   ]);
   const customerById = new Map(customers.map((c) => [c.id, c]));
   const carById = new Map(cars.map((c) => [c.id, c]));
 
+  const formattedComplaints = rawComplaints.map((c) => {
+    const cust = customerById.get(c.customerId);
+    const assignedStaff = c.staffId ? staffById.get(c.staffId) : null;
+    return {
+      id: c.id,
+      customerId: c.customerId,
+      customerName: cust?.name ?? 'Customer',
+      customerPhone: cust?.phone ?? '—',
+      customerAddress: cust?.address ?? null,
+      staffId: c.staffId,
+      staffName: assignedStaff?.name ?? null,
+      type: c.type,
+      body: c.body,
+      status: c.status,
+      resolution: c.resolution,
+      createdAt: c.createdAt,
+      resolvedAt: c.resolvedAt,
+    };
+  });
+
+  const openComplaintsCount = rawComplaints.filter(
+    (c) => c.status === 'OPEN' || c.status === 'ESCALATED',
+  ).length;
+
   return (
     <>
       <PageHeader
-        title="Team Alerts"
-        description="Washes not done, washes rated poorly, and staff who took leave without informing anyone — the operational picture, not the money one."
+        title="Team Alerts & Complaints"
+        description="Washes not done, poor ratings, unresolved complaints, and staff who took leave without informing anyone."
       />
 
       <div className="my-4">
-        <StatGrid columns={3}>
+        <StatGrid columns={4}>
           <StatCard
             label="MISSED TODAY"
             value={missedToday.length}
@@ -81,12 +107,26 @@ export default async function ManagerTeamAlerts() {
             subtext="Customer-rated washes"
           />
           <StatCard
+            label="OPEN COMPLAINTS"
+            value={openComplaintsCount}
+            tone={openComplaintsCount ? 'rose' : 'emerald'}
+            subtext={`${rawComplaints.length} total logged`}
+          />
+          <StatCard
             label="UNINFORMED LEAVES"
             value={scopedUninformedLeaves.length}
             tone={scopedUninformedLeaves.length ? 'rose' : 'emerald'}
             subtext="No heads-up before taking leave"
           />
         </StatGrid>
+      </div>
+
+      {/* Complaints Section */}
+      <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+        <ManagerComplaintsSection
+          complaints={formattedComplaints}
+          staffList={staff.map((s) => ({ id: s.id, name: s.name }))}
+        />
       </div>
 
       <div className="space-y-3">

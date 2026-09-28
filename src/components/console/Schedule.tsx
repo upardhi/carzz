@@ -47,12 +47,15 @@ export async function ConsoleSchedule({
   const customerIds = [...new Set(visits.map((v) => v.customerId))];
   const carIds = [...new Set(visits.map((v) => v.carId))];
 
-  const [customers, cars] = await Promise.all([
+  const [customers, cars, invoices] = await Promise.all([
     customerIds.length
       ? store.customers.find({ where: { id: { in: customerIds } } as never })
       : Promise.resolve([]),
     carIds.length
       ? store.cars.find({ where: { id: { in: carIds } } as never })
+      : Promise.resolve([]),
+    customerIds.length
+      ? store.invoices.find({ where: { customerId: { in: customerIds } } as never })
       : Promise.resolve([]),
   ]);
 
@@ -60,6 +63,12 @@ export async function ConsoleSchedule({
   const carById = new Map(cars.map((c) => [c.id, c]));
   const staffById = new Map(staff.map((s) => [s.id, s]));
   const areaById = new Map(areas.map((a) => [a.id, a]));
+  const invoicesByCustomer = new Map<string, typeof invoices>();
+  for (const inv of invoices) {
+    const list = invoicesByCustomer.get(inv.customerId) || [];
+    list.push(inv);
+    invoicesByCustomer.set(inv.customerId, list);
+  }
 
   const unassigned = visits.filter((v) => !v.staffId && v.status === 'PENDING');
   // Staff is considered ON DUTY / PRESENT by default unless explicitly recorded as OFF or ABSENT or on approved leave
@@ -73,7 +82,6 @@ export async function ConsoleSchedule({
   });
   const absentStaffIds = new Set(absent.map((s) => s.id));
 
-
   const areaWithGaps = unassigned[0]?.areaId ?? null;
   const areaWithGapsName = areaWithGaps ? areaById.get(areaWithGaps)?.name ?? null : null;
 
@@ -82,6 +90,24 @@ export async function ConsoleSchedule({
     const car = carById.get(v.carId);
     const staffMember = v.staffId ? staffById.get(v.staffId) : null;
     const area = areaById.get(v.areaId);
+    const custInvoices = invoicesByCustomer.get(v.customerId) || [];
+    
+    // Calculate customer dues
+    let customerDueAmount = 0;
+    let customerDueStatus: ScheduleItem['customerDueStatus'] = null;
+    let customerDueOn: string | null = null;
+
+    if (custInvoices.length > 0) {
+      const openInvoices = custInvoices.filter((i) => i.status !== 'PAID' && i.status !== 'WRITTEN_OFF');
+      if (openInvoices.length === 0) {
+        customerDueStatus = 'PAID';
+      } else {
+        customerDueAmount = openInvoices.reduce((sum, i) => sum + (i.amount - i.paidAmount), 0);
+        const overdue = openInvoices.some((i) => i.status === 'OVERDUE' || i.dueOn < todayISO());
+        customerDueStatus = overdue ? 'OVERDUE' : 'DUE';
+        customerDueOn = openInvoices[0]?.dueOn ?? null;
+      }
+    }
 
     return {
       id: v.id,
@@ -105,6 +131,9 @@ export async function ConsoleSchedule({
       ratingComment: v.ratingComment,
       managerRating: v.managerRating,
       managerRatingComment: v.managerRatingComment,
+      customerDueAmount,
+      customerDueStatus,
+      customerDueOn,
     };
   });
 

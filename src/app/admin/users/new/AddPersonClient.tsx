@@ -506,18 +506,26 @@ export function AddPersonClient({
                       id="new-staff-referral"
                       className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs sm:text-sm font-semibold text-navy-950 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600 shadow-xs"
                       value={referralId}
-                      onChange={(e) => setReferralId(e.target.value)}
+                      onChange={(e) => {
+                        const selectedId = e.target.value;
+                        setReferralId(selectedId);
+                        const ref = approvedStaffReferrals.find((r) => r.id === selectedId);
+                        if (ref) {
+                          if (!name.trim()) setName(ref.name);
+                          if (!phone.trim()) setPhone(ref.phone);
+                        }
+                      }}
                     >
                       <option value="">Nobody referred them</option>
                       {approvedStaffReferrals
-                        .filter((r) => r.areaId === areaId)
+                        .filter((r) => !r.areaId || r.areaId === areaId)
                         .map((r) => (
                           <option key={r.id} value={r.id}>
                             {r.name} ({r.phone}) — referred by {r.referredByStaffName}
                           </option>
                         ))}
                     </select>
-                    {approvedStaffReferrals.filter((r) => r.areaId === areaId).length === 0 ? (
+                    {approvedStaffReferrals.filter((r) => !r.areaId || r.areaId === areaId).length === 0 ? (
                       <p className="mt-1 text-[11px] text-slate-500">
                         No approved wash-boy referrals for this area yet. A wash boy submits one
                         from Refer &amp; Earn, and it needs the area admin and owner to both

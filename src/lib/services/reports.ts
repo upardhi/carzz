@@ -74,7 +74,7 @@ export function areaPerformance(
 
   areaPerfCache.set(cacheKey, {
     data: promise,
-    expires: now + 60_000,
+    expires: now + 5_000,
   });
 
   return promise;
@@ -207,16 +207,21 @@ async function _computeAreaPerformance(
       (sum, i) => sum + i.quantity * (itemCost.get(i.itemId)?.unitCost ?? 0),
       0,
     );
-    // A staff member who has taken more pocket money than they've earned
-    // this cycle (0 washes done, but an advance already disbursed) has a
-    // NEGATIVE net payout — money owed back, not still owed to them. Summing
-    // that raw would subtract a negative from cost, inflating profit by the
-    // exact amount of cash that actually left the business today. Floor each
-    // person's contribution at 0: an unearned advance is real cash paid out
-    // (a cost/receivable), never a source of profit.
+    // The staff labor expense for the business is the total earned by staff
+    // (base + bonuses + referrals - deductions). Pocket money disbursed is an advance
+    // payment against their earnings, so giving pocket money does not reduce the company's
+    // real labor cost. If an unearned advance exceeds earnings, cash paid out is counted.
     const payoutCost = payouts
       .filter((p) => p.areaId === area.id)
-      .reduce((sum, p) => sum + Math.max(0, p.net), 0);
+      .reduce(
+        (sum, p) =>
+          sum +
+          Math.max(
+            p.pocketTaken,
+            Math.max(0, (p.base || 0) + (p.bonuses || 0) + (p.referrals || 0) - (p.deductions || 0)),
+          ),
+        0,
+      );
 
     const profit = collected - goodsCost - payoutCost;
 

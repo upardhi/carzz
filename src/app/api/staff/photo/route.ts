@@ -51,13 +51,15 @@ export async function POST(request: Request) {
       contentType: file.type || 'image/jpeg',
     });
 
-    // Record it on the visit immediately so a crash between upload and submit
-    // does not lose the wash boy's work.
+    const nowIso = new Date().toISOString();
+    const shouldStart = kind === 'before' && !visit.startedAt;
+    const finalStartedAt = shouldStart ? nowIso : visit.startedAt;
+
     await store.visits.update(visitId, {
       [kind === 'before' ? 'beforePhotoUrl' : 'afterPhotoUrl']: stored.url,
       [kind === 'before' ? 'beforePhotoBytes' : 'afterPhotoBytes']: stored.bytes,
-      ...(kind === 'before' && !visit.startedAt
-        ? { startedAt: new Date().toISOString(), status: 'IN_PROGRESS' as const }
+      ...(shouldStart
+        ? { startedAt: nowIso, status: 'IN_PROGRESS' as const }
         : {}),
     });
 
@@ -69,6 +71,7 @@ export async function POST(request: Request) {
       rawUrl: stored.url,
       key: stored.key,
       bytes: stored.bytes,
+      startedAt: finalStartedAt,
     });
   } catch (error) {
     if (error instanceof HttpError) {

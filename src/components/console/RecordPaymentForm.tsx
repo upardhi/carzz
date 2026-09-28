@@ -18,6 +18,8 @@ export function RecordPaymentForm({
   const router = useRouter();
   const [amount, setAmount] = useState(String(suggested || ''));
   const [mode, setMode] = useState<PaymentMode>('CASH');
+  const [reference, setReference] = useState('');
+  const [note, setNote] = useState('');
   const [pending, setPending] = useState(false);
   const [state, setState] = useState<{ ok?: string; error?: string }>({});
 
@@ -33,7 +35,14 @@ export function RecordPaymentForm({
       const result = await safeOfflineFetch<{ message?: string; error?: string }>('/api/ops/payments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: { action: 'record', customerId, amount: value, mode },
+        body: {
+          action: 'record',
+          customerId,
+          amount: value,
+          mode,
+          reference: reference.trim() || undefined,
+          note: note.trim() || undefined,
+        },
         label: `Record Payment ₹${value} (${mode})`,
       });
 
@@ -46,6 +55,8 @@ export function RecordPaymentForm({
         setState({ ok: 'Saved offline! Payment will sync automatically when you are back online.' });
       } else {
         setState({ ok: result.data?.message ?? 'Payment recorded.' });
+        setReference('');
+        setNote('');
       }
 
       router.refresh();
@@ -57,7 +68,7 @@ export function RecordPaymentForm({
   }
 
   return (
-    <div>
+    <div className="space-y-2">
       <label className="field-label" htmlFor="pay-amount">
         Record a payment
       </label>
@@ -66,6 +77,7 @@ export function RecordPaymentForm({
           id="pay-amount"
           className="field flex-1"
           type="number"
+          placeholder="Amount (₹)"
           inputMode="numeric"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
@@ -84,7 +96,24 @@ export function RecordPaymentForm({
         </select>
       </div>
 
-      <Button block className="mt-2" disabled={pending} onClick={submit}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <input
+          type="text"
+          placeholder="Ref # / UPI Txn / Receipt"
+          value={reference}
+          onChange={(e) => setReference(e.target.value)}
+          className="field text-xs"
+        />
+        <input
+          type="text"
+          placeholder="Note (optional)"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          className="field text-xs"
+        />
+      </div>
+
+      <Button block className="mt-1" disabled={pending} onClick={submit}>
         {pending ? 'Recording…' : 'Record payment'}
       </Button>
 
@@ -101,3 +130,4 @@ export function RecordPaymentForm({
     </div>
   );
 }
+

@@ -497,164 +497,201 @@ export function EditCarModalButton({
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-              <div>
-                <h3 className="text-base font-bold text-slate-900">
-                  Edit Vehicle: {car.make} {car.model}
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Plate: {car.plate} · Update package, staff assignment & schedule
-                </p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
+          <div className="relative w-full max-w-xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden my-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/70 px-5 py-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 font-black text-lg">
+                  🚗
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    Edit Vehicle: {make} {model}
+                  </h3>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="font-mono text-xs font-bold text-slate-700 bg-white px-2 py-0.5 rounded border border-slate-200">
+                      {plate || 'NO PLATE'}
+                    </span>
+                    <span className="text-[11px] text-slate-500">Update package, routine &amp; wash boy</span>
+                  </div>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="text-slate-400 hover:text-slate-600 text-lg font-bold p-1 cursor-pointer"
+                className="text-slate-400 hover:text-slate-600 rounded-lg p-1 text-lg font-bold cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleSave} className="space-y-3.5 text-xs">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Make *</label>
-                  <input
-                    type="text"
-                    required
-                    value={make}
-                    onChange={(e) => setMake(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold focus:border-blue-500 focus:outline-none"
-                  />
+            <form onSubmit={handleSave} className="p-5 space-y-4 max-h-[75vh] overflow-y-auto text-xs">
+              {/* Section 1: Vehicle Information */}
+              <div className="rounded-xl border border-slate-200/90 bg-white p-3.5 space-y-3 shadow-2xs">
+                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  1. Vehicle Details
                 </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Model *</label>
-                  <input
-                    type="text"
-                    required
-                    value={model}
-                    onChange={(e) => setModel(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold focus:border-blue-500 focus:outline-none"
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Make *</label>
+                    <input
+                      type="text"
+                      required
+                      value={make}
+                      onChange={(e) => setMake(e.target.value)}
+                      placeholder="e.g. Maruti, Tata, Hyundai"
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-blue-600 focus:outline-none shadow-2xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Model *</label>
+                    <input
+                      type="text"
+                      required
+                      value={model}
+                      onChange={(e) => setModel(e.target.value)}
+                      placeholder="e.g. Swift, Nexon, Creta"
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-blue-600 focus:outline-none shadow-2xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Plate Number *</label>
+                    <input
+                      type="text"
+                      required
+                      value={plate}
+                      onChange={(e) => setPlate(e.target.value.toUpperCase())}
+                      placeholder="e.g. MH12AB1234"
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-mono font-bold focus:border-blue-600 focus:outline-none uppercase shadow-2xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Vehicle Colour</label>
+                    <input
+                      type="text"
+                      value={colour}
+                      onChange={(e) => setColour(e.target.value)}
+                      placeholder="e.g. White, Black, Silver"
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-blue-600 focus:outline-none shadow-2xs"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              {/* Section 2: Package & Wash Boy */}
+              <div className="rounded-xl border border-slate-200/90 bg-white p-3.5 space-y-3 shadow-2xs">
+                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  2. Subscription &amp; Operations
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Service Package *</label>
+                    <select
+                      value={packageId}
+                      onChange={(e) => handlePackageChange(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold bg-white focus:border-blue-600 focus:outline-none shadow-2xs"
+                    >
+                      {packages.map((pkg) => (
+                        <option key={pkg.id} value={pkg.id}>
+                          {pkg.name} ({pkg.washesPerMonth} washes/mo)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Assigned Wash Boy</label>
+                    <select
+                      value={assignedStaffId}
+                      onChange={(e) => setAssignedStaffId(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold bg-white focus:border-blue-600 focus:outline-none shadow-2xs"
+                    >
+                      <option value="">Unassigned</option>
+                      {staffList.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name} ({s.phone})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 3: Timing & Weekly Routine */}
+              <div className="rounded-xl border border-slate-200/90 bg-white p-3.5 space-y-3 shadow-2xs">
+                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  3. Wash Routine &amp; Schedule
+                </div>
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Plate Number *</label>
+                  <label className="block font-bold text-slate-700 mb-1">Preferred Slot Time (HH:MM) *</label>
                   <input
-                    type="text"
+                    type="time"
                     required
-                    value={plate}
-                    onChange={(e) => setPlate(e.target.value.toUpperCase())}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-mono font-bold focus:border-blue-500 focus:outline-none uppercase"
+                    value={scheduleTime}
+                    onChange={(e) => setScheduleTime(e.target.value)}
+                    className="w-full max-w-[160px] rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-blue-600 focus:outline-none shadow-2xs"
                   />
                 </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Colour</label>
-                  <input
-                    type="text"
-                    value={colour}
-                    onChange={(e) => setColour(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold focus:border-blue-500 focus:outline-none"
-                  />
-                </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Service Package *</label>
-                  <select
-                    value={packageId}
-                    onChange={(e) => handlePackageChange(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold bg-white focus:border-blue-500 focus:outline-none"
-                  >
-                    {packages.map((pkg) => (
-                      <option key={pkg.id} value={pkg.id}>
-                        {pkg.name} ({pkg.washesPerMonth} washes/mo)
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Assigned Wash Boy</label>
-                  <select
-                    value={assignedStaffId}
-                    onChange={(e) => setAssignedStaffId(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold bg-white focus:border-blue-500 focus:outline-none"
-                  >
-                    <option value="">Unassigned</option>
-                    {staffList.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} ({s.phone})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Slot Time (HH:MM) *</label>
-                <input
-                  type="time"
-                  required
-                  value={scheduleTime}
-                  onChange={(e) => setScheduleTime(e.target.value)}
-                  className="w-full max-w-[160px] rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold focus:border-blue-500 focus:outline-none"
+                <WeeklyScheduleEditor
+                  weeklyDays={weeklyDays}
+                  dayServices={dayServices}
+                  serviceOptions={serviceOptions}
+                  pkg={selectedPackage}
+                  onChange={(next) => {
+                    setWeeklyDays(next.weeklyDays);
+                    setDayServices(next.dayServices);
+                  }}
                 />
               </div>
 
-              <WeeklyScheduleEditor
-                weeklyDays={weeklyDays}
-                dayServices={dayServices}
-                serviceOptions={serviceOptions}
-                pkg={selectedPackage}
-                onChange={(next) => {
-                  setWeeklyDays(next.weeklyDays);
-                  setDayServices(next.dayServices);
-                }}
-              />
+              {/* Section 4: Parking & Notes */}
+              <div className="rounded-xl border border-slate-200/90 bg-white p-3.5 space-y-3 shadow-2xs">
+                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  4. Parking &amp; Instructions
+                </div>
+                <div>
+                  <input
+                    type="text"
+                    value={specialInstructions}
+                    onChange={(e) => setSpecialInstructions(e.target.value)}
+                    placeholder="e.g. Basement 1, Pillar 42, Key with security guard"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-blue-600 focus:outline-none shadow-2xs"
+                  />
+                </div>
 
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Special Instructions / Parking Spot</label>
-                <input
-                  type="text"
-                  value={specialInstructions}
-                  onChange={(e) => setSpecialInstructions(e.target.value)}
-                  placeholder="e.g. Basement 1, Pillar 42, Key with guard"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold focus:border-blue-500 focus:outline-none"
-                />
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="checkbox"
+                    id={`car-active-${car.id}`}
+                    checked={active}
+                    onChange={(e) => setActive(e.target.checked)}
+                    className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <label htmlFor={`car-active-${car.id}`} className="font-bold text-slate-800 cursor-pointer text-xs">
+                    Car subscription is active &amp; receiving scheduled washes
+                  </label>
+                </div>
               </div>
 
-              <div className="flex items-center gap-2 pt-1">
-                <input
-                  type="checkbox"
-                  id={`car-active-${car.id}`}
-                  checked={active}
-                  onChange={(e) => setActive(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                />
-                <label htmlFor={`car-active-${car.id}`} className="font-bold text-slate-700 cursor-pointer">
-                  Car is active & subscribed for washes
-                </label>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              {/* Footer */}
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
-                  className="rounded-lg border border-slate-300 px-4 py-2 font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 font-bold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={pending}
-                  className="rounded-lg bg-blue-600 px-5 py-2 font-bold text-white hover:bg-blue-700 transition-colors disabled:opacity-50"
+                  className="rounded-xl bg-blue-600 px-5 py-2 font-bold text-white hover:bg-blue-700 transition-colors disabled:opacity-50 cursor-pointer shadow-xs"
                 >
-                  {pending ? 'Saving…' : 'Save Changes'}
+                  {pending ? 'Saving Changes…' : 'Save Changes'}
                 </button>
               </div>
             </form>
@@ -1286,13 +1323,12 @@ export function VisitPhotoPreviewButton({
                 ✕
               </button>
             </div>
-            <div className="relative h-[65vh] w-[75vw] max-w-2xl">
-              <Image
+            <div className="relative flex h-[65vh] w-[75vw] max-w-2xl items-center justify-center p-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
                 src={activePhoto.url}
-                alt="Full photo"
-                fill
-                sizes="(max-width: 1200px) 100vw, 800px"
-                className="object-contain"
+                alt={activePhoto.label}
+                className="max-h-full max-w-full rounded-lg object-contain shadow-md"
               />
             </div>
           </div>

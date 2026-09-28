@@ -69,6 +69,17 @@ export async function POST(request: Request) {
       createdAt: new Date().toISOString(),
     });
 
+    try {
+      const { revalidatePath } = await import('next/cache');
+      revalidatePath('/staff/refer');
+      revalidatePath('/admin/referrals');
+      revalidatePath('/area/referrals');
+      revalidatePath('/manager/staff/new');
+      revalidatePath('/area/staff/new');
+    } catch {
+      // ignore
+    }
+
     return NextResponse.json({
       ok: true,
       referral,

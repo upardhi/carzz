@@ -32,7 +32,8 @@ const schema = z.discriminatedUnion('action', [
     customerId: z.string().min(1),
     amount: z.number().int().positive(),
     mode: z.enum(['CASH', 'MANUAL_UPI', 'GATEWAY']),
-    note: z.string().max(300).optional(),
+    reference: z.string().max(100).optional().nullable(),
+    note: z.string().max(300).optional().nullable(),
   }),
   z.object({
     action: z.literal('confirm'),
@@ -91,7 +92,8 @@ export async function POST(request: Request) {
       mode: parsed.data.mode,
       cycle: currentCycle(),
       recordedByUserId: session.user.id,
-      note: parsed.data.note,
+      reference: parsed.data.reference || null,
+      note: parsed.data.note || null,
       status: 'CONFIRMED',
     });
 

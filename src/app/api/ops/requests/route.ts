@@ -177,7 +177,8 @@ export async function GET(request: Request) {
 
         const washesRemaining = Math.max(0, currWashes - washesDoneCount);
         const unusedCredit = Math.round((washesRemaining / Math.max(1, currWashes)) * currPrice);
-        const targetRemainingCost = Math.round((washesRemaining / Math.max(1, reqWashes)) * reqPrice);
+        const newPlanRemainingWashes = Math.max(0, reqWashes - washesDoneCount);
+        const targetRemainingCost = Math.round((newPlanRemainingWashes / Math.max(1, reqWashes)) * reqPrice);
         const proratedDifference = targetRemainingCost - unusedCredit;
         const fullDifference = reqPrice - unusedCredit;
 
@@ -301,17 +302,34 @@ export async function POST(request: Request) {
           finalPaymentAmount = Math.round(adjustmentAmount);
 
           if (adjustmentAmount > 0) {
-            // UPGRADE: Customer owes extra money -> Generate open adjustment invoice
-            await store.invoices.create({
-              customerId: customer.id,
-              areaId: customer.areaId,
-              cycle: currentCycle(),
-              amount: Math.round(adjustmentAmount),
-              dueOn: todayISO(),
-              paidAmount: 0,
-              status: 'OPEN',
-              createdAt: new Date().toISOString(),
+            // UPGRADE: Customer owes extra money -> Update existing cycle invoice or create if none exists
+            const existingInvoice = await store.invoices.findOne({
+              where: { customerId: customer.id, cycle: currentCycle() } as never,
             });
+            if (existingInvoice) {
+              const newAmount = existingInvoice.amount + Math.round(adjustmentAmount);
+              const newStatus =
+                existingInvoice.paidAmount >= newAmount
+                  ? 'PAID'
+                  : existingInvoice.paidAmount > 0
+                  ? 'PARTIAL'
+                  : 'OPEN';
+              await store.invoices.update(existingInvoice.id, {
+                amount: newAmount,
+                status: newStatus,
+              });
+            } else {
+              await store.invoices.create({
+                customerId: customer.id,
+                areaId: customer.areaId,
+                cycle: currentCycle(),
+                amount: Math.round(adjustmentAmount),
+                dueOn: todayISO(),
+                paidAmount: 0,
+                status: 'OPEN',
+                createdAt: new Date().toISOString(),
+              });
+            }
             finalPaymentStatus = 'PENDING';
           } else if (adjustmentAmount < 0) {
             // DOWNGRADE: Customer is owed credit -> Record credit payment adjustment to ledger
@@ -344,16 +362,33 @@ export async function POST(request: Request) {
 
         if (applyFinance && adjustmentAmount > 0) {
           finalPaymentAmount = Math.round(adjustmentAmount);
-          await store.invoices.create({
-            customerId: customer.id,
-            areaId: customer.areaId,
-            cycle: currentCycle(),
-            amount: Math.round(adjustmentAmount),
-            dueOn: todayISO(),
-            paidAmount: 0,
-            status: 'OPEN',
-            createdAt: new Date().toISOString(),
+          const existingInvoice = await store.invoices.findOne({
+            where: { customerId: customer.id, cycle: currentCycle() } as never,
           });
+          if (existingInvoice) {
+            const newAmount = existingInvoice.amount + Math.round(adjustmentAmount);
+            const newStatus =
+              existingInvoice.paidAmount >= newAmount
+                ? 'PAID'
+                : existingInvoice.paidAmount > 0
+                ? 'PARTIAL'
+                : 'OPEN';
+            await store.invoices.update(existingInvoice.id, {
+              amount: newAmount,
+              status: newStatus,
+            });
+          } else {
+            await store.invoices.create({
+              customerId: customer.id,
+              areaId: customer.areaId,
+              cycle: currentCycle(),
+              amount: Math.round(adjustmentAmount),
+              dueOn: todayISO(),
+              paidAmount: 0,
+              status: 'OPEN',
+              createdAt: new Date().toISOString(),
+            });
+          }
           finalPaymentStatus = 'PENDING';
         }
 

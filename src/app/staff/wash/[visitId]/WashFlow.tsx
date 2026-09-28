@@ -122,14 +122,17 @@ export function WashFlow({
       body.set('photo', file);
 
       const response = await fetch('/api/staff/photo', { method: 'POST', body });
-      const data = (await response.json()) as { url?: string; error?: string };
+      const data = (await response.json()) as { url?: string; startedAt?: string; error?: string };
       if (!response.ok || !data.url) {
         setError(data.error ?? 'Could not save that photo.');
         return;
       }
       if (kind === 'before') {
         setBefore(data.url);
-        toast.success('Before photo saved! Tap "START WASH" to start cleaning.');
+        if (data.startedAt) {
+          setWashStartedAt(data.startedAt);
+        }
+        toast.success('Before photo saved! Cleaning timer is running.');
       } else {
         setAfter(data.url);
         toast.success('After photo saved! Ready to complete wash.');

@@ -270,6 +270,8 @@ export function LocationPickerMap({
     };
   }, []);
 
+  const [searchResults, setSearchResults] = useState<Array<{ display_name: string; lat: string; lon: string }>>([]);
+
   // Handle Search input or Google Maps Link search
   async function handleSearch(e?: React.FormEvent) {
     if (e) e.preventDefault();
@@ -277,6 +279,7 @@ export function LocationPickerMap({
     if (!query) return;
 
     setSearchError('');
+    setSearchResults([]);
 
     // Check if user pasted a Google Maps URL
     const gmapsCoords = parseGoogleMapsUrl(query);
@@ -290,37 +293,41 @@ export function LocationPickerMap({
       return;
     }
 
-    // Otherwise, perform Nominatim address search
+    // Perform multi-result search supporting apartments, societies, landmarks
     setIsSearching(true);
     try {
-      const fullQuery = query.toLowerCase().includes(city.toLowerCase())
-        ? query
-        : `${query}, ${city}`;
-
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fullQuery)}&limit=1`,
+      // First try the query as typed (or with city if not already included)
+      const qEncoded = encodeURIComponent(query);
+      let res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${qEncoded}&limit=5&addressdetails=1`,
         { headers: { 'User-Agent': 'CarzzWeb-App/1.0' } },
       );
 
-      if (!res.ok) throw new Error('Search request failed.');
+      let results: Array<{ display_name: string; lat: string; lon: string }> = [];
+      if (res.ok) {
+        results = await res.json();
+      }
 
-      const results = await res.json();
+      // If no results and city wasn't in query, try appending city
+      if ((!results || results.length === 0) && city && !query.toLowerCase().includes(city.toLowerCase())) {
+        const cityQuery = `${query}, ${city}`;
+        res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cityQuery)}&limit=5&addressdetails=1`,
+          { headers: { 'User-Agent': 'CarzzWeb-App/1.0' } },
+        );
+        if (res.ok) {
+          results = await res.json();
+        }
+      }
+
       if (results && results.length > 0) {
-        const item = results[0];
-        const sLat = Number(parseFloat(item.lat).toFixed(6));
-        const sLng = Number(parseFloat(item.lon).toFixed(6));
-
-        onCoordinatesChange(sLat, sLng);
-        if (item.display_name) {
-          onAddressChange(item.display_name);
+        if (results.length === 1) {
+          selectSearchResult(results[0]);
+        } else {
+          setSearchResults(results);
         }
-
-        if (mapInstanceRef.current) {
-          mapInstanceRef.current.setView([sLat, sLng], 15);
-        }
-        setSearchQuery('');
       } else {
-        setSearchError('Location not found. Try clicking directly on the map.');
+        setSearchError('Location not found. Try typing a nearby landmark, society, or click directly on the map.');
       }
     } catch {
       setSearchError('Could not search location. Please tap/click directly on the map.');
@@ -329,9 +336,26 @@ export function LocationPickerMap({
     }
   }
 
+  function selectSearchResult(item: { display_name: string; lat: string; lon: string }) {
+    const sLat = Number(parseFloat(item.lat).toFixed(6));
+    const sLng = Number(parseFloat(item.lon).toFixed(6));
+
+    onCoordinatesChange(sLat, sLng);
+    if (item.display_name) {
+      onAddressChange(item.display_name);
+    }
+
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.setView([sLat, sLng], 16);
+    }
+    setSearchResults([]);
+    setSearchQuery('');
+  }
+
   function handleClearLocation() {
     onCoordinatesChange(null, null);
     setSearchError('');
+    setSearchResults([]);
   }
 
   return (
@@ -347,7 +371,7 @@ export function LocationPickerMap({
           <input
             id="garage-address"
             className="field text-sm"
-            placeholder="e.g. Plot 14, MIDC Area, Near Toll Plaza"
+            placeholder="e.g. Flat 302, Palm Heights, Near Toll Plaza, Wardha Road"
             value={address}
             onChange={(e) => onAddressChange(e.target.value)}
             required={addressRequired}
@@ -372,45 +396,67 @@ export function LocationPickerMap({
         </div>
 
         {/* Search / Google Maps URL Box */}
-        <div className="flex flex-col sm:flex-row gap-2">
-          <div className="relative flex-1">
-            <input
-              type="text"
-              placeholder="Search area, landmark or paste Google Maps link..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleSearch();
-                }
-              }}
-              className="w-full rounded-lg border border-line bg-white py-1.5 pl-8 pr-3 text-xs placeholder:text-ink-mute focus:border-blue-600 focus:outline-hidden"
-            />
-            <svg
-              className="pointer-events-none absolute left-2.5 top-2 h-3.5 w-3.5 text-ink-mute"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+        <div className="relative">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                placeholder="Search apartment, society, landmark or paste Google Maps link..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleSearch();
+                  }
+                }}
+                className="w-full rounded-lg border border-line bg-white py-1.5 pl-8 pr-3 text-xs placeholder:text-ink-mute focus:border-blue-600 focus:outline-hidden"
               />
-            </svg>
+              <svg
+                className="pointer-events-none absolute left-2.5 top-2 h-3.5 w-3.5 text-ink-mute"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => handleSearch()}
+              disabled={isSearching || !searchQuery.trim()}
+              className="w-full sm:w-auto justify-center"
+            >
+              {isSearching ? 'Searching…' : 'Search / Locate'}
+            </Button>
           </div>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={() => handleSearch()}
-            disabled={isSearching || !searchQuery.trim()}
-            className="w-full sm:w-auto justify-center"
-          >
-            {isSearching ? 'Searching…' : 'Search / Locate'}
-          </Button>
+
+          {/* Search Result Suggestions Dropdown */}
+          {searchResults.length > 0 && (
+            <div className="absolute top-full left-0 right-0 z-30 mt-1 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl max-h-48 overflow-y-auto divide-y divide-slate-100">
+              <div className="px-2 py-1 text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
+                Select matching location ({searchResults.length})
+              </div>
+              {searchResults.map((item, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => selectSearchResult(item)}
+                  className="w-full text-left px-2.5 py-1.5 text-xs text-slate-800 hover:bg-blue-50 hover:text-blue-900 rounded-lg transition-colors flex items-start gap-1.5"
+                >
+                  <span className="text-blue-600 shrink-0 mt-0.5">📍</span>
+                  <span className="line-clamp-2 leading-snug">{item.display_name}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {searchError ? (

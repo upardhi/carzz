@@ -151,6 +151,7 @@ const MANAGER_PERMISSIONS: Permission[] = [
 const AREA_ADMIN_PERMISSIONS: Permission[] = [
   ...MANAGER_PERMISSIONS,
   'user:manage',
+  'area:manage',
   'expense:manage',
   'accounting:view',
   // Deliberately not on MANAGER_PERMISSIONS — dual sign-off is area admin +

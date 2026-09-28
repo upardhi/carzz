@@ -10,16 +10,29 @@ export default async function AreaAddStaffPage() {
   const store = await getStore();
   const areaFilter = scopeAreaFilter(session.scope);
 
-  const [regions, areas, rules, pendingReferrals, staff] = await Promise.all([
+  const [regions, allAreas, rules, pendingReferrals, staff] = await Promise.all([
     store.regions.find({ orderBy: [{ field: 'name' }] }),
     store.areas.find({ orderBy: [{ field: 'name' }] }),
     store.getPayoutSettings(),
     store.staffReferrals.find({
-      where: { type: 'STAFF', status: 'APPROVED', convertedStaffId: null, ...areaFilter } as never,
+      where: { type: 'STAFF', status: 'APPROVED', convertedStaffId: null } as never,
     }),
-    store.staff.find({ where: areaFilter as never }),
+    store.staff.find(),
   ]);
   const staffById = new Map(staff.map((s) => [s.id, s]));
+
+  // Restrict areas to area admin's assigned scope
+  const areas = session.scope.areaIds && session.scope.areaIds.length > 0
+    ? allAreas.filter((a) => session.scope.areaIds!.includes(a.id))
+    : allAreas;
+
+  const scopedApprovedReferrals = pendingReferrals.filter((r) => {
+    if (!r.areaId) return true;
+    if (session.scope.areaIds && session.scope.areaIds.length > 0) {
+      return session.scope.areaIds.includes(r.areaId);
+    }
+    return true;
+  });
 
   return (
     <AddPersonClient
@@ -32,7 +45,7 @@ export default async function AreaAddStaffPage() {
       title="Add Wash Staff Member"
       description="Register a car wash boy, assign area operations, setup payout details, and attach KYC verification documents (Aadhaar or PAN)."
       staffReferralBonus={rules.staffReferralBonus}
-      approvedStaffReferrals={pendingReferrals.map((r) => ({
+      approvedStaffReferrals={scopedApprovedReferrals.map((r) => ({
         id: r.id,
         areaId: r.areaId,
         name: r.name,
@@ -43,3 +56,4 @@ export default async function AreaAddStaffPage() {
     />
   );
 }
+

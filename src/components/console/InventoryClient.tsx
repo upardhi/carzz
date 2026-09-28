@@ -41,14 +41,18 @@ export function InventoryClient({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const debouncedSearch = useDebounce(searchQuery, 250);
 
-  const checkHasActiveRequest = useCallback((areaId: string, itemId: string) => {
-    return _requests.some(
+  const getActiveRequest = useCallback((areaId: string, itemId: string) => {
+    return _requests.find(
       (r) =>
         r.itemId === itemId &&
         r.areaId === areaId &&
-        (r.status === 'PENDING' || r.status === 'APPROVED')
+        (r.status === 'PENDING' || r.status === 'APPROVED' || r.status === 'RECEIVED')
     );
   }, [_requests]);
+
+  const checkHasActiveRequest = useCallback((areaId: string, itemId: string) => {
+    return Boolean(getActiveRequest(areaId, itemId));
+  }, [getActiveRequest]);
 
   // Modal / Action States
   const [reorderModal, setReorderModal] = useState<{
@@ -663,7 +667,7 @@ export function InventoryClient({
                   <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
                     {itemsNeedingAttention.slice(0, 5).map((row, i) => {
                       const isOut = row.status === 'OUT';
-                      const hasActiveRequest = checkHasActiveRequest(row.areaId, row.item.id);
+                      const activeReq = getActiveRequest(row.areaId, row.item.id);
                       return (
                         <tr key={`${row.areaId}-${row.item.id}-${i}`} className="hover:bg-slate-50/50 transition-colors">
                           <td className="px-6 py-3.5 font-bold text-slate-900">
@@ -696,10 +700,18 @@ export function InventoryClient({
                             </span>
                           </td>
                           <td className="px-6 py-3.5 text-right">
-                            {hasActiveRequest ? (
-                              <span className="inline-flex items-center rounded-lg bg-emerald-50 px-3.5 py-1.5 text-xs font-bold text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
-                                Ordered
-                              </span>
+                            {activeReq ? (
+                              activeReq.status === 'PENDING' ? (
+                                <span className="inline-flex items-center gap-1 rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-800 border border-amber-200 shadow-2xs">
+                                  <span>⏳</span>
+                                  <span>Awaiting Permission</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 ring-1 ring-inset ring-emerald-600/20 shadow-2xs">
+                                  <span>✓</span>
+                                  <span>Ordered</span>
+                                </span>
+                              )
                             ) : isOut ? (
                               <button
                                 type="button"
@@ -924,6 +936,7 @@ export function InventoryClient({
                         const isOut = row.status === 'OUT';
                         const isLow = row.status === 'LOW' || row.status === 'CRITICAL';
                         const hasActiveRequest = checkHasActiveRequest(group.area.id, row.item.id);
+                        const activeReq = getActiveRequest(group.area.id, row.item.id);
                         return (
                           <tr key={row.item.id} className="hover:bg-slate-50/60 transition-colors">
                             <td className="px-6 py-3.5 font-bold text-slate-900">
@@ -977,19 +990,25 @@ export function InventoryClient({
                                 >
                                   Issue
                                 </button>
-                                {hasActiveRequest ? (
-                                  <span className="inline-flex items-center rounded-lg bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
-                                    Ordered
-                                  </span>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() => openNewRequestModal(group.area.id, row.item.id)}
-                                    className="rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-2.5 py-1 text-[11px] font-bold text-blue-600 shadow-sm transition-all"
-                                  >
-                                    Order
-                                  </button>
-                                )}
+                                 {activeReq ? (
+                                    activeReq.status === 'PENDING' ? (
+                                      <span className="inline-flex items-center rounded-lg bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-700 ring-1 ring-inset ring-amber-600/20" title="Request submitted, awaiting admin approval">
+                                        ⏳ Awaiting Permission
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center rounded-lg bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 ring-1 ring-inset ring-emerald-600/20" title="Approved / Ordered">
+                                        ✓ Ordered
+                                      </span>
+                                    )
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => openNewRequestModal(group.area.id, row.item.id)}
+                                      className="rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-2.5 py-1 text-[11px] font-bold text-blue-600 shadow-sm transition-all"
+                                    >
+                                      Order
+                                    </button>
+                                  )}
                               </div>
                             </td>
                           </tr>

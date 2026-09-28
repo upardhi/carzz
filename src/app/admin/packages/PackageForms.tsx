@@ -13,11 +13,17 @@ import {
   type PackageServiceItem,
 } from '@/lib/data/types';
 
-const PERIOD_LABEL: Record<BillingPeriod, string> = {
-  WEEKLY: 'week',
-  MONTHLY: 'month',
-  YEARLY: 'year',
+const PERIOD_UNIT: Record<BillingPeriod, string> = {
+  WEEKLY: '/wk',
+  MONTHLY: '/mo',
+  YEARLY: '/yr',
 };
+
+function getPeriodWashLimit(period: BillingPeriod): number {
+  if (period === 'WEEKLY') return 7;
+  if (period === 'MONTHLY') return 31;
+  return 366;
+}
 
 const PREDEFINED_SERVICES = [
   'Exterior wash',
@@ -186,8 +192,24 @@ export function CreatePackageForm() {
 
       <div className="mt-2 grid grid-cols-3 gap-2">
         <div>
-          <label className="field-label">Washes / {PERIOD_LABEL[billingPeriod]}</label>
-          <input className="field" type="number" min="1" max="366" inputMode="numeric" value={washes} onChange={(e) => handleMainWashesChange(e.target.value)} />
+          <label className="field-label">Washes {PERIOD_UNIT[billingPeriod]}</label>
+          <input
+            className="field"
+            type="number"
+            min="1"
+            max={getPeriodWashLimit(billingPeriod)}
+            inputMode="numeric"
+            value={washes}
+            onChange={(e) => {
+              const maxAllowed = getPeriodWashLimit(billingPeriod);
+              const num = Number(e.target.value);
+              if (num > maxAllowed) {
+                handleMainWashesChange(String(maxAllowed));
+              } else {
+                handleMainWashesChange(e.target.value);
+              }
+            }}
+          />
           {billingPeriod !== 'MONTHLY' && (
             <p className="mt-0.5 text-[10.5px] text-slate-400">≈ {maxWashes} washes/month</p>
           )}
@@ -203,7 +225,9 @@ export function CreatePackageForm() {
       </div>
 
       <div className="mt-4 flex items-center justify-between">
-        <span className="field-label mb-0 block">Services included & monthly frequency</span>
+        <span className="field-label mb-0 block">
+          Services included &amp; {billingPeriod.toLowerCase()} frequency
+        </span>
         <button
           type="button"
           onClick={() => setShowAddCustom(!showAddCustom)}
@@ -230,7 +254,7 @@ export function CreatePackageForm() {
               max={maxWashes}
               value={customWashes}
               onChange={(e) => setCustomWashes(e.target.value)}
-              placeholder="Washes/mo"
+              placeholder={`Washes${PERIOD_UNIT[billingPeriod]}`}
               className="field bg-white"
             />
           </div>
@@ -285,7 +309,7 @@ export function CreatePackageForm() {
                     onChange={(e) => updateServiceWashes(serviceName, Number(e.target.value))}
                     className="w-14 rounded-lg border border-slate-300 bg-white px-2 py-1 text-center text-xs font-bold text-slate-900 focus:outline-none focus:border-blue-500"
                   />
-                  <span className="text-[11px] text-slate-500 font-medium">/mo</span>
+                  <span className="text-[11px] text-slate-500 font-medium">{PERIOD_UNIT[billingPeriod]}</span>
                 </div>
               ) : (
                 <span className="text-[11px] text-slate-400">—</span>
@@ -576,15 +600,17 @@ export function EditPackageForm({
 
               <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <label className="block mb-1 text-slate-600">Washes / {PERIOD_LABEL[nextBillingPeriod]}</label>
+                  <label className="block mb-1 text-slate-600">Washes {PERIOD_UNIT[nextBillingPeriod]}</label>
                   <input
                     type="number"
                     min="1"
-                    max="366"
+                    max={getPeriodWashLimit(nextBillingPeriod)}
                     value={nextWashes}
                     onChange={(e) => {
-                      setWashes(e.target.value);
-                      const m = washesPerMonthFor(nextBillingPeriod, Number(e.target.value) || 1);
+                      const maxAllowed = getPeriodWashLimit(nextBillingPeriod);
+                      const val = Number(e.target.value) > maxAllowed ? String(maxAllowed) : e.target.value;
+                      setWashes(val);
+                      const m = washesPerMonthFor(nextBillingPeriod, Number(val) || 1);
                       setServiceItems((cur) => cur.map((s) => ({ ...s, washesPerMonth: Math.min(s.washesPerMonth, m) })));
                     }}
                     className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-blue-500"
@@ -628,7 +654,9 @@ export function EditPackageForm({
 
               <div className="pt-2 border-t border-slate-100">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-slate-700 font-bold">Services & frequencies</span>
+                  <span className="text-slate-700 font-bold">
+                    Services &amp; {nextBillingPeriod.toLowerCase()} frequencies
+                  </span>
                   <button
                     type="button"
                     onClick={() => setShowAddCustom(!showAddCustom)}
@@ -654,7 +682,7 @@ export function EditPackageForm({
                         max={maxWashes}
                         value={customWashes}
                         onChange={(e) => setCustomWashes(e.target.value)}
-                        placeholder="Washes/mo"
+                        placeholder={`Washes${PERIOD_UNIT[nextBillingPeriod]}`}
                         className="field bg-white"
                       />
                     </div>
@@ -709,7 +737,7 @@ export function EditPackageForm({
                               onChange={(e) => updateServiceWashes(serviceName, Number(e.target.value))}
                               className="w-12 rounded-lg border border-slate-300 bg-white px-1.5 py-0.5 text-center text-xs font-bold text-slate-900 focus:outline-none focus:border-blue-500"
                             />
-                            <span className="text-[10.5px] text-slate-500">/mo</span>
+                            <span className="text-[10.5px] text-slate-500">{PERIOD_UNIT[nextBillingPeriod]}</span>
                           </div>
                         ) : (
                           <span className="text-[10.5px] text-slate-400">—</span>
