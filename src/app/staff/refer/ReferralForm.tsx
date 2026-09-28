@@ -19,8 +19,8 @@ export function ReferralForm() {
       setState({ error: 'Please enter a name.' });
       return;
     }
-    if (phone.trim().length < 6) {
-      setState({ error: 'Please enter a valid phone number.' });
+    if (!/^\d{10}$/.test(phone.trim())) {
+      setState({ error: 'Please enter a valid 10-digit mobile number.' });
       return;
     }
     setPending(true);
@@ -85,8 +85,11 @@ export function ReferralForm() {
       <label className="mb-1.5 block text-[12.5px] font-semibold text-slate-700">Their phone number</label>
       <input
         type="tel"
+        inputMode="numeric"
+        pattern="\d{10}"
+        maxLength={10}
         value={phone}
-        onChange={(e) => setPhone(e.target.value)}
+        onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
         placeholder="10-digit mobile number"
         className="field mb-3 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-[13.5px] text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:outline-none"
       />

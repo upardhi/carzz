@@ -62,6 +62,7 @@ export function StaffLeaveClient({
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [showOverlapWarning, setShowOverlapWarning] = useState(false);
 
   // Helper for quick date presets
   function setPreset(daysInAdvance: number, type: LeaveType) {
@@ -72,10 +73,26 @@ export function StaffLeaveClient({
     setEndDate(isoDate);
     setLeaveType(type);
     setError(null);
+    setSuccess(null);
+    setShowOverlapWarning(true);
   }
+
+  const overlappingLeave = leaves.find(
+    (l) =>
+      (l.status === 'PENDING' || l.status === 'APPROVED') &&
+      !(endDate < l.startDate || startDate > l.endDate),
+  );
+
+  const isOverlapVisible = Boolean(overlappingLeave && showOverlapWarning);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (overlappingLeave) {
+      setSuccess(null);
+      setError(null);
+      setShowOverlapWarning(true);
+      return;
+    }
     if (!reason.trim()) {
       setError('Please provide a reason for the leave.');
       return;
@@ -107,6 +124,7 @@ export function StaffLeaveClient({
         return;
       }
 
+      setShowOverlapWarning(false);
       setSuccess('Leave request submitted! Awaiting manager approval.');
       setReason('');
       if (data.leave) {
@@ -155,12 +173,6 @@ export function StaffLeaveClient({
   }
 
   const remainingAllowance = Math.max(0, offsAllowed - offsTaken);
-
-  const overlappingLeave = leaves.find(
-    (l) =>
-      (l.status === 'PENDING' || l.status === 'APPROVED') &&
-      !(endDate < l.startDate || startDate > l.endDate),
-  );
 
   return (
     <div className="space-y-5">
@@ -302,6 +314,8 @@ export function StaffLeaveClient({
                   onChange={(e) => {
                     setStartDate(e.target.value);
                     if (e.target.value > endDate) setEndDate(e.target.value);
+                    setSuccess(null);
+                    setShowOverlapWarning(true);
                   }}
                   className="w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 py-2.5 text-xs font-semibold text-slate-800 transition-all focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                 />
@@ -318,7 +332,11 @@ export function StaffLeaveClient({
                   required
                   value={endDate}
                   min={startDate}
-                  onChange={(e) => setEndDate(e.target.value)}
+                  onChange={(e) => {
+                    setEndDate(e.target.value);
+                    setSuccess(null);
+                    setShowOverlapWarning(true);
+                  }}
                   className="w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 py-2.5 text-xs font-semibold text-slate-800 transition-all focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                 />
               </div>
@@ -332,7 +350,10 @@ export function StaffLeaveClient({
             </label>
             <select
               value={leaveType}
-              onChange={(e) => setLeaveType(e.target.value as LeaveType)}
+              onChange={(e) => {
+                setLeaveType(e.target.value as LeaveType);
+                setSuccess(null);
+              }}
               className="w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 py-2.5 text-xs font-semibold text-slate-800 transition-all focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             >
               {(Object.keys(LEAVE_TYPE_LABELS) as LeaveType[]).map((type) => (
@@ -353,7 +374,13 @@ export function StaffLeaveClient({
               rows={2}
               placeholder="e.g. Village function, family emergency, unwell..."
               value={reason}
-              onChange={(e) => setReason(e.target.value)}
+              onChange={(e) => {
+                setReason(e.target.value);
+                if (e.target.value.trim().length > 0) {
+                  setSuccess(null);
+                  setShowOverlapWarning(true);
+                }
+              }}
               className="w-full rounded-xl border border-slate-200 bg-slate-50/60 p-3 text-xs text-slate-800 placeholder:text-slate-400 transition-all focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             />
           </div>
@@ -372,13 +399,13 @@ export function StaffLeaveClient({
           )}
 
           {/* Overlapping Warning Banner */}
-          {overlappingLeave && (
+          {isOverlapVisible && overlappingLeave && (
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-medium text-amber-900 flex items-center gap-2.5">
               <span className="text-base">⚠️</span>
               <div>
-                <b className="font-bold">Already requested!</b> You already have an{' '}
+                <b className="font-bold">Already requested!</b> You already have{' '}
                 <span className="font-bold">
-                  {overlappingLeave.status === 'APPROVED' ? 'approved leave' : 'pending leave request'}
+                  {overlappingLeave.status === 'APPROVED' ? 'an approved leave' : 'a pending leave request'}
                 </span>{' '}
                 on{' '}
                 {overlappingLeave.startDate === overlappingLeave.endDate
@@ -391,12 +418,12 @@ export function StaffLeaveClient({
           {/* Action Submit Button */}
           <button
             type="submit"
-            disabled={submitting || Boolean(overlappingLeave)}
+            disabled={submitting || isOverlapVisible}
             className="w-full rounded-xl bg-blue-600 hover:bg-blue-700 py-3 text-xs font-bold text-white shadow-sm transition-all disabled:bg-blue-400 disabled:cursor-not-allowed"
           >
             {submitting
               ? 'Submitting...'
-              : overlappingLeave
+              : isOverlapVisible
                 ? 'Leave Already Exists For This Date'
                 : 'Submit Leave Request'}
           </button>
@@ -456,16 +483,21 @@ export function StaffLeaveClient({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2.5 shrink-0">
+                  <div className="flex items-center gap-2 shrink-0">
                     {leave.status === 'PENDING' ? (
-                      <button
-                        type="button"
-                        disabled={cancellingId === leave.id}
-                        onClick={() => handleCancel(leave.id)}
-                        className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700 hover:bg-amber-100 transition-colors"
-                      >
-                        {cancellingId === leave.id ? '...' : 'Pending (Cancel)'}
-                      </button>
+                      <>
+                        <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">
+                          Pending
+                        </span>
+                        <button
+                          type="button"
+                          disabled={cancellingId === leave.id}
+                          onClick={() => handleCancel(leave.id)}
+                          className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-bold text-rose-700 hover:bg-rose-100 transition-colors cursor-pointer disabled:opacity-50"
+                        >
+                          {cancellingId === leave.id ? 'Cancelling...' : 'Cancel'}
+                        </button>
+                      </>
                     ) : leave.status === 'APPROVED' ? (
                       <span className="rounded-full border border-emerald-200/80 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
                         Approved

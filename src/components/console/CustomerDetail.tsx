@@ -82,7 +82,6 @@ export async function ConsoleCustomerDetail({
         description={`${area?.name ?? ''} · joined ${formatDateFull(customer.joinedOn)} · ${LEAD_SOURCE_LABEL[customer.source]}`}
         actions={
           <div className="flex items-center gap-2">
-            <EditCustomerModalButton customer={customer} areas={allAreas} />
             <ButtonLink href={`${base}/customers`} variant="secondary" size="sm">
               ← All customers
             </ButtonLink>
@@ -90,162 +89,515 @@ export async function ConsoleCustomerDetail({
         }
       />
 
-      <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
-        <Card className="p-4 min-w-0">
-          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-            <CardHeading>Details</CardHeading>
-            <EditCustomerModalButton customer={customer} areas={allAreas} />
-          </div>
-          <Row label="WhatsApp" value={customer.phone} />
-          {customer.altPhone ? (
-            <Row label="Alternate" value={customer.altPhone} />
-          ) : null}
-          <Row
-            label="Address"
-            value={
-              customer.lat !== null && customer.lat !== undefined && customer.lng !== null && customer.lng !== undefined ? (
-                <a
-                  href={`https://www.google.com/maps/search/?api=1&query=${customer.lat},${customer.lng}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-blue-600 hover:underline inline-flex items-center gap-1 font-semibold text-slate-900"
-                >
-                  <span>{customer.address}</span>
-                  <span className="text-[10px] text-blue-600 font-bold">📍 ↗</span>
-                </a>
-              ) : (
-                customer.address
-              )
-            }
-          />
-          {customer.landmark ? (
-            <Row label="Landmark" value={customer.landmark} />
-          ) : null}
-          <Row
-            label="Status"
-            value={
-              <Tag
-                tone={
-                  customer.status === 'ACTIVE'
-                    ? 'ok'
-                    : customer.status === 'HOLD'
-                      ? 'warn'
-                      : 'neutral'
-                }
-              >
-                {customer.status}
-              </Tag>
-            }
-          />
-          {customer.status === 'INACTIVE' && customer.inactivationReason ? (
-            <div className="my-2 rounded-lg border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-800">
-              <span className="font-bold">Inactivation Reason:</span>{' '}
-              <span>{customer.inactivationReason}</span>
-              {customer.inactivatedAt && (
-                <span className="block mt-0.5 text-[10px] text-rose-600">
-                  Deactivated on {formatDateFull(customer.inactivatedAt)}
-                </span>
-              )}
+      <div className="space-y-8">
+        {/* ================================================================
+            1. CUSTOMER DETAILS SECTION
+           ================================================================ */}
+        <section className="space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900 tracking-tight">
+                Customer Details
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Contact information, service location, account status, and customer app access.
+              </p>
             </div>
-          ) : null}
-          <Row
-            label="App Login"
-            value={
-              user ? (
-                <span className="font-mono text-xs font-semibold text-blue-600">
-                  {user.email}
-                </span>
-              ) : (
-                <Tag tone="neutral">No app login</Tag>
-              )
-            }
-          />
-          {customer.note ? <Row label="Note" value={customer.note} /> : null}
-
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <CustomerLoginAction
-              customerId={customer.id}
-              customerName={customer.name}
-              hasLogin={Boolean(customer.userId)}
-              userEmail={user?.email}
-            />
-            {customer.status !== 'ACTIVE' ? (
-              <ActionButton
-                endpoint="/api/ops/customers"
-                payload={{ action: 'setStatus', customerId, status: 'ACTIVE' }}
-              >
-                Reactivate
-              </ActionButton>
-            ) : (
-              <ActionButton
-                endpoint="/api/ops/customers"
-                variant="secondary"
-                payload={{ action: 'setStatus', customerId, status: 'HOLD' }}
-                confirm="Put this customer on hold? Their upcoming washes will be unassigned."
-              >
-                Put on hold
-              </ActionButton>
-            )}
-            {customer.status !== 'INACTIVE' ? (
-              <InactivateCustomerButton
-                customerId={customer.id}
-                customerName={customer.name}
-              />
-            ) : null}
+            <div className="shrink-0 self-start sm:self-auto">
+              <EditCustomerModalButton customer={customer} areas={allAreas} />
+            </div>
           </div>
-        </Card>
 
-        <Card className="p-4 min-w-0">
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-            <CardHeading>Cars on this account ({cars.length})</CardHeading>
-            <AddCarModalButton
-              customerId={customer.id}
-              packages={allPackages}
-              staffList={staff}
-            />
-          </div>
-          {cars.map((car) => {
-            const isStarted = car.serviceStarted ?? true;
-            const today = todayISO();
-            const todaysVisit = visits.find(
-              (v) => v.carId === car.id && v.scheduledDate === today
-            );
-            const upcomingVisit = visits.find(
-              (v) => v.carId === car.id && v.status === 'PENDING' && v.scheduledDate >= today,
-            );
-
-            return (
-              <div
-                key={car.id}
-                className="mb-3 rounded-lg border border-line bg-white p-3.5 last:mb-0 shadow-xs"
-              >
-                <div className="flex flex-col gap-3 border-b border-line/60 pb-3 mb-3 min-w-0">
-                  <b className="text-base font-bold text-ink min-w-0 break-words">
-                    {car.make} {car.model} — {car.plate}
-                  </b>
-                  <div className="flex flex-wrap items-center gap-1.5 min-w-0">
-                    {isStarted ? (
-                      car.serviceStartedBeforePayment ? (
-                        <Tag tone="warn">Started Before Payment (Override)</Tag>
-                      ) : (
-                        <Tag tone="ok">Active · Prepaid</Tag>
-                      )
+          <Card className="p-5 min-w-0">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 divide-y lg:divide-y-0 lg:divide-x divide-slate-100">
+              {/* Column 1: Contact & Status */}
+              <div className="lg:col-span-4 space-y-1">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                  Contact &amp; Profile
+                </div>
+                <Row
+                  label="Status"
+                  value={
+                    <Tag
+                      tone={
+                        customer.status === 'ACTIVE'
+                          ? 'ok'
+                          : customer.status === 'HOLD'
+                            ? 'warn'
+                            : 'neutral'
+                      }
+                    >
+                      {customer.status}
+                    </Tag>
+                  }
+                />
+                <Row label="WhatsApp" value={customer.phone} />
+                {customer.altPhone ? (
+                  <Row label="Alternate" value={customer.altPhone} />
+                ) : null}
+                <Row
+                  label="App Login"
+                  value={
+                    user ? (
+                      <span className="font-mono text-xs font-semibold text-blue-600">
+                        {user.email}
+                      </span>
                     ) : (
-                      <Tag tone="warn">Pending Payment · Not Started</Tag>
+                      <Tag tone="neutral">No app login</Tag>
+                    )
+                  }
+                />
+                {customer.note ? <Row label="Note" value={customer.note} /> : null}
+
+                {customer.status === 'INACTIVE' && customer.inactivationReason ? (
+                  <div className="mt-2 rounded-lg border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-800">
+                    <span className="font-bold">Inactivation Reason:</span>{' '}
+                    <span>{customer.inactivationReason}</span>
+                    {customer.inactivatedAt && (
+                      <span className="block mt-0.5 text-[10px] text-rose-600">
+                        Deactivated on {formatDateFull(customer.inactivatedAt)}
+                      </span>
                     )}
-                    {isStarted && (
-                      todaysVisit ? (
-                        todaysVisit.status === 'DONE' ? (
-                          <Tag tone="ok">✓ Washed Today</Tag>
-                        ) : todaysVisit.status === 'IN_PROGRESS' ? (
-                          <Tag tone="warn">⚡ In Progress Today</Tag>
-                        ) : todaysVisit.status === 'MISSED' ? (
-                          <Tag tone="bad">Missed Today</Tag>
-                        ) : (
-                          <Tag tone="ok">📅 Today&apos;s Booking</Tag>
-                        )
-                      ) : (
-                        <WashTodayAction
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Column 2: Service Address & Map */}
+              <div className="lg:col-span-5 pt-4 lg:pt-0 lg:pl-6 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      Service Address &amp; Location
+                    </span>
+                    {(customer.lat !== null &&
+                      customer.lat !== undefined &&
+                      customer.lng !== null &&
+                      customer.lng !== undefined) ||
+                    customer.address ? (
+                      <a
+                        href={
+                          customer.lat !== null &&
+                          customer.lat !== undefined &&
+                          customer.lng !== null &&
+                          customer.lng !== undefined
+                            ? `https://www.google.com/maps/search/?api=1&query=${customer.lat},${customer.lng}`
+                            : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(customer.address)}`
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700 hover:bg-blue-100 transition-colors shrink-0"
+                      >
+                        <span>📍 Open Map</span>
+                        <span>↗</span>
+                      </a>
+                    ) : null}
+                  </div>
+
+                  <div className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-3.5 text-left">
+                    <p className="text-xs font-semibold text-slate-800 leading-relaxed break-words">
+                      {customer.address || 'No address provided'}
+                    </p>
+                    {(customer.landmark || area?.name) && (
+                      <div className="mt-2.5 flex flex-wrap items-center gap-2 pt-2.5 border-t border-slate-200/60 text-[11px]">
+                        {area?.name && (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-white px-2.5 py-0.5 font-semibold text-slate-600 border border-slate-200">
+                            Area: <strong className="text-slate-800">{area.name}</strong>
+                          </span>
+                        )}
+                        {customer.landmark && (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-white px-2.5 py-0.5 font-semibold text-slate-600 border border-slate-200">
+                            Landmark: <strong className="text-slate-800">{customer.landmark}</strong>
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Column 3: Account Controls & Quick Actions */}
+              <div className="lg:col-span-3 pt-4 lg:pt-0 lg:pl-6 flex flex-col justify-between">
+                <div>
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2.5">
+                    Account Actions &amp; Access
+                  </div>
+                  <p className="text-xs text-slate-500 mb-3 leading-relaxed">
+                    Manage customer portal login credentials or change account service status.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <CustomerLoginAction
+                    customerId={customer.id}
+                    customerName={customer.name}
+                    hasLogin={Boolean(customer.userId)}
+                    userEmail={user?.email}
+                  />
+                  {customer.status !== 'ACTIVE' ? (
+                    <ActionButton
+                      endpoint="/api/ops/customers"
+                      payload={{ action: 'setStatus', customerId, status: 'ACTIVE' }}
+                    >
+                      Reactivate
+                    </ActionButton>
+                  ) : (
+                    <ActionButton
+                      endpoint="/api/ops/customers"
+                      variant="secondary"
+                      payload={{ action: 'setStatus', customerId, status: 'HOLD' }}
+                      confirm="Put this customer on hold? Their upcoming washes will be unassigned."
+                    >
+                      Put on hold
+                    </ActionButton>
+                  )}
+                  {customer.status !== 'INACTIVE' ? (
+                    <InactivateCustomerButton
+                      customerId={customer.id}
+                      customerName={customer.name}
+                    />
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          </Card>
+        </section>
+
+        {/* ================================================================
+            2. CARS ON THIS ACCOUNT SECTION
+           ================================================================ */}
+        <section className="space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-bold text-slate-900 tracking-tight">
+                  Cars on This Account
+                </h2>
+                <span className="inline-flex items-center justify-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-blue-700 border border-blue-200">
+                  {cars.length}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Registered vehicles, weekly wash schedules, assigned wash boys, and monthly package progress.
+              </p>
+            </div>
+            <div className="shrink-0 self-start sm:self-auto">
+              <AddCarModalButton
+                customerId={customer.id}
+                packages={allPackages}
+                staffList={staff}
+              />
+            </div>
+          </div>
+
+          {cars.length === 0 ? (
+            <Card className="p-8 text-center">
+              <p className="text-sm font-semibold text-slate-600">
+                No vehicles registered on this account yet.
+              </p>
+              <p className="text-xs text-slate-400 mt-1">
+                Click &ldquo;+ Add Another Car&rdquo; above to add a vehicle and schedule washes.
+              </p>
+            </Card>
+          ) : (
+            <div className="space-y-3.5">
+              {cars.map((car) => {
+                const isStarted = car.serviceStarted ?? true;
+                const today = todayISO();
+                const todaysVisit = visits.find(
+                  (v) => v.carId === car.id && v.scheduledDate === today,
+                );
+                const upcomingVisit = visits.find(
+                  (v) =>
+                    v.carId === car.id &&
+                    v.status === 'PENDING' &&
+                    v.scheduledDate >= today,
+                );
+
+                return (
+                  <Card key={car.id} className="p-5 min-w-0">
+                    {/* Horizontal Car Card Header */}
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-100 pb-4 mb-4">
+                      <div className="flex flex-wrap items-center gap-2.5 min-w-0">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 border border-blue-100 text-lg">
+                          🚗
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-base font-bold text-slate-900">
+                              {car.make} {car.model}
+                            </h3>
+                            <span className="font-mono text-xs font-bold text-slate-800 bg-slate-100 px-2.5 py-0.5 rounded-md border border-slate-200">
+                              {car.plate}
+                            </span>
+                            {car.colour && car.colour !== 'Unspecified' && (
+                              <span className="text-xs font-medium text-slate-500">
+                                • {car.colour}
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                            {isStarted ? (
+                              car.serviceStartedBeforePayment ? (
+                                <Tag tone="warn">Started Before Payment (Override)</Tag>
+                              ) : (
+                                <Tag tone="ok">Active · Prepaid</Tag>
+                              )
+                            ) : (
+                              <Tag tone="warn">Pending Payment · Not Started</Tag>
+                            )}
+                            {isStarted &&
+                              todaysVisit &&
+                              (todaysVisit.status === 'DONE' ? (
+                                <Tag tone="ok">✓ Washed Today</Tag>
+                              ) : todaysVisit.status === 'IN_PROGRESS' ? (
+                                <Tag tone="warn">⚡ In Progress Today</Tag>
+                              ) : todaysVisit.status === 'MISSED' ? (
+                                <Tag tone="bad">Missed Today</Tag>
+                              ) : (
+                                <Tag tone="ok">📅 Today&apos;s Booking</Tag>
+                              ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right Actions Toolbar */}
+                      <div className="flex flex-wrap items-center gap-2 shrink-0">
+                        {isStarted && !todaysVisit && (
+                          <WashTodayAction
+                            customerId={customer.id}
+                            carId={car.id}
+                            carName={`${car.make} ${car.model}`}
+                            carPlate={car.plate}
+                            currentAssignedStaffId={car.assignedStaffId}
+                            staffList={staff}
+                          />
+                        )}
+                        <CarWashHistoryButton
+                          car={{
+                            id: car.id,
+                            make: car.make,
+                            model: car.model,
+                            plate: car.plate,
+                            packageName: car.package?.name,
+                            washesPerMonth: car.package?.washesPerMonth,
+                          }}
+                          customer={{
+                            id: customer.id,
+                            name: customer.name,
+                            phone: customer.phone,
+                          }}
+                          visits={visits}
+                          staffList={staff}
+                        />
+                        <EditCarModalButton
+                          customerId={customer.id}
+                          car={car}
+                          packages={allPackages}
+                          staffList={staff}
+                        />
+                        <DeleteCarButton
+                          customerId={customer.id}
+                          carId={car.id}
+                          carName={`${car.make} ${car.model}`}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Horizontal Body: Bordered Car Detail Cards + Service Quota Breakdown */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+                      <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                        {/* 1. Package */}
+                        <div className="rounded-xl border border-slate-200/90 bg-slate-50/50 p-3.5 flex flex-col justify-between">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                            Package
+                          </span>
+                          <div className="mt-1.5 text-sm font-bold text-slate-900 break-words">
+                            {car.package?.name ?? '—'}
+                          </div>
+                        </div>
+
+                        {/* 2. Washes this month */}
+                        <div className="rounded-xl border border-slate-200/90 bg-slate-50/50 p-3.5 flex flex-col justify-between">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                            Washes this month
+                          </span>
+                          <div className="mt-1.5 text-sm font-bold text-slate-900">
+                            {isStarted
+                              ? `${car.tally.done} of ${car.package?.washesPerMonth ?? 0}`
+                              : 'Washes not started yet'}
+                          </div>
+                        </div>
+
+                        {/* 3. Weekly slot */}
+                        <div className="rounded-xl border border-slate-200/90 bg-slate-50/50 p-3.5 flex flex-col justify-between">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                            Weekly slot
+                          </span>
+                          <div className="mt-1.5 text-sm font-bold text-slate-900">
+                            {summarizeWeeklyDays(car.weeklyDays)} · {formatTime(car.scheduleTime)}
+                          </div>
+                        </div>
+
+                        {/* 4. Wash boy */}
+                        <div className="rounded-xl border border-slate-200/90 bg-slate-50/50 p-3.5 flex flex-col justify-between">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                            Wash boy
+                          </span>
+                          <div className="mt-1.5 flex items-center justify-between gap-2 min-w-0">
+                            <QuickAssignStaff
+                              customerId={customer.id}
+                              carId={car.id}
+                              currentStaffId={car.assignedStaffId}
+                              staffList={staff}
+                            />
+                          </div>
+                        </div>
+
+                        {/* 5. Next wash */}
+                        <div className="rounded-xl border border-slate-200/90 bg-slate-50/50 p-3.5 flex flex-col justify-between sm:col-span-2">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                            Next wash
+                          </span>
+                          <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
+                            {upcomingVisit ? (
+                              <>
+                                <span className="text-sm font-bold text-slate-900">
+                                  {formatDateFull(upcomingVisit.scheduledDate)} ·{' '}
+                                  {formatTime(upcomingVisit.scheduledTime)}
+                                  {upcomingVisit.plannedService
+                                    ? ` · ${upcomingVisit.plannedService}`
+                                    : ''}
+                                </span>
+                                <RescheduleVisitButton
+                                  customerId={customer.id}
+                                  visitId={upcomingVisit.id}
+                                  currentDate={upcomingVisit.scheduledDate}
+                                  currentTime={upcomingVisit.scheduledTime}
+                                  currentStaffId={upcomingVisit.staffId}
+                                  staffList={staff}
+                                />
+                              </>
+                            ) : (
+                              <span className="text-xs font-medium text-slate-400">
+                                No upcoming wash scheduled
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right Column: Package Sub-Services Quota & Audit Notices */}
+                      <div className="lg:col-span-4 space-y-2.5">
+                        {(() => {
+                          const parsedServices = parsePackageServices(
+                            car.package?.services,
+                            car.package?.washesPerMonth ?? 8,
+                          );
+                          if (parsedServices.length === 0) return null;
+
+                          const completedThisCycle = visits.filter(
+                            (v) =>
+                              v.carId === car.id &&
+                              v.cycle === cycle &&
+                              v.status === 'DONE',
+                          );
+
+                          return (
+                            <div className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-3 text-xs">
+                              <div className="font-semibold text-slate-700 mb-2 flex items-center justify-between">
+                                <span>Package Services ({cycle})</span>
+                                <span className="text-[10.5px] text-slate-500 font-normal">
+                                  Quota &amp; Done
+                                </span>
+                              </div>
+                              <div className="space-y-1.5">
+                                {parsedServices.map((svc) => {
+                                  const doneCount = completedThisCycle.filter(
+                                    (v) =>
+                                      Array.isArray(v.servicesDone) &&
+                                      v.servicesDone.some(
+                                        (n) =>
+                                          n.trim().toLowerCase() ===
+                                            svc.name.trim().toLowerCase() ||
+                                          n
+                                            .trim()
+                                            .toLowerCase()
+                                            .includes(svc.name.trim().toLowerCase()),
+                                      ),
+                                  ).length;
+                                  const isMet = doneCount >= svc.washesPerMonth;
+
+                                  return (
+                                    <div
+                                      key={svc.name}
+                                      className="flex items-center justify-between gap-2 text-[11px]"
+                                    >
+                                      <span className="font-medium text-slate-700 truncate">
+                                        {svc.name}
+                                      </span>
+                                      <span
+                                        className={`font-mono font-semibold px-2 py-0.5 rounded text-[10px] shrink-0 ${
+                                          isMet
+                                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                            : 'bg-blue-50 text-blue-700 border border-blue-200'
+                                        }`}
+                                      >
+                                        {doneCount} / {svc.washesPerMonth}{' '}
+                                        {isMet ? '✓' : ''}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })()}
+
+                        {/* Audit Trail Info for Started Before Payment */}
+                        {isStarted && car.serviceStartedBeforePayment && (
+                          <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-xs text-amber-950">
+                            <div className="font-semibold text-amber-900 flex items-center gap-1.5">
+                              <span>
+                                ⚠️ Service Started Before Payment (Owner Audit Trail)
+                              </span>
+                            </div>
+                            <div className="mt-1.5 text-[11px] text-amber-900 space-y-1">
+                              <div>
+                                <span className="font-medium text-amber-950">
+                                  Authorized by:
+                                </span>{' '}
+                                {car.serviceStartedByUser
+                                  ? `${car.serviceStartedByUser.name} (${car.serviceStartedByUser.role})`
+                                  : 'Staff / Manager'}
+                              </div>
+                              {car.serviceStartedAt && (
+                                <div>
+                                  <span className="font-medium text-amber-950">
+                                    Started on:
+                                  </span>{' '}
+                                  {formatDateFull(car.serviceStartedAt)}
+                                </div>
+                              )}
+                              {car.serviceStartNote && (
+                                <div>
+                                  <span className="font-medium text-amber-950">
+                                    Reason / Note:
+                                  </span>{' '}
+                                  {car.serviceStartNote}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Manual Start Service Action for Pending Cars */}
+                    {!isStarted && (
+                      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
+                        <span className="text-xs text-slate-500">
+                          Prepaid package pending. Washes will auto-start on payment or can be started manually by a manager.
+                        </span>
+                        <StartCarServiceAction
                           customerId={customer.id}
                           carId={car.id}
                           carName={`${car.make} ${car.model}`}
@@ -253,229 +605,197 @@ export async function ConsoleCustomerDetail({
                           currentAssignedStaffId={car.assignedStaffId}
                           staffList={staff}
                         />
-                      )
-                    )}
-                    <CarWashHistoryButton
-                      car={{
-                        id: car.id,
-                        make: car.make,
-                        model: car.model,
-                        plate: car.plate,
-                        packageName: car.package?.name,
-                        washesPerMonth: car.package?.washesPerMonth,
-                      }}
-                      customer={{
-                        id: customer.id,
-                        name: customer.name,
-                        phone: customer.phone,
-                      }}
-                      visits={visits}
-                      staffList={staff}
-                    />
-                    <EditCarModalButton
-                      customerId={customer.id}
-                      car={car}
-                      packages={allPackages}
-                      staffList={staff}
-                    />
-                    <DeleteCarButton
-                      customerId={customer.id}
-                      carId={car.id}
-                      carName={`${car.make} ${car.model}`}
-                    />
-                  </div>
-                </div>
-
-                <Row label="Package" value={car.package?.name ?? '—'} />
-                <Row
-                  label="Washes this month"
-                  value={
-                    isStarted
-                      ? `${car.tally.done} of ${car.package?.washesPerMonth ?? 0}`
-                      : 'Washes not started yet'
-                  }
-                />
-                <Row
-                  label="Slot"
-                  value={`${summarizeWeeklyDays(car.weeklyDays)} · ${formatTime(car.scheduleTime)}`}
-                />
-                {upcomingVisit ? (
-                  <Row
-                    label="Next wash"
-                    value={
-                      <div className="flex flex-wrap items-center justify-end gap-2">
-                        <span>
-                          {formatDateFull(upcomingVisit.scheduledDate)} · {formatTime(upcomingVisit.scheduledTime)}
-                          {upcomingVisit.plannedService ? ` · ${upcomingVisit.plannedService}` : ''}
-                        </span>
-                        <RescheduleVisitButton
-                          customerId={customer.id}
-                          visitId={upcomingVisit.id}
-                          currentDate={upcomingVisit.scheduledDate}
-                          currentTime={upcomingVisit.scheduledTime}
-                          currentStaffId={upcomingVisit.staffId}
-                          staffList={staff}
-                        />
                       </div>
-                    }
+                    )}
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        {/* ================================================================
+            3. PAYMENTS & HISTORY SECTION
+           ================================================================ */}
+        <section className="space-y-3">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900 tracking-tight">
+              Payments &amp; History
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Whole-account billing summary, advance balance, payment recording, and receipt history.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+            {/* Left: Payment — Whole Account */}
+            <Card className="lg:col-span-5 xl:col-span-4 p-5 min-w-0">
+              <CardHeading>Payment — whole account</CardHeading>
+              <div className="mt-2">
+                <Row label="Monthly package" value={money(account.monthly)} />
+                <Row
+                  label="Advance deposited"
+                  value={money(account.advanceDeposited)}
+                />
+                <Row label="Total paid" value={money(account.totalPaid)} />
+                <Row
+                  label="Balance"
+                  value={money(Math.max(0, account.balance))}
+                  tone="success"
+                />
+                <Row
+                  label="Outstanding"
+                  value={money(account.outstanding)}
+                  tone={account.outstanding > 0 ? 'danger' : undefined}
+                />
+                {account.nextDue ? (
+                  <Row
+                    label="Next due"
+                    value={`${formatDateFull(account.nextDue.dueOn)} · ${money(
+                      account.nextDue.amount - account.nextDue.paidAmount,
+                    )}`}
                   />
                 ) : null}
-                <Row
-                  label="Wash boy"
-                  value={
-                    <div className="flex flex-wrap items-center gap-2 justify-end min-w-0">
-                      <QuickAssignStaff
-                        customerId={customer.id}
-                        carId={car.id}
-                        currentStaffId={car.assignedStaffId}
-                        staffList={staff}
-                      />
-                    </div>
-                  }
-                />
-
-                {/* Package Sub-Services Breakdown */}
-                {(() => {
-                  const parsedServices = parsePackageServices(
-                    car.package?.services,
-                    car.package?.washesPerMonth ?? 8,
-                  );
-                  if (parsedServices.length === 0) return null;
-
-                  const completedThisCycle = visits.filter(
-                    (v) => v.carId === car.id && v.cycle === cycle && v.status === 'DONE',
-                  );
-
-                  return (
-                    <div className="mt-2.5 rounded-lg border border-slate-100 bg-slate-50/70 p-2.5 text-xs">
-                      <div className="font-semibold text-slate-700 mb-1.5 flex items-center justify-between">
-                        <span>Package Services ({cycle})</span>
-                        <span className="text-[10.5px] text-slate-500 font-normal">Quota & Done</span>
-                      </div>
-                      <div className="space-y-1.5">
-                        {parsedServices.map((svc) => {
-                          const doneCount = completedThisCycle.filter(
-                            (v) =>
-                              Array.isArray(v.servicesDone) &&
-                              v.servicesDone.some(
-                                (n) =>
-                                  n.trim().toLowerCase() === svc.name.trim().toLowerCase() ||
-                                  n.trim().toLowerCase().includes(svc.name.trim().toLowerCase()),
-                              ),
-                          ).length;
-                          const isMet = doneCount >= svc.washesPerMonth;
-
-                          return (
-                            <div
-                              key={svc.name}
-                              className="flex items-center justify-between gap-2 text-[11px]"
-                            >
-                              <span className="font-medium text-slate-700 truncate">
-                                {svc.name}
-                              </span>
-                              <span
-                                className={`font-mono font-semibold px-1.5 py-0.5 rounded text-[10px] shrink-0 ${
-                                  isMet
-                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                    : 'bg-blue-50 text-blue-700 border border-blue-200'
-                                }`}
-                              >
-                                {doneCount} / {svc.washesPerMonth} {isMet ? '✓' : ''}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {/* Audit Trail Info for Started Before Payment */}
-                {isStarted && car.serviceStartedBeforePayment && (
-                  <div className="mt-2.5 rounded-lg border border-amber-200 bg-amber-50/80 p-2.5 text-xs text-amber-950">
-                    <div className="font-semibold text-amber-900 flex items-center gap-1.5">
-                      <span>⚠️ Service Started Before Payment (Owner Audit Trail)</span>
-                    </div>
-                    <div className="mt-1.5 text-[11px] text-amber-900 space-y-1">
-                      <div>
-                        <span className="font-medium text-amber-950">Authorized by:</span>{' '}
-                        {car.serviceStartedByUser
-                          ? `${car.serviceStartedByUser.name} (${car.serviceStartedByUser.role})`
-                          : 'Staff / Manager'}
-                      </div>
-                      {car.serviceStartedAt && (
-                        <div>
-                          <span className="font-medium text-amber-950">Started on:</span>{' '}
-                          {formatDateFull(car.serviceStartedAt)}
-                        </div>
-                      )}
-                      {car.serviceStartNote && (
-                        <div>
-                          <span className="font-medium text-amber-950">Reason / Note:</span>{' '}
-                          {car.serviceStartNote}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Manual Start Service Action for Pending Cars */}
-                {!isStarted && (
-                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line/70 pt-2.5">
-                    <span className="text-[11px] text-slate-500 max-w-xs">
-                      Prepaid package pending. Washes will auto-start on payment or can be started manually by manager.
-                    </span>
-                    <StartCarServiceAction
-                      customerId={customer.id}
-                      carId={car.id}
-                      carName={`${car.make} ${car.model}`}
-                      carPlate={car.plate}
-                      currentAssignedStaffId={car.assignedStaffId}
-                      staffList={staff}
-                    />
-                  </div>
-                )}
               </div>
-            );
-          })}
-        </Card>
 
-        <Card className="p-4 min-w-0">
-          <CardHeading>Payment — whole account</CardHeading>
-          <Row label="Monthly package" value={money(account.monthly)} />
-          <Row label="Advance deposited" value={money(account.advanceDeposited)} />
-          <Row label="Total paid" value={money(account.totalPaid)} />
-          <Row
-            label="Balance"
-            value={money(Math.max(0, account.balance))}
-            tone="success"
-          />
-          <Row
-            label="Outstanding"
-            value={money(account.outstanding)}
-            tone={account.outstanding > 0 ? 'danger' : undefined}
-          />
-          {account.nextDue ? (
-            <Row
-              label="Next due"
-              value={`${formatDateFull(account.nextDue.dueOn)} · ${money(
-                account.nextDue.amount - account.nextDue.paidAmount,
-              )}`}
-            />
-          ) : null}
+              <div className="mt-4 pt-3 border-t border-slate-100">
+                <RecordPaymentForm
+                  customerId={customerId}
+                  suggested={account.outstanding || account.monthly}
+                  outstanding={account.outstanding}
+                  monthly={account.monthly}
+                  invoices={invoices}
+                />
+              </div>
+            </Card>
 
-          <div className="mt-3">
-            <RecordPaymentForm
-              customerId={customerId}
-              suggested={account.outstanding || account.monthly}
-              outstanding={account.outstanding}
-              monthly={account.monthly}
-              invoices={invoices}
-            />
+            {/* Right: Payment History */}
+            <div className="lg:col-span-7 xl:col-span-8 min-w-0 space-y-3">
+              <WidgetTable<(typeof payments)[number]>
+                title="Payment history"
+                data={payments.slice(0, 10)}
+                keyExtractor={(payment) => payment.id}
+                emptyMessage="No payments recorded."
+                columns={[
+                  {
+                    id: 'receipt',
+                    header: 'RECEIPT #',
+                    className: 'whitespace-nowrap',
+                    render: (payment) => (
+                      <div>
+                        <span className="font-mono text-xs font-bold text-slate-900 block">
+                          #RCP-{payment.id.slice(-6).toUpperCase()}
+                        </span>
+                        <span className="text-[10.5px] text-slate-400">
+                          {formatDateFull(payment.createdAt)}
+                        </span>
+                      </div>
+                    ),
+                  },
+                  {
+                    id: 'amount',
+                    header: 'AMOUNT',
+                    className: 'font-bold text-slate-900',
+                    render: (payment) => (
+                      <div>
+                        <div>{money(payment.amount)}</div>
+                        <span className="text-[10px] text-slate-500 font-normal">
+                          {PAYMENT_MODE_LABEL[payment.mode]}
+                        </span>
+                      </div>
+                    ),
+                  },
+                  {
+                    id: 'reference',
+                    header: 'REF / NOTE',
+                    render: (payment) => (
+                      <div className="text-xs max-w-[200px]">
+                        {payment.reference ? (
+                          <span className="font-mono text-[11px] font-semibold text-slate-700 block truncate">
+                            Ref: {payment.reference}
+                          </span>
+                        ) : null}
+                        {payment.note ? (
+                          <span className="text-[11px] text-slate-500 italic block truncate">
+                            {payment.note}
+                          </span>
+                        ) : null}
+                        {!payment.reference && !payment.note ? (
+                          <span className="text-slate-300">—</span>
+                        ) : null}
+                      </div>
+                    ),
+                  },
+                  {
+                    id: 'type',
+                    header: 'TYPE',
+                    render: (payment) => (
+                      <span
+                        className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                          payment.kind === 'ADVANCE'
+                            ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                            : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        }`}
+                      >
+                        {payment.kind === 'ADVANCE' ? 'Advance' : 'Invoice'}
+                      </span>
+                    ),
+                  },
+                  {
+                    id: 'status',
+                    header: 'STATUS',
+                    align: 'right',
+                    render: (payment) => (
+                      <Tag tone={payment.status === 'CONFIRMED' ? 'ok' : 'warn'}>
+                        {payment.status === 'CONFIRMED' ? 'Paid' : 'To confirm'}
+                      </Tag>
+                    ),
+                  },
+                ]}
+              />
+
+              {payments.some((p) => p.status === 'PENDING') ? (
+                <div className="space-y-2">
+                  <p className="text-xs font-bold text-gold-700">
+                    Declared by the customer, waiting for you to confirm the money arrived:
+                  </p>
+                  {payments
+                    .filter((p) => p.status === 'PENDING')
+                    .map((payment) => (
+                      <div
+                        key={payment.id}
+                        className="flex items-center justify-between gap-2 rounded-lg border border-gold-200 bg-gold-50 p-2.5"
+                      >
+                        <span className="text-sm font-bold">
+                          {money(payment.amount)} · {PAYMENT_MODE_LABEL[payment.mode]}
+                        </span>
+                        <ActionButton
+                          endpoint="/api/ops/payments"
+                          payload={{ action: 'confirm', paymentId: payment.id }}
+                        >
+                          Confirm received
+                        </ActionButton>
+                      </div>
+                    ))}
+                </div>
+              ) : null}
+            </div>
           </div>
-        </Card>
+        </section>
 
-        <div className="flex flex-col justify-between lg:col-span-2 min-w-0">
+        {/* ================================================================
+            4. RECENT WASHES SECTION
+           ================================================================ */}
+        <section className="space-y-3">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900 tracking-tight">
+              Recent Washes
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Completed and missed wash visits, service checklists, proof photos, and ratings.
+            </p>
+          </div>
+
           <WidgetTable<(typeof history)[number]>
             title="Recent washes"
             data={history}
@@ -517,7 +837,10 @@ export async function ConsoleCustomerDetail({
                   if (visit.status !== 'DONE') {
                     return <span className="text-slate-400">—</span>;
                   }
-                  if (!Array.isArray(visit.servicesDone) || visit.servicesDone.length === 0) {
+                  if (
+                    !Array.isArray(visit.servicesDone) ||
+                    visit.servicesDone.length === 0
+                  ) {
                     return <span className="text-xs text-slate-500">Wash</span>;
                   }
                   return (
@@ -572,159 +895,77 @@ export async function ConsoleCustomerDetail({
               },
             ]}
           />
+
           {visits.some((v) => v.rescheduledToVisitId) ? (
-            <div className="mt-2">
+            <div>
               <Note tone="success">
                 Missed washes on this account were returned to the customer’s
                 count and rescheduled — they were not lost.
               </Note>
             </div>
           ) : null}
-        </div>
+        </section>
 
-        <div className="flex flex-col justify-between min-w-0">
-          <WidgetTable<(typeof payments)[number]>
-            title="Payment history"
-            data={payments.slice(0, 10)}
-            keyExtractor={(payment) => payment.id}
-            emptyMessage="No payments recorded."
+        {/* ================================================================
+            5. INVOICES SECTION
+           ================================================================ */}
+        <section className="space-y-3">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900 tracking-tight">
+              Invoices
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Generated billing statements, due dates, and payment status for this account.
+            </p>
+          </div>
+
+          <WidgetTable<(typeof invoices)[number]>
+            title="Invoices"
+            data={invoices.slice(0, 6)}
+            keyExtractor={(invoice) => invoice.id}
+            emptyMessage="No invoices generated for this account yet."
             columns={[
               {
-                id: 'receipt',
-                header: 'RECEIPT #',
-                className: 'whitespace-nowrap',
-                render: (payment) => (
-                  <div>
-                    <span className="font-mono text-xs font-bold text-slate-900 block">
-                      #RCP-{payment.id.slice(-6).toUpperCase()}
-                    </span>
-                    <span className="text-[10.5px] text-slate-400">
-                      {formatDateFull(payment.createdAt)}
-                    </span>
-                  </div>
+                id: 'cycle',
+                header: 'BILLING CYCLE',
+                render: (invoice) => (
+                  <span className="font-semibold text-slate-900">{invoice.cycle}</span>
+                ),
+              },
+              {
+                id: 'due',
+                header: 'DUE DATE',
+                render: (invoice) => (
+                  <span className="text-slate-600">{formatDateFull(invoice.dueOn)}</span>
                 ),
               },
               {
                 id: 'amount',
                 header: 'AMOUNT',
                 className: 'font-bold text-slate-900',
-                render: (payment) => (
-                  <div>
-                    <div>{money(payment.amount)}</div>
-                    <span className="text-[10px] text-slate-500 font-normal">
-                      {PAYMENT_MODE_LABEL[payment.mode]}
-                    </span>
-                  </div>
-                ),
-              },
-              {
-                id: 'reference',
-                header: 'REF / NOTE',
-                render: (payment) => (
-                  <div className="text-xs max-w-[180px]">
-                    {payment.reference ? (
-                      <span className="font-mono text-[11px] font-semibold text-slate-700 block truncate">
-                        Ref: {payment.reference}
-                      </span>
-                    ) : null}
-                    {payment.note ? (
-                      <span className="text-[11px] text-slate-500 italic block truncate">
-                        {payment.note}
-                      </span>
-                    ) : null}
-                    {!payment.reference && !payment.note ? (
-                      <span className="text-slate-300">—</span>
-                    ) : null}
-                  </div>
-                ),
-              },
-              {
-                id: 'type',
-                header: 'TYPE',
-                render: (payment) => (
-                  <span
-                    className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold ${
-                      payment.kind === 'ADVANCE'
-                        ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                        : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                    }`}
-                  >
-                    {payment.kind === 'ADVANCE' ? 'Advance' : 'Invoice'}
-                  </span>
-                ),
+                render: (invoice) => money(invoice.amount),
               },
               {
                 id: 'status',
                 header: 'STATUS',
                 align: 'right',
-                render: (payment) => (
-                  <Tag tone={payment.status === 'CONFIRMED' ? 'ok' : 'warn'}>
-                    {payment.status === 'CONFIRMED' ? 'Paid' : 'To confirm'}
+                render: (invoice) => (
+                  <Tag
+                    tone={
+                      invoice.status === 'PAID'
+                        ? 'ok'
+                        : invoice.status === 'PARTIAL'
+                          ? 'warn'
+                          : 'bad'
+                    }
+                  >
+                    {invoice.status}
                   </Tag>
                 ),
               },
             ]}
           />
-
-          {payments.some((p) => p.status === 'PENDING') ? (
-            <div className="mt-3 space-y-2">
-              <p className="text-xs font-bold text-gold-700">
-                Declared by the customer, waiting for you to confirm the money
-                arrived:
-              </p>
-              {payments
-                .filter((p) => p.status === 'PENDING')
-                .map((payment) => (
-                  <div
-                    key={payment.id}
-                    className="flex items-center justify-between gap-2 rounded-lg border border-gold-200 bg-gold-50 p-2.5"
-                  >
-                    <span className="text-sm font-bold">
-                      {money(payment.amount)} · {PAYMENT_MODE_LABEL[payment.mode]}
-                    </span>
-                    <ActionButton
-                      endpoint="/api/ops/payments"
-                      payload={{ action: 'confirm', paymentId: payment.id }}
-                    >
-                      Confirm received
-                    </ActionButton>
-                  </div>
-                ))}
-            </div>
-          ) : null}
-        </div>
-
-        <Card className="p-4 min-w-0">
-          <CardHeading>Invoices</CardHeading>
-          {invoices.length === 0 ? (
-            <p className="py-4 text-center text-xs font-medium text-slate-400">
-              No invoices generated for this account yet.
-            </p>
-          ) : (
-            invoices.slice(0, 6).map((invoice) => (
-              <Row
-                key={invoice.id}
-                label={`${invoice.cycle} · due ${formatDateFull(invoice.dueOn)}`}
-                value={
-                  <span className="inline-flex items-center gap-2">
-                    {money(invoice.amount)}
-                    <Tag
-                      tone={
-                        invoice.status === 'PAID'
-                          ? 'ok'
-                          : invoice.status === 'PARTIAL'
-                            ? 'warn'
-                            : 'bad'
-                      }
-                    >
-                      {invoice.status}
-                    </Tag>
-                  </span>
-                }
-              />
-            ))
-          )}
-        </Card>
+        </section>
       </div>
     </>
   );

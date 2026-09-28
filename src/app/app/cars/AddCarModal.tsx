@@ -103,9 +103,10 @@ export function AddCarModal({ packages }: { packages: PackageOption[] }) {
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="w-full rounded-xl border border-navy-200 bg-white py-3.5 text-center text-[13.5px] font-semibold text-[#0f2347] shadow-xs transition-all hover:bg-navy-50 hover:border-navy-400 active:scale-[0.99] cursor-pointer"
+        className="inline-flex items-center gap-2 rounded-xl bg-[#0f2347] hover:bg-[#163263] px-4 py-2.5 text-[13px] sm:text-sm font-bold text-white shadow-sm transition-all active:scale-[0.98] cursor-pointer whitespace-nowrap"
       >
-        + Add another car
+        <span className="text-base leading-none">+</span>
+        <span>Add Another Car</span>
       </button>
 
       {isOpen ? (

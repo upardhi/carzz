@@ -209,14 +209,6 @@ export function StaffShell({
           </div>
 
           <div className="flex items-center gap-3.5">
-            <Link
-              href="/staff"
-              className="flex items-center gap-2 bg-[#0a1931] hover:bg-[#12284c] text-white text-xs font-semibold px-4 py-2 rounded-xl shadow-xs transition-colors"
-            >
-              <IconCalendar width={15} height={15} />
-              <span>Book a Wash</span>
-            </Link>
-
             <button
               type="button"
               aria-label="Notifications"

@@ -6,7 +6,7 @@ import { getStore } from '@/lib/data';
 const submitSchema = z.object({
   type: z.enum(['CUSTOMER', 'STAFF']),
   name: z.string().trim().min(2, 'Please enter a name.'),
-  phone: z.string().trim().min(6, 'Please enter a valid phone number.'),
+  phone: z.string().trim().regex(/^\d{10}$/, 'Please enter a valid 10-digit mobile number.'),
   note: z.string().trim().max(300).optional(),
 });
 

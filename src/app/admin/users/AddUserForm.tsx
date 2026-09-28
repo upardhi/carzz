@@ -41,10 +41,16 @@ export function AddUserForm({
   const needsArea = role === 'MANAGER' || role === 'EMPLOYEE';
   const needsRegion = role === 'AREA_ADMIN';
 
+  const phoneValid = /^\d{10}$/.test(phone.trim());
+  const emergencyPhoneInvalid = emergencyPhone.trim().length > 0 && !/^\d{10}$/.test(emergencyPhone.trim());
+  const aadharInvalid = aadharNumber.trim().length > 0 && !/^\d{12}$/.test(aadharNumber.trim());
+
   const valid =
     name.trim().length > 1 &&
     /.+@.+\..+/.test(email) &&
-    phone.trim().length > 5 &&
+    phoneValid &&
+    !emergencyPhoneInvalid &&
+    !aadharInvalid &&
     password.length >= 6 &&
     (!needsArea || areaId) &&
     (!needsRegion || regionId);
@@ -136,7 +142,17 @@ export function AddUserForm({
         </div>
         <div>
           <label className="field-label" htmlFor="u-phone">Mobile *</label>
-          <input id="u-phone" className="field" inputMode="tel" placeholder="e.g. 9822100001" value={phone} onChange={(e) => setPhone(e.target.value)} />
+          <input
+            id="u-phone"
+            type="tel"
+            inputMode="numeric"
+            pattern="\d{10}"
+            maxLength={10}
+            className="field"
+            placeholder="e.g. 9822100001"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+          />
         </div>
       </div>
 
@@ -215,11 +231,14 @@ export function AddUserForm({
             </label>
             <input
               id="u-aadhar"
+              type="text"
+              inputMode="numeric"
+              pattern="\d{12}"
+              maxLength={12}
               className="field text-xs font-mono"
-              placeholder="12-digit UID (e.g. 5421 8901 2345)"
-              maxLength={14}
+              placeholder="12-digit UID (e.g. 542189012345)"
               value={aadharNumber}
-              onChange={(e) => setAadharNumber(e.target.value)}
+              onChange={(e) => setAadharNumber(e.target.value.replace(/\D/g, '').slice(0, 12))}
             />
             <div className="flex items-center justify-between pt-1">
               <label className="field-label text-[11px]" htmlFor="u-aadhar-file">Aadhaar Copy (Image or PDF)</label>
@@ -314,10 +333,14 @@ export function AddUserForm({
             <label className="field-label text-xs" htmlFor="u-emer-phone">Emergency Phone</label>
             <input
               id="u-emer-phone"
+              type="tel"
+              inputMode="numeric"
+              pattern="\d{10}"
+              maxLength={10}
               className="field text-xs"
-              placeholder="Phone number"
+              placeholder="10-digit phone number"
               value={emergencyPhone}
-              onChange={(e) => setEmergencyPhone(e.target.value)}
+              onChange={(e) => setEmergencyPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
             />
           </div>
         </div>

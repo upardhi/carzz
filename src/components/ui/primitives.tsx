@@ -164,7 +164,7 @@ export function Row({
     danger: 'text-danger-500',
   };
   return (
-    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-dashed border-line-soft py-1.5 text-sm last:border-0 min-w-0">
+    <div className="flex items-start justify-between gap-4 border-b border-dashed border-line-soft py-1.5 text-sm last:border-0 min-w-0">
       <span className="text-ink-mute shrink-0">{label}</span>
       <span className={clsx('text-right font-semibold break-words min-w-0', tone && TONE[tone])}>
         {value}
