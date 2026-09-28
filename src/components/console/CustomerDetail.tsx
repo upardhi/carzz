@@ -468,6 +468,9 @@ export async function ConsoleCustomerDetail({
             <RecordPaymentForm
               customerId={customerId}
               suggested={account.outstanding || account.monthly}
+              outstanding={account.outstanding}
+              monthly={account.monthly}
+              invoices={invoices}
             />
           </div>
         </Card>
@@ -587,34 +590,45 @@ export async function ConsoleCustomerDetail({
             emptyMessage="No payments recorded."
             columns={[
               {
-                id: 'date',
-                header: 'DATE',
-                className: 'whitespace-nowrap text-slate-700',
-                render: (payment) => formatDateFull(payment.createdAt),
+                id: 'receipt',
+                header: 'RECEIPT #',
+                className: 'whitespace-nowrap',
+                render: (payment) => (
+                  <div>
+                    <span className="font-mono text-xs font-bold text-slate-900 block">
+                      #RCP-{payment.id.slice(-6).toUpperCase()}
+                    </span>
+                    <span className="text-[10.5px] text-slate-400">
+                      {formatDateFull(payment.createdAt)}
+                    </span>
+                  </div>
+                ),
               },
               {
                 id: 'amount',
                 header: 'AMOUNT',
                 className: 'font-bold text-slate-900',
-                render: (payment) => money(payment.amount),
-              },
-              {
-                id: 'mode',
-                header: 'MODE',
-                render: (payment) => PAYMENT_MODE_LABEL[payment.mode],
+                render: (payment) => (
+                  <div>
+                    <div>{money(payment.amount)}</div>
+                    <span className="text-[10px] text-slate-500 font-normal">
+                      {PAYMENT_MODE_LABEL[payment.mode]}
+                    </span>
+                  </div>
+                ),
               },
               {
                 id: 'reference',
                 header: 'REF / NOTE',
                 render: (payment) => (
-                  <div className="text-xs">
+                  <div className="text-xs max-w-[180px]">
                     {payment.reference ? (
-                      <span className="font-mono text-[11px] font-semibold text-slate-700 block">
-                        #{payment.reference}
+                      <span className="font-mono text-[11px] font-semibold text-slate-700 block truncate">
+                        Ref: {payment.reference}
                       </span>
                     ) : null}
                     {payment.note ? (
-                      <span className="text-[11px] text-slate-500 italic block">
+                      <span className="text-[11px] text-slate-500 italic block truncate">
                         {payment.note}
                       </span>
                     ) : null}
@@ -625,16 +639,27 @@ export async function ConsoleCustomerDetail({
                 ),
               },
               {
+                id: 'type',
+                header: 'TYPE',
+                render: (payment) => (
+                  <span
+                    className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                      payment.kind === 'ADVANCE'
+                        ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                        : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                    }`}
+                  >
+                    {payment.kind === 'ADVANCE' ? 'Advance' : 'Invoice'}
+                  </span>
+                ),
+              },
+              {
                 id: 'status',
                 header: 'STATUS',
                 align: 'right',
                 render: (payment) => (
                   <Tag tone={payment.status === 'CONFIRMED' ? 'ok' : 'warn'}>
-                    {payment.kind === 'ADVANCE'
-                      ? 'Advance'
-                      : payment.status === 'CONFIRMED'
-                        ? 'Paid'
-                        : 'To confirm'}
+                    {payment.status === 'CONFIRMED' ? 'Paid' : 'To confirm'}
                   </Tag>
                 ),
               },

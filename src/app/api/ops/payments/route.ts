@@ -32,6 +32,7 @@ const schema = z.discriminatedUnion('action', [
     customerId: z.string().min(1),
     amount: z.number().int().positive(),
     mode: z.enum(['CASH', 'MANUAL_UPI', 'GATEWAY']),
+    kind: z.enum(['PACKAGE', 'ADVANCE', 'REFUND', 'ADJUSTMENT']).optional(),
     reference: z.string().max(100).optional().nullable(),
     note: z.string().max(300).optional().nullable(),
   }),
@@ -75,10 +76,12 @@ export async function POST(request: Request) {
       });
 
       revalidatePaymentPages();
+      const receiptNo = `RCP-${settled.id.slice(-6).toUpperCase()}`;
       return NextResponse.json({
         ok: true,
         payment: settled,
-        message: 'Payment confirmed and receipt sent.',
+        receiptNo,
+        message: `Payment confirmed successfully. Receipt #${receiptNo}`,
       });
     }
 
@@ -90,6 +93,7 @@ export async function POST(request: Request) {
       customerId: customer.id,
       amount: parsed.data.amount,
       mode: parsed.data.mode,
+      kind: parsed.data.kind ?? 'PACKAGE',
       cycle: currentCycle(),
       recordedByUserId: session.user.id,
       reference: parsed.data.reference || null,
@@ -98,10 +102,12 @@ export async function POST(request: Request) {
     });
 
     revalidatePaymentPages();
+    const receiptNo = `RCP-${payment.id.slice(-6).toUpperCase()}`;
     return NextResponse.json({
       ok: true,
       payment,
-      message: 'Payment recorded and receipt sent.',
+      receiptNo,
+      message: `Payment of ₹${payment.amount.toLocaleString('en-IN')} recorded. Receipt #${receiptNo}`,
     });
   } catch (error) {
     return opsError(error);
