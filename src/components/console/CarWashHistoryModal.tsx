@@ -64,7 +64,7 @@ export function CarWashHistoryModal({
   );
 
   // App settings fallback thresholds
-  const settings = { minWashMinutes: 8, maxWashMinutes: 40 };
+  const settings = useMemo(() => ({ minWashMinutes: 8, maxWashMinutes: 40 }), []);
 
   // Calculate statistics for this car
   const carVisits = useMemo(() => {
@@ -446,6 +446,7 @@ export function CarWashHistoryModal({
                               src={beforePhoto}
                               alt="Before wash"
                               fill
+                              unoptimized
                               sizes="80px"
                               className="object-cover group-hover:scale-105 transition duration-200"
                             />
@@ -476,6 +477,7 @@ export function CarWashHistoryModal({
                               src={afterPhoto}
                               alt="After wash"
                               fill
+                              unoptimized
                               sizes="80px"
                               className="object-cover group-hover:scale-105 transition duration-200"
                             />
@@ -517,6 +519,7 @@ export function CarWashHistoryModal({
                 src={previewPhoto.url}
                 alt="Full photo"
                 fill
+                unoptimized
                 sizes="(max-width: 1200px) 100vw, 800px"
                 className="object-contain"
               />

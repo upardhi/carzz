@@ -446,6 +446,7 @@ export function WashBoyReviewsModal({
                                     src={rev.beforePhotoUrl}
                                     alt="Before wash"
                                     fill
+                                    unoptimized
                                     className="object-cover"
                                   />
                                 </div>
@@ -471,6 +472,7 @@ export function WashBoyReviewsModal({
                                     src={rev.afterPhotoUrl}
                                     alt="After wash"
                                     fill
+                                    unoptimized
                                     className="object-cover"
                                   />
                                 </div>
@@ -555,6 +557,7 @@ export function WashBoyReviewsModal({
                 src={previewPhoto.url}
                 alt={previewPhoto.title}
                 fill
+                unoptimized
                 className="object-contain"
               />
             </div>

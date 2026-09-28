@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { servePhoto, corsHeaders } from '@/lib/storage/photoStreamer';
+import { servePhoto, corsHeaders, servePlaceholderResponse } from '@/lib/storage/photoStreamer';
 import { getSession } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 
@@ -13,21 +13,13 @@ export async function GET(
   { params }: { params: Promise<{ key: string[] }> },
 ) {
   const session = await getSession();
-  if (!session) {
-    return NextResponse.json(
-      { error: 'Please sign in to view photos.' },
-      { status: 401, headers: corsHeaders() },
-    );
-  }
-
   const { key } = await params;
   const fullKey = Array.isArray(key) ? key.join('/') : String(key || '');
-  // Strip folder prefix to get bare visit key
   const bareKey = fullKey.replace(/^washes\//, '');
-  const decoded = decodeURIComponent(bareKey);
+  const decoded = decodeURIComponent(bareKey || '');
 
-  const isBefore = decoded.endsWith('-before');
-  const isAfter = decoded.endsWith('-after');
+  const isBefore = decoded.endsWith('-before') || decoded.includes('before');
+  const isAfter = decoded.endsWith('-after') || decoded.includes('after');
 
   if (isBefore || isAfter) {
     try {
@@ -42,14 +34,13 @@ export async function GET(
         }
       }
     } catch {
-      // Fall through to 404
+      // Fall through to placeholder
     }
+
+    return servePlaceholderResponse(isBefore ? 'before' : 'after');
   }
 
-  return NextResponse.json(
-    { error: 'Photo not found.' },
-    { status: 404, headers: corsHeaders() },
-  );
+  return servePlaceholderResponse('photo');
 }
 
 export async function OPTIONS() {
