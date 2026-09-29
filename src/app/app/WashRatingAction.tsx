@@ -19,6 +19,11 @@ interface WashRatingActionProps {
   isMissed?: boolean;
   completedAt?: string | null;
   scheduledDate?: string | null;
+  existingComplaint?: {
+    id: string;
+    status: string;
+    resolution?: string | null;
+  } | null;
   variant?: 'inline' | 'compact';
 }
 
@@ -33,6 +38,7 @@ export function WashRatingAction({
   isMissed = false,
   completedAt,
   scheduledDate,
+  existingComplaint,
   variant = 'inline',
 }: WashRatingActionProps) {
   const router = useRouter();
@@ -151,6 +157,10 @@ export function WashRatingAction({
   const activeStars = hoverStars ?? selectedStars;
   const filteredComplaintTypes = COMPLAINT_TYPES.filter((t) => t !== 'REFUND_DEMAND');
 
+  const hasComplaint = complaintSubmitted || !!existingComplaint;
+  const isResolved = existingComplaint?.status === 'RESOLVED';
+  const isUnderReview = hasComplaint && !isResolved;
+
   return (
     <>
       {/* ========================================================================= */}
@@ -186,9 +196,21 @@ export function WashRatingAction({
             )
           )}
 
-          {complaintSubmitted ? (
-            <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-200">
-              ✓ Reported
+          {isResolved ? (
+            <span
+              className="inline-flex items-center gap-1 text-[10.5px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200 shadow-2xs"
+              title={existingComplaint?.resolution ? `Resolved: ${existingComplaint.resolution}` : 'Issue resolved by manager'}
+            >
+              <span>✓</span>
+              <span>Resolved</span>
+            </span>
+          ) : isUnderReview ? (
+            <span
+              className="inline-flex items-center gap-1 text-[10.5px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200 shadow-2xs"
+              title="Issue is under review with area manager"
+            >
+              <span>⏳</span>
+              <span>Under Review</span>
             </span>
           ) : isExpired ? (
             <button
@@ -258,10 +280,21 @@ export function WashRatingAction({
 
           {/* Right Action: Report Issue / Raise Complaint (Disabled after 7 days) */}
           <div>
-            {complaintSubmitted ? (
-              <span className="inline-flex items-center gap-1 text-xs font-bold text-rose-700 bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-200">
+            {isResolved ? (
+              <span
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-800 bg-emerald-50 px-3.5 py-1.5 rounded-xl border border-emerald-200 shadow-2xs"
+                title={existingComplaint?.resolution ? `Resolved: ${existingComplaint.resolution}` : 'Issue resolved by manager'}
+              >
                 <span>✓</span>
-                <span>Issue Reported</span>
+                <span>Issue Resolved</span>
+              </span>
+            ) : isUnderReview ? (
+              <span
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-800 bg-amber-50 px-3.5 py-1.5 rounded-xl border border-amber-200 shadow-2xs"
+                title="Issue is under review with area manager"
+              >
+                <span>⏳</span>
+                <span>Issue Under Review</span>
               </span>
             ) : isExpired ? (
               <button

@@ -65,11 +65,25 @@ export async function POST(request: Request) {
       }
     }
 
-    if (targetVisit && isWashFeedbackExpired(targetVisit)) {
-      throw new HttpError(
-        400,
-        'Complaint option is disabled after 7 days of wash completion.',
-      );
+    if (targetVisit) {
+      if (isWashFeedbackExpired(targetVisit)) {
+        throw new HttpError(
+          400,
+          'Complaint option is disabled after 7 days of wash completion.',
+        );
+      }
+
+      const existingComplaint = await store.complaints.findOne({
+        where: { customerId: customer.id, visitId: targetVisit.id } as never,
+      });
+      if (existingComplaint) {
+        throw new HttpError(
+          400,
+          existingComplaint.status === 'RESOLVED'
+            ? 'A complaint for this wash was already submitted and resolved by your area manager.'
+            : 'A complaint for this wash is already under review with your area manager.',
+        );
+      }
     }
 
     const complaint = await store.complaints.create({

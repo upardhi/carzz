@@ -30,15 +30,22 @@ export const metadata = { title: 'Customer Dashboard' };
 export default async function CustomerHome() {
   const session = await requirePermission('self:cars');
   const store = await getStore();
-  const [account, packages] = await Promise.all([
+  const [account, packages, complaints] = await Promise.all([
     loadCustomerAccount(
       store,
       session.user.customerId!,
       currentCycle(),
     ),
     store.packages.find({ where: { active: true } }),
+    store.complaints.find({
+      where: { customerId: session.user.customerId! },
+    }),
   ]);
   if (!account) notFound();
+
+  const complaintsByVisitId = new Map(
+    complaints.filter((c) => c.visitId).map((c) => [c.visitId!, c]),
+  );
 
   const activeInProgressVisit = account.visits.find((v) => v.status === 'IN_PROGRESS');
   const inProgressCar = activeInProgressVisit
@@ -538,6 +545,7 @@ export default async function CustomerHome() {
                           isMissed={!b.isDone}
                           completedAt={b.completedAt}
                           scheduledDate={b.scheduledDate}
+                          existingComplaint={complaintsByVisitId.get(b.id) ?? null}
                           variant="compact"
                         />
                       )}

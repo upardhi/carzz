@@ -43,7 +43,16 @@ export default async function CarDetail({
     (v) => v.carId === carId && v.status === 'IN_PROGRESS',
   );
 
-  const settings = await store.getAppSettings();
+  const [settings, complaints] = await Promise.all([
+    store.getAppSettings(),
+    store.complaints.find({
+      where: { customerId: account.customer.id },
+    }),
+  ]);
+  const complaintsByVisitId = new Map(
+    complaints.filter((c) => c.visitId).map((c) => [c.visitId!, c]),
+  );
+
   const history = account.visits
     .filter((v) => v.carId === carId && v.status !== 'PENDING')
     .slice(0, 20);
@@ -528,6 +537,7 @@ export default async function CarDetail({
                   ratingComment={visit.ratingComment}
                   completedAt={visit.completedAt}
                   scheduledDate={visit.scheduledDate}
+                  existingComplaint={complaintsByVisitId.get(visit.id) ?? null}
                 />
               </div>
             </div>
@@ -567,6 +577,7 @@ export default async function CarDetail({
                 isMissed={true}
                 completedAt={visit.completedAt}
                 scheduledDate={visit.scheduledDate}
+                existingComplaint={complaintsByVisitId.get(visit.id) ?? null}
               />
             </div>
           </div>
