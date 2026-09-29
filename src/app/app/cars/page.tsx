@@ -100,12 +100,14 @@ export default async function CustomerCars() {
             );
 
             const nextCarVisit = car.serviceStarted
-              ? account.visits.find(
-                  (v) =>
-                    v.carId === car.id &&
-                    v.status === 'PENDING' &&
-                    v.scheduledDate >= todayISO(),
-                )
+              ? account.visits
+                  .filter(
+                    (v) =>
+                      v.carId === car.id &&
+                      v.status === 'PENDING' &&
+                      v.scheduledDate >= todayISO(),
+                  )
+                  .sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate))[0] || null
               : null;
 
             const nextWashText = inProgressVisit

@@ -387,12 +387,14 @@ export async function POST(request: Request) {
       const cycle = currentCycle();
       const today = todayISO();
       
-      // Delete any existing PENDING visit for today to avoid duplicate washes on the same day
-      const existingToday = await store.visits.find({
-        where: { carId: car.id, scheduledDate: today, status: 'PENDING' } as never,
+      // Delete any existing future PENDING visits for this car so that today's wash becomes the immediate upcoming visit
+      const existingPending = await store.visits.find({
+        where: { carId: car.id, status: 'PENDING' } as never,
       });
-      for (const v of existingToday) {
-        await store.visits.delete(v.id);
+      for (const v of existingPending) {
+        if (v.scheduledDate >= today) {
+          await store.visits.delete(v.id);
+        }
       }
 
       const visit = await store.visits.create({

@@ -13,7 +13,7 @@ import { canSeeArea } from '@/lib/auth/rbac';
 import type { Session } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { loadCustomerAccount } from '@/lib/services/accounts';
-import { parsePackageServices } from '@/lib/data/types';
+import { parsePackageServices, WEEKDAY_NUM } from '@/lib/data/types';
 import {
   currentCycle,
   formatClock,
@@ -349,16 +349,23 @@ export async function ConsoleCustomerDetail({
               {cars.map((car) => {
                 const isStarted = car.serviceStarted ?? true;
                 const today = todayISO();
+                const todayDate = new Date(`${today}T00:00:00.000Z`);
+                const todayDayNum = todayDate.getUTCDay();
+                const isScheduledDayToday = (car.weeklyDays && car.weeklyDays.length > 0 ? car.weeklyDays : ['MON', 'THU']).some(
+                  (d) => (WEEKDAY_NUM as Record<string, number>)[d] === todayDayNum,
+                );
                 const carPay = carPaymentsMap.get(car.id);
                 const todaysVisit = visits.find(
                   (v) => v.carId === car.id && v.scheduledDate === today,
                 );
-                const upcomingVisit = visits.find(
-                  (v) =>
-                    v.carId === car.id &&
-                    v.status === 'PENDING' &&
-                    v.scheduledDate >= today,
-                );
+                const upcomingVisit = visits
+                  .filter(
+                    (v) =>
+                      v.carId === car.id &&
+                      v.status === 'PENDING' &&
+                      v.scheduledDate >= today,
+                  )
+                  .sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate))[0] || null;
 
                 return (
                   <Card key={car.id} className="p-5 min-w-0">
@@ -416,7 +423,7 @@ export async function ConsoleCustomerDetail({
 
                       {/* Right Actions Toolbar */}
                       <div className="flex flex-wrap items-center gap-2 shrink-0">
-                        {isStarted && !todaysVisit && (
+                        {isStarted && !todaysVisit && !isScheduledDayToday && (
                           <WashTodayAction
                             customerId={customer.id}
                             carId={car.id}
@@ -516,8 +523,10 @@ export async function ConsoleCustomerDetail({
                             {upcomingVisit ? (
                               <>
                                 <span className="text-sm font-bold text-slate-900">
-                                  {formatDateFull(upcomingVisit.scheduledDate)} ·{' '}
-                                  {formatTime(upcomingVisit.scheduledTime)}
+                                  {upcomingVisit.scheduledDate === today
+                                    ? `Today (${formatDateFull(upcomingVisit.scheduledDate)})`
+                                    : formatDateFull(upcomingVisit.scheduledDate)}{' '}
+                                  · {formatTime(upcomingVisit.scheduledTime)}
                                   {upcomingVisit.plannedService
                                     ? ` · ${upcomingVisit.plannedService}`
                                     : ''}

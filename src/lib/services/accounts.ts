@@ -130,7 +130,7 @@ export async function loadCustomerAccount(
   const prunedVisitIds = new Set<string>();
   for (const car of cars) {
     const carPending = effectiveVisits
-      .filter((v) => v.carId === car.id && v.cycle === cycle && v.status === 'PENDING')
+      .filter((v) => v.carId === car.id && v.status === 'PENDING' && v.scheduledDate >= today)
       .sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate));
     if (carPending.length > 1) {
       const redundant = carPending.slice(1);
