@@ -42,22 +42,36 @@ function calculatePayoutRecord({
     (v) => Boolean(v.payoutReverted) || Boolean(v.missNote?.includes('[Payout Reverted]')),
   );
 
-  /* --- base pay, by whichever rule the owner has set --- */
-  let base = 0;
+  /* --- gross base pay for all completed washes --- */
+  let grossBase = 0;
+  let eligibleBase = 0;
   if (rules.baseMode === 'DAY_SLAB') {
-    // A rising rate by the car's position in that day's route.
-    const byDate = new Map<string, number>();
+    // Gross
+    const byDateGross = new Map<string, number>();
+    for (const visit of [...visits].sort((a, b) =>
+      a.scheduledDate.localeCompare(b.scheduledDate) ||
+      a.scheduledTime.localeCompare(b.scheduledTime),
+    )) {
+      const index = byDateGross.get(visit.scheduledDate) ?? 0;
+      byDateGross.set(visit.scheduledDate, index + 1);
+      grossBase += rules.slabByCarIndex[index] ?? rules.slabBeyond;
+    }
+
+    const byDateEligible = new Map<string, number>();
     for (const visit of [...eligibleVisits].sort((a, b) =>
       a.scheduledDate.localeCompare(b.scheduledDate) ||
       a.scheduledTime.localeCompare(b.scheduledTime),
     )) {
-      const index = byDate.get(visit.scheduledDate) ?? 0;
-      byDate.set(visit.scheduledDate, index + 1);
-      base += rules.slabByCarIndex[index] ?? rules.slabBeyond;
+      const index = byDateEligible.get(visit.scheduledDate) ?? 0;
+      byDateEligible.set(visit.scheduledDate, index + 1);
+      eligibleBase += rules.slabByCarIndex[index] ?? rules.slabBeyond;
     }
   } else {
-    base = eligibleVisits.length * rules.perWashRate;
+    grossBase = visits.length * rules.perWashRate;
+    eligibleBase = eligibleVisits.length * rules.perWashRate;
   }
+
+  const rewashReversalAmount = grossBase - eligibleBase;
 
   /* --- bonuses (only for non-reverted successful washes) --- */
   const onTime = eligibleVisits.filter((v) => v.onTime).length;
@@ -97,14 +111,14 @@ function calculatePayoutRecord({
   const lines: PayoutLine[] = [
     {
       label: 'Washes completed',
-      qty: eligibleVisits.length,
-      rate: null,
-      amount: base,
+      qty: visits.length,
+      rate: rules.baseMode === 'PER_WASH' ? rules.perWashRate : null,
+      amount: grossBase,
       kind: 'EARNING',
       detail:
         rules.baseMode === 'DAY_SLAB'
           ? `Slab ${rules.slabByCarIndex.join(' / ')} by car position in the day`
-          : `Flat rate of ${rules.perWashRate} per wash`,
+          : `Flat rate of ₹${rules.perWashRate} per wash`,
     },
     {
       label: 'On-time bonus',
@@ -140,10 +154,10 @@ function calculatePayoutRecord({
     lines.push({
       label: 'Rewash Reversals (Faulty Washes)',
       qty: revertedVisits.length,
-      rate: null,
-      amount: 0,
+      rate: rules.baseMode === 'PER_WASH' ? rules.perWashRate : null,
+      amount: rewashReversalAmount,
       kind: 'DEDUCTION',
-      detail: `${revertedVisits.length} wash${revertedVisits.length > 1 ? 'es' : ''} uncredited due to customer complaint & rewash booking`,
+      detail: `${revertedVisits.length} wash${revertedVisits.length > 1 ? 'es' : ''} deducted due to customer complaint & rewash booking`,
     });
   }
 
@@ -178,8 +192,8 @@ function calculatePayoutRecord({
 
   const bonuses = onTimeAmount + reviewAmount;
   const referrals = carReferralAmount + staffReferralAmount;
-  const deductions = offPenalty + uninformedPenalty;
-  const net = base + bonuses + referrals - deductions - pocketTaken;
+  const deductions = offPenalty + uninformedPenalty + rewashReversalAmount;
+  const net = grossBase + bonuses + referrals - deductions - pocketTaken;
 
   return {
     id: existing?.id ?? `pyt_${staff.id}_${cycle}`,
@@ -187,7 +201,7 @@ function calculatePayoutRecord({
     areaId: staff.areaId,
     cycle,
     washes: eligibleVisits.length,
-    base,
+    base: grossBase,
     bonuses,
     referrals,
     deductions,
