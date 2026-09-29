@@ -3,7 +3,6 @@ import { cache } from 'react';
 
 import type { DataStore } from '../data/ports/store';
 import {
-  parsePackageServices,
   type Car,
   type Customer,
   type CustomerRequest,
@@ -26,6 +25,12 @@ export interface CustomerAccount {
   cars: (Car & {
     package: ServicePackage | null;
     tally: VisitTally;
+    payment: {
+      price: number;
+      paid: number;
+      due: number;
+      status: 'PAID' | 'DUE' | 'OVERDUE';
+    };
     serviceStartedByUser?: { id: Id; name: string; role: string; email?: string } | null;
     pendingRequest?: (CustomerRequest & {
       requestedPackage?: ServicePackage | null;
@@ -183,10 +188,7 @@ export async function loadCustomerAccount(
       ? userById.get(car.serviceStartedByUserId)
       : null;
     const pkg = packageById.get(car.packageId) ?? null;
-    const parsedServices = parsePackageServices(pkg?.services, pkg?.washesPerMonth ?? 8);
-    const effectiveQuota = parsedServices.length > 0
-      ? parsedServices.reduce((sum, s) => sum + s.washesPerMonth, 0)
-      : (pkg?.washesPerMonth ?? 8);
+    const effectiveQuota = pkg?.washesPerMonth ?? 8;
 
     const carPending = pendingRequests.find((r) => r.carId === car.id);
     const pendingRequest = carPending
@@ -221,7 +223,7 @@ export async function loadCustomerAccount(
   });
 
   const monthly = cars
-    .filter((c) => c.active)
+    .filter((c) => c.active && (c.serviceStarted ?? true))
     .reduce((sum, c) => sum + (packageById.get(c.packageId)?.price ?? 0), 0);
 
   // Keep current cycle's invoice perfectly synchronized with active cars' monthly subscription total
@@ -271,6 +273,33 @@ export async function loadCustomerAccount(
   const totalPaid = confirmedPayments
     .filter((p) => p.kind !== 'REFUND')
     .reduce((sum, p) => sum + p.amount, 0);
+
+  // Auto-apply unapplied confirmed payments or advance credits to open invoices (oldest cycle first)
+  const totalInvoicePaid = effectiveInvoices.reduce((sum, i) => sum + i.paidAmount, 0);
+  let unappliedCredit = Math.max(0, totalPaid - totalInvoicePaid);
+  if (unappliedCredit > 0) {
+    const openInvoices = effectiveInvoices
+      .filter((i) => i.paidAmount < i.amount && i.status !== 'WRITTEN_OFF')
+      .sort((a, b) => a.cycle.localeCompare(b.cycle));
+    for (const inv of openInvoices) {
+      if (unappliedCredit <= 0) break;
+      const owed = inv.amount - inv.paidAmount;
+      const applied = Math.min(owed, unappliedCredit);
+      unappliedCredit -= applied;
+      const newPaid = inv.paidAmount + applied;
+      try {
+        const updated = await store.invoices.update(inv.id, {
+          paidAmount: newPaid,
+          status: newPaid >= inv.amount ? 'PAID' : 'PARTIAL',
+        });
+        const idx = effectiveInvoices.findIndex((x) => x.id === inv.id);
+        if (idx >= 0) effectiveInvoices[idx] = updated;
+      } catch {
+        // ignore
+      }
+    }
+  }
+
   const totalBilled = effectiveInvoices.reduce((sum, i) => sum + i.amount, 0);
   const outstanding = effectiveInvoices.reduce(
     (sum, i) => sum + Math.max(0, i.amount - i.paidAmount),
@@ -305,16 +334,63 @@ export async function loadCustomerAccount(
       }
     : null;
 
-  const totalAccountQuota = cars.reduce((sum, c) => {
-    const pkg = packageById.get(c.packageId);
-    const parsed = parsePackageServices(pkg?.services, pkg?.washesPerMonth ?? 8);
-    const quota = parsed.length > 0 ? parsed.reduce((s, item) => s + item.washesPerMonth, 0) : (pkg?.washesPerMonth ?? 8);
-    return sum + quota;
-  }, 0);
+  const activeCars = carsWithDetail.filter((c) => c.active && (c.serviceStarted ?? true));
+  const sortedActiveCars = [...activeCars].sort((a, b) => {
+    const doneA = effectiveCycleVisits.filter((v) => v.carId === a.id && v.status === 'DONE').length;
+    const doneB = effectiveCycleVisits.filter((v) => v.carId === b.id && v.status === 'DONE').length;
+    if ((doneA > 0) !== (doneB > 0)) {
+      return doneA > 0 ? -1 : 1;
+    }
+    if (doneA !== doneB) {
+      return doneB - doneA;
+    }
+    const startedA = a.serviceStartedAt
+      ? new Date(a.serviceStartedAt).getTime()
+      : a.serviceStarted ? 1 : 0;
+    const startedB = b.serviceStartedAt
+      ? new Date(b.serviceStartedAt).getTime()
+      : b.serviceStarted ? 1 : 0;
+    if (startedA !== startedB) {
+      return startedA - startedB;
+    }
+    return a.id.localeCompare(b.id);
+  });
+
+  const finalInvoicePaid = effectiveInvoices.reduce((sum, i) => sum + i.paidAmount, 0);
+  const openInvoices = effectiveInvoices.filter((i) => i.status !== 'PAID' && i.status !== 'WRITTEN_OFF');
+  const isOverdue = openInvoices.some((i) => i.status === 'OVERDUE' || i.dueOn < today);
+
+  let remainingPaidForCars = finalInvoicePaid;
+  const carPaymentsMap = new Map<string, { price: number; paid: number; due: number; status: 'PAID' | 'DUE' | 'OVERDUE' }>();
+  for (const c of sortedActiveCars) {
+    const price = c.package?.price ?? 0;
+    const allocated = Math.min(price, remainingPaidForCars);
+    remainingPaidForCars -= allocated;
+    const due = Math.max(0, price - allocated);
+    const status = due === 0 ? 'PAID' : (isOverdue ? 'OVERDUE' : 'DUE');
+    carPaymentsMap.set(c.id, { price, paid: allocated, due, status });
+  }
+
+  const finalCarsWithDetail = carsWithDetail.map((c) => ({
+    ...c,
+    payment: carPaymentsMap.get(c.id) || {
+      price: c.package?.price ?? 0,
+      paid: 0,
+      due: c.active && (c.serviceStarted ?? true) ? (c.package?.price ?? 0) : 0,
+      status: (c.active && (c.serviceStarted ?? true) ? (isOverdue ? 'OVERDUE' : 'DUE') : 'PAID') as 'PAID' | 'DUE' | 'OVERDUE',
+    },
+  }));
+
+  const totalAccountQuota = cars
+    .filter((c) => c.active && (c.serviceStarted ?? true))
+    .reduce((sum, c) => {
+      const pkg = packageById.get(c.packageId);
+      return sum + (pkg?.washesPerMonth ?? 8);
+    }, 0);
 
   return {
     customer,
-    cars: carsWithDetail,
+    cars: finalCarsWithDetail,
     visits: resolvedVisits,
     payments,
     invoices,

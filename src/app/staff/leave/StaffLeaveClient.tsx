@@ -138,32 +138,39 @@ export function StaffLeaveClient({
     }
   }
 
-  async function handleCancel(leaveId: string) {
+  async function handleCancel(leaveId: string, isEndEarly = false) {
     const ok = await confirm({
-      title: 'Cancel Leave Request?',
-      message: 'Are you sure you want to cancel this leave request?',
-      confirmText: 'Yes, Cancel Request',
-      tone: 'danger',
+      title: isEndEarly ? 'Resume Duty & End Leave Early?' : 'Cancel Leave Request?',
+      message: isEndEarly
+        ? 'You will resume duty today and any remaining scheduled leave days will be cancelled.'
+        : 'Are you sure you want to cancel this leave?',
+      confirmText: isEndEarly ? 'Yes, Resume Duty' : 'Yes, Cancel Leave',
+      tone: isEndEarly ? 'primary' : 'danger',
     });
     if (!ok) return;
 
     setCancellingId(leaveId);
     setError(null);
+    setSuccess(null);
 
     try {
       const res = await fetch(`/api/staff/leave?id=${leaveId}`, {
         method: 'DELETE',
       });
 
+      const data = await res.json();
       if (!res.ok) {
-        const data = await res.json();
         setError(data.error || 'Could not cancel leave request.');
         return;
       }
 
-      setLeaves((prev) =>
-        prev.map((l) => (l.id === leaveId ? { ...l, status: 'CANCELLED' } : l)),
-      );
+      setSuccess(data.message || (isEndEarly ? 'Resumed duty early.' : 'Leave cancelled.'));
+      // Fetch fresh leaves list
+      const fetchRes = await fetch('/api/staff/leave');
+      if (fetchRes.ok) {
+        const fresh = await fetchRes.json();
+        if (fresh.leaves) setLeaves(fresh.leaves);
+      }
       router.refresh();
     } catch {
       setError('Failed to cancel. Check your connection.');
@@ -499,9 +506,39 @@ export function StaffLeaveClient({
                         </button>
                       </>
                     ) : leave.status === 'APPROVED' ? (
-                      <span className="rounded-full border border-emerald-200/80 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
-                        Approved
-                      </span>
+                      leave.endDate < today ? (
+                        <span className="rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">
+                          Completed
+                        </span>
+                      ) : leave.startDate < today && leave.endDate >= today ? (
+                        <>
+                          <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">
+                            Ongoing
+                          </span>
+                          <button
+                            type="button"
+                            disabled={cancellingId === leave.id}
+                            onClick={() => handleCancel(leave.id, true)}
+                            className="rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-800 hover:bg-amber-100 transition-colors cursor-pointer disabled:opacity-50"
+                          >
+                            {cancellingId === leave.id ? 'Resuming...' : 'End Early'}
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <span className="rounded-full border border-emerald-200/80 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
+                            Approved
+                          </span>
+                          <button
+                            type="button"
+                            disabled={cancellingId === leave.id}
+                            onClick={() => handleCancel(leave.id, false)}
+                            className="rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700 hover:bg-rose-100 transition-colors cursor-pointer disabled:opacity-50"
+                          >
+                            {cancellingId === leave.id ? 'Cancelling...' : 'Cancel'}
+                          </button>
+                        </>
+                      )
                     ) : (
                       <span className="rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
                         {leave.status === 'REJECTED' ? 'Rejected' : 'Cancelled'}

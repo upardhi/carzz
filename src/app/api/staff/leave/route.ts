@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { HttpError, requireApiSession } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
-import { currentCycle } from '@/lib/util/format';
+import { currentCycle, todayISO, addDays } from '@/lib/util/format';
 import type { LeaveType } from '@/lib/data/types';
 
 const applySchema = z.object({
@@ -189,19 +189,93 @@ export async function DELETE(request: Request) {
       throw new HttpError(403, 'You can only cancel your own leave requests.');
     }
 
-    if (leave.status !== 'PENDING') {
+    if (leave.status === 'CANCELLED') {
+      return NextResponse.json({ error: 'This leave is already cancelled.' }, { status: 400 });
+    }
+    if (leave.status === 'REJECTED') {
+      return NextResponse.json({ error: 'This leave was rejected.' }, { status: 400 });
+    }
+
+    const today = todayISO();
+
+    if (leave.endDate < today) {
       return NextResponse.json(
-        { error: 'Only pending leave requests can be cancelled directly. Contact your manager.' },
+        { error: 'Cannot cancel a past leave that has already ended.' },
         { status: 400 },
       );
     }
 
-    await store.leaves.update(leave.id, {
-      status: 'CANCELLED',
-      note: 'Cancelled by staff member',
-    });
+    if (leave.status === 'PENDING') {
+      await store.leaves.update(leave.id, {
+        status: 'CANCELLED',
+        note: 'Cancelled by staff member',
+      });
+      return NextResponse.json({ ok: true, message: 'Leave request cancelled.' });
+    }
 
-    return NextResponse.json({ ok: true, message: 'Leave request cancelled.' });
+    if (leave.status === 'APPROVED') {
+      function getDates(startDate: string, endDate: string) {
+        const dates: string[] = [];
+        const cur = new Date(`${startDate}T00:00:00.000Z`);
+        const end = new Date(`${endDate}T00:00:00.000Z`);
+        while (cur <= end) {
+          dates.push(cur.toISOString().slice(0, 10));
+          cur.setUTCDate(cur.getUTCDate() + 1);
+        }
+        return dates;
+      }
+
+      // If leave starts today or in future: cancel completely
+      if (leave.startDate >= today) {
+        const dates = getDates(today, leave.endDate);
+        for (const date of dates) {
+          const existingAtt = await store.attendance.findOne({
+            where: { staffId: leave.staffId, date },
+          });
+          if (existingAtt && (existingAtt.status === 'OFF' || existingAtt.status === 'OFF_UNINFORMED')) {
+            await store.attendance.update(existingAtt.id, {
+              status: 'PRESENT',
+              note: 'Leave cancelled by staff member',
+            });
+          }
+        }
+        await store.leaves.update(leave.id, {
+          status: 'CANCELLED',
+          note: 'Cancelled by staff member',
+        });
+        return NextResponse.json({ ok: true, message: 'Approved leave cancelled and attendance restored.' });
+      }
+
+      // If leave is ongoing (startDate < today && endDate >= today): end early
+      const yesterday = addDays(today, -1).toISOString().slice(0, 10);
+      const datesTaken = getDates(leave.startDate, yesterday);
+      const datesRemaining = getDates(today, leave.endDate);
+
+      for (const date of datesRemaining) {
+        const existingAtt = await store.attendance.findOne({
+          where: { staffId: leave.staffId, date },
+        });
+        if (existingAtt && (existingAtt.status === 'OFF' || existingAtt.status === 'OFF_UNINFORMED')) {
+          await store.attendance.update(existingAtt.id, {
+            status: 'PRESENT',
+            note: 'Staff returned to duty early',
+          });
+        }
+      }
+
+      await store.leaves.update(leave.id, {
+        endDate: yesterday,
+        daysCount: datesTaken.length,
+        note: `Staff resumed duty early on ${today} (${datesRemaining.length} remaining day(s) cancelled).`,
+      });
+
+      return NextResponse.json({
+        ok: true,
+        message: `Leave ended early. ${datesRemaining.length} remaining day(s) cancelled and attendance restored.`,
+      });
+    }
+
+    return NextResponse.json({ error: 'Invalid leave status.' }, { status: 400 });
   } catch (error) {
     if (error instanceof HttpError) {
       return NextResponse.json({ error: error.message }, { status: error.status });

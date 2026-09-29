@@ -16,27 +16,32 @@ export interface InvoiceInfo {
   dueOn?: string;
 }
 
+export interface CarPaymentInfo {
+  id: string;
+  name: string;
+  price: number;
+  due: number;
+}
+
 export function RecordPaymentForm({
   customerId,
   suggested = 0,
   outstanding = 0,
   monthly = 0,
   invoices = [],
+  cars = [],
 }: {
   customerId: string;
   suggested?: number;
   outstanding?: number;
   monthly?: number;
   invoices?: InvoiceInfo[];
+  cars?: CarPaymentInfo[];
 }) {
   const router = useRouter();
   const hasDues = outstanding > 0;
-  const [paymentType, setPaymentType] = useState<'INVOICE' | 'ADVANCE'>(
-    hasDues ? 'INVOICE' : 'ADVANCE',
-  );
-  const [showAdvanceForm, setShowAdvanceForm] = useState(hasDues);
   const [amount, setAmount] = useState(
-    String(hasDues ? outstanding || suggested : monthly || suggested || ''),
+    String(hasDues ? outstanding : monthly || suggested || ''),
   );
   const [mode, setMode] = useState<PaymentMode>('CASH');
   const [reference, setReference] = useState('');
@@ -45,8 +50,8 @@ export function RecordPaymentForm({
   const [lastReceipt, setLastReceipt] = useState<{
     receiptNo: string;
     amount: number;
-    kind: string;
-    message: string;
+    settledDues: number;
+    advanceAdded: number;
   } | null>(null);
   const [state, setState] = useState<{ ok?: string; error?: string }>({});
 
@@ -54,15 +59,10 @@ export function RecordPaymentForm({
     (inv) => inv.paidAmount < inv.amount && inv.status !== 'WRITTEN_OFF',
   );
 
-  function handleTypeChange(type: 'INVOICE' | 'ADVANCE') {
-    setPaymentType(type);
-    setState({});
-    if (type === 'INVOICE') {
-      setAmount(String(outstanding || suggested || ''));
-    } else {
-      setAmount(String(monthly || ''));
-    }
-  }
+  const numAmount = Number(amount) || 0;
+  const duesCovered = hasDues ? Math.min(numAmount, outstanding) : 0;
+  const surplusAdvance = Math.max(0, numAmount - duesCovered);
+  const remainingDues = Math.max(0, outstanding - duesCovered);
 
   async function submit() {
     const value = Number(amount);
@@ -74,7 +74,6 @@ export function RecordPaymentForm({
     setState({});
     setLastReceipt(null);
     try {
-      const kind = paymentType === 'ADVANCE' ? 'ADVANCE' : 'PACKAGE';
       const result = await safeOfflineFetch<{
         ok?: boolean;
         message?: string;
@@ -88,7 +87,7 @@ export function RecordPaymentForm({
           customerId,
           amount: value,
           mode,
-          kind,
+          kind: hasDues ? 'PACKAGE' : 'ADVANCE',
           reference: reference.trim() || undefined,
           note: note.trim() || undefined,
         },
@@ -109,15 +108,12 @@ export function RecordPaymentForm({
         setLastReceipt({
           receiptNo,
           amount: value,
-          kind: paymentType === 'ADVANCE' ? 'Advance Deposit' : 'Invoice Payment',
-          message: result.data?.message ?? 'Payment recorded successfully.',
+          settledDues: duesCovered,
+          advanceAdded: surplusAdvance,
         });
         setState({ ok: result.data?.message ?? 'Payment recorded.' });
         setReference('');
         setNote('');
-        if (!hasDues) {
-          setShowAdvanceForm(false);
-        }
       }
 
       router.refresh();
@@ -130,38 +126,6 @@ export function RecordPaymentForm({
 
   return (
     <div className="space-y-3">
-      {/* If customer has 0 dues and form is not expanded */}
-      {!hasDues && !showAdvanceForm ? (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50/80 p-3 text-center sm:text-left">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5">
-            <div className="flex items-center gap-2">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-xs font-bold text-white shadow-xs">
-                ✓
-              </span>
-              <div>
-                <p className="text-xs font-bold text-emerald-950">
-                  Account is fully paid
-                </p>
-                <p className="text-[11px] text-emerald-700">
-                  No outstanding dues for this customer.
-                </p>
-              </div>
-            </div>
-            <Button
-              variant="secondary"
-              className="text-xs shrink-0 bg-white border-emerald-300 text-emerald-900 hover:bg-emerald-100/50"
-              onClick={() => {
-                setShowAdvanceForm(true);
-                setPaymentType('ADVANCE');
-                setAmount(String(monthly || ''));
-              }}
-            >
-              + Record Advance Payment
-            </Button>
-          </div>
-        </div>
-      ) : null}
-
       {/* Payment Receipt Banner if just paid */}
       {lastReceipt ? (
         <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 shadow-xs">
@@ -174,8 +138,9 @@ export function RecordPaymentForm({
                 </span>
               </p>
               <p className="text-[11px] text-emerald-800 mt-0.5">
-                ₹{lastReceipt.amount.toLocaleString('en-IN')} logged as{' '}
-                {lastReceipt.kind}. Recorded in payment history.
+                ₹{lastReceipt.amount.toLocaleString('en-IN')} received.
+                {lastReceipt.settledDues > 0 ? ` Settled ₹${lastReceipt.settledDues.toLocaleString('en-IN')} towards dues.` : ''}
+                {lastReceipt.advanceAdded > 0 ? ` ₹${lastReceipt.advanceAdded.toLocaleString('en-IN')} added to advance balance.` : ''}
               </p>
             </div>
             <Tag tone="ok">Recorded</Tag>
@@ -183,131 +148,190 @@ export function RecordPaymentForm({
         </div>
       ) : null}
 
-      {/* Main Payment Recording Form */}
-      {(hasDues || showAdvanceForm) && (
-        <div className="rounded-lg border border-line bg-slate-50/50 p-3 space-y-2.5">
-          <div className="flex items-center justify-between border-b border-line/60 pb-2">
-            <span className="text-xs font-bold text-ink">
-              {hasDues ? 'Record Payment / Settle Invoice' : 'Record Advance Payment'}
+      {/* Main Unified Payment Recording Form */}
+      <div className="rounded-lg border border-line bg-slate-50/50 p-3 space-y-2.5">
+        <div className="flex items-center justify-between border-b border-line/60 pb-2">
+          <span className="text-xs font-bold text-ink">Record Payment</span>
+          {hasDues ? (
+            <span className="text-[11px] font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200/60">
+              ₹{outstanding.toLocaleString('en-IN')} Outstanding
             </span>
-            {!hasDues && (
-              <button
-                type="button"
-                onClick={() => setShowAdvanceForm(false)}
-                className="text-xs font-medium text-slate-500 hover:text-slate-800 underline"
-              >
-                Cancel
-              </button>
+          ) : (
+            <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200/60">
+              No Dues (Fully Paid)
+            </span>
+          )}
+        </div>
+
+        {/* Target Invoices Breakdown if any dues exist */}
+        {openInvoices.length > 0 && (
+          <div className="text-[11px] text-slate-600 bg-white border border-slate-200/80 rounded px-2.5 py-1.5 flex flex-wrap items-center gap-1.5">
+            <span className="font-semibold text-slate-800">Target Invoices:</span>
+            {openInvoices.map((inv) => (
+              <span key={inv.id} className="font-mono text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded">
+                [{inv.cycle}: ₹{(inv.amount - inv.paidAmount).toLocaleString('en-IN')} left]
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Quick Fill Buttons */}
+        <div className="flex flex-wrap gap-1.5 items-center">
+          <span className="text-[10px] uppercase font-bold text-slate-400">Quick set:</span>
+          {hasDues && (
+            <button
+              type="button"
+              onClick={() => setAmount(String(outstanding))}
+              className="text-[11px] font-medium px-2 py-0.5 rounded border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 transition-colors"
+            >
+              Exact Dues (₹{outstanding.toLocaleString('en-IN')})
+            </button>
+          )}
+          {monthly > 0 && monthly !== outstanding && (
+            <button
+              type="button"
+              onClick={() => setAmount(String(monthly))}
+              className="text-[11px] font-medium px-2 py-0.5 rounded border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 transition-colors"
+            >
+              1 Month (₹{monthly.toLocaleString('en-IN')})
+            </button>
+          )}
+          {monthly > 0 && (
+            <button
+              type="button"
+              onClick={() => setAmount(String((hasDues ? outstanding : 0) + monthly))}
+              className="text-[11px] font-medium px-2 py-0.5 rounded border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 transition-colors"
+            >
+              {hasDues ? `Dues + 1 Mo (₹${(outstanding + monthly).toLocaleString('en-IN')})` : `2 Months (₹${(monthly * 2).toLocaleString('en-IN')})`}
+            </button>
+          )}
+        </div>
+
+        {/* Vehicle Selection (if customer has multiple cars) */}
+        {cars.length > 1 && (
+          <div className="rounded-md border border-slate-200/80 bg-white p-2 space-y-1.5">
+            <span className="text-[10px] uppercase font-bold text-slate-500">Pay for specific vehicle:</span>
+            <div className="flex flex-wrap gap-1.5">
+              {cars.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => {
+                    setAmount(String(c.due > 0 ? c.due : c.price));
+                    setNote(`Payment for ${c.name}`);
+                  }}
+                  className="text-[11px] font-medium px-2.5 py-1 rounded-md border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-800 flex items-center gap-1.5 transition-colors shadow-2xs"
+                >
+                  <span>🚗 {c.name}</span>
+                  <span
+                    className={`font-mono text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                      c.due > 0
+                        ? 'bg-amber-100 text-amber-900 border border-amber-200'
+                        : 'bg-emerald-100 text-emerald-900 border border-emerald-200'
+                    }`}
+                  >
+                    {c.due > 0 ? `₹${c.due.toLocaleString('en-IN')} due` : 'Paid'}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Amount & Payment Mode Inputs */}
+        <div className="flex gap-2">
+          <input
+            id="pay-amount"
+            className="field flex-1 text-sm font-semibold"
+            type="number"
+            placeholder="Amount (₹)"
+            inputMode="numeric"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+          />
+          <select
+            aria-label="Payment mode"
+            className="field w-36 text-xs font-medium"
+            value={mode}
+            onChange={(e) => setMode(e.target.value as PaymentMode)}
+          >
+            {(['CASH', 'MANUAL_UPI', 'GATEWAY'] as PaymentMode[]).map((m) => (
+              <option key={m} value={m}>
+                {PAYMENT_MODE_LABEL[m]}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Live Payment Allocation Preview */}
+        {numAmount > 0 && (
+          <div className="rounded border border-blue-200/80 bg-blue-50/70 px-2.5 py-1.5 text-[11px] text-blue-900 space-y-0.5">
+            {hasDues ? (
+              numAmount <= outstanding ? (
+                <div className="flex items-center justify-between">
+                  <span>
+                    Settles <strong>₹{numAmount.toLocaleString('en-IN')}</strong> towards open dues.
+                  </span>
+                  <span className="font-semibold text-rose-700">
+                    ₹{remainingDues.toLocaleString('en-IN')} will remain due
+                  </span>
+                </div>
+              ) : (
+                <div>
+                  <span>
+                    ✓ Clears all <strong>₹{outstanding.toLocaleString('en-IN')}</strong> dues.{' '}
+                  </span>
+                  <span className="text-emerald-800 font-semibold">
+                    +₹{surplusAdvance.toLocaleString('en-IN')} deposited into Advance balance.
+                  </span>
+                </div>
+              )
+            ) : (
+              <div>
+                <span>Account has no dues. </span>
+                <span className="text-emerald-800 font-semibold">
+                  Full ₹{numAmount.toLocaleString('en-IN')} deposited into Advance balance.
+                </span>
+              </div>
             )}
           </div>
+        )}
 
-          {/* Type Selector (Invoice Settlement vs Advance) */}
-          <div className="flex gap-1.5 p-0.5 bg-slate-200/60 rounded-lg text-xs">
-            <button
-              type="button"
-              onClick={() => handleTypeChange('INVOICE')}
-              className={`flex-1 py-1 px-2 rounded-md font-medium text-center transition-all ${
-                paymentType === 'INVOICE'
-                  ? 'bg-white shadow-xs text-ink font-bold'
-                  : 'text-slate-600 hover:text-ink'
-              }`}
-            >
-              Invoice Payment {hasDues ? `(₹${outstanding} due)` : ''}
-            </button>
-            <button
-              type="button"
-              onClick={() => handleTypeChange('ADVANCE')}
-              className={`flex-1 py-1 px-2 rounded-md font-medium text-center transition-all ${
-                paymentType === 'ADVANCE'
-                  ? 'bg-white shadow-xs text-ink font-bold'
-                  : 'text-slate-600 hover:text-ink'
-              }`}
-            >
-              Advance Deposit
-            </button>
-          </div>
-
-          {/* Context Notice */}
-          {paymentType === 'INVOICE' && openInvoices.length > 0 && (
-            <div className="text-[11px] text-slate-600 bg-white border border-slate-200/80 rounded px-2.5 py-1.5">
-              <span className="font-semibold text-slate-800">Target Invoices: </span>
-              {openInvoices.map((inv) => (
-                <span key={inv.id} className="font-mono text-slate-700 mr-2">
-                  [{inv.cycle}: ₹{inv.amount - inv.paidAmount} left]
-                </span>
-              ))}
-            </div>
-          )}
-
-          {paymentType === 'ADVANCE' && (
-            <p className="text-[11px] text-blue-700 bg-blue-50 border border-blue-200/60 rounded px-2.5 py-1.5">
-              💡 Advance payment will be deposited into the customer&apos;s account balance and automatically applied to future invoices.
-            </p>
-          )}
-
-          {/* Amount & Mode */}
-          <div className="flex gap-2">
-            <input
-              id="pay-amount"
-              className="field flex-1 text-sm font-semibold"
-              type="number"
-              placeholder="Amount (₹)"
-              inputMode="numeric"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
-            <select
-              aria-label="Payment mode"
-              className="field w-36 text-xs font-medium"
-              value={mode}
-              onChange={(e) => setMode(e.target.value as PaymentMode)}
-            >
-              {(['CASH', 'MANUAL_UPI', 'GATEWAY'] as PaymentMode[]).map((m) => (
-                <option key={m} value={m}>
-                  {PAYMENT_MODE_LABEL[m]}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Reference and Note */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <input
-              type="text"
-              placeholder="Ref # / UPI Txn / Receipt #"
-              value={reference}
-              onChange={(e) => setReference(e.target.value)}
-              className="field text-xs"
-            />
-            <input
-              type="text"
-              placeholder="Note (optional)"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              className="field text-xs"
-            />
-          </div>
-
-          <Button
-            block
-            className="mt-1 font-semibold"
-            disabled={pending}
-            onClick={submit}
-          >
-            {pending
-              ? 'Recording…'
-              : `Confirm & Record ₹${Number(amount) || 0} (${
-                  paymentType === 'ADVANCE' ? 'Advance' : 'Invoice'
-                })`}
-          </Button>
-
-          {state.error ? (
-            <div className="mt-2">
-              <Note tone="danger">{state.error}</Note>
-            </div>
-          ) : null}
+        {/* Reference and Note */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <input
+            type="text"
+            placeholder="Ref # / UPI Txn / Receipt #"
+            value={reference}
+            onChange={(e) => setReference(e.target.value)}
+            className="field text-xs"
+          />
+          <input
+            type="text"
+            placeholder="Note (optional)"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            className="field text-xs"
+          />
         </div>
-      )}
+
+        <Button
+          block
+          className="mt-1 font-semibold"
+          disabled={pending || numAmount <= 0}
+          onClick={submit}
+        >
+          {pending
+            ? 'Recording…'
+            : `Confirm & Record ₹${numAmount.toLocaleString('en-IN')}`}
+        </Button>
+
+        {state.error ? (
+          <div className="mt-2">
+            <Note tone="danger">{state.error}</Note>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }

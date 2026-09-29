@@ -310,6 +310,22 @@ export default async function CarDetail({
             <span className="font-semibold text-slate-900">{car.tally.total} washes</span>
           </div>
           <div className="flex items-center justify-between py-2">
+            <span className="text-slate-500 font-medium">Monthly Rate</span>
+            <span className="font-semibold text-slate-900">₹{(car.payment?.price ?? car.package?.price ?? 0).toLocaleString('en-IN')}</span>
+          </div>
+          <div className="flex items-center justify-between py-2">
+            <span className="text-slate-500 font-medium">Payment Status</span>
+            {car.payment?.due === 0 ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
+                ✓ Paid (₹{car.payment.paid.toLocaleString('en-IN')})
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2.5 py-0.5 text-xs font-bold text-amber-800">
+                Due: ₹{(car.payment?.due ?? car.package?.price ?? 0).toLocaleString('en-IN')}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center justify-between py-2">
             <span className="text-slate-500 font-medium">Time Slot</span>
             <span className="font-semibold text-slate-900">{formatTime(car.scheduleTime)}</span>
           </div>

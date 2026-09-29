@@ -45,24 +45,36 @@ export async function ConsoleSchedule({
   const onLeaveStaffIds = new Set(leaves.map((l) => l.staffId));
 
   const customerIds = [...new Set(visits.map((v) => v.customerId))];
-  const carIds = [...new Set(visits.map((v) => v.carId))];
 
-  const [customers, cars, invoices] = await Promise.all([
+  const [customers, allCars, invoices, packages, doneVisits] = await Promise.all([
     customerIds.length
       ? store.customers.find({ where: { id: { in: customerIds } } as never })
       : Promise.resolve([]),
-    carIds.length
-      ? store.cars.find({ where: { id: { in: carIds } } as never })
+    customerIds.length
+      ? store.cars.find({ where: { customerId: { in: customerIds }, active: true } as never })
       : Promise.resolve([]),
     customerIds.length
       ? store.invoices.find({ where: { customerId: { in: customerIds } } as never })
       : Promise.resolve([]),
+    store.packages.find(),
+    customerIds.length
+      ? store.visits.find({ where: { customerId: { in: customerIds }, status: 'DONE' } as never })
+      : Promise.resolve([]),
   ]);
 
   const customerById = new Map(customers.map((c) => [c.id, c]));
-  const carById = new Map(cars.map((c) => [c.id, c]));
+  const carById = new Map(allCars.map((c) => [c.id, c]));
   const staffById = new Map(staff.map((s) => [s.id, s]));
   const areaById = new Map(areas.map((a) => [a.id, a]));
+  const packageById = new Map(packages.map((p) => [p.id, p]));
+
+  const carsByCustomer = new Map<string, typeof allCars>();
+  for (const c of allCars) {
+    const list = carsByCustomer.get(c.customerId) || [];
+    list.push(c);
+    carsByCustomer.set(c.customerId, list);
+  }
+
   const invoicesByCustomer = new Map<string, typeof invoices>();
   for (const inv of invoices) {
     const list = invoicesByCustomer.get(inv.customerId) || [];
@@ -91,21 +103,63 @@ export async function ConsoleSchedule({
     const staffMember = v.staffId ? staffById.get(v.staffId) : null;
     const area = areaById.get(v.areaId);
     const custInvoices = invoicesByCustomer.get(v.customerId) || [];
+    const custCars = carsByCustomer.get(v.customerId) || [];
     
-    // Calculate customer dues
+    // Calculate car-specific dues and payment status
     let customerDueAmount = 0;
     let customerDueStatus: ScheduleItem['customerDueStatus'] = null;
     let customerDueOn: string | null = null;
 
     if (custInvoices.length > 0) {
       const openInvoices = custInvoices.filter((i) => i.status !== 'PAID' && i.status !== 'WRITTEN_OFF');
+      const totalPaid = custInvoices.reduce((sum, i) => sum + i.paidAmount, 0);
+      const isOverdue = openInvoices.some((i) => i.status === 'OVERDUE' || i.dueOn < todayISO());
+      customerDueOn = openInvoices[0]?.dueOn ?? null;
+
       if (openInvoices.length === 0) {
         customerDueStatus = 'PAID';
-      } else {
+        customerDueAmount = 0;
+      } else if (custCars.length <= 1) {
         customerDueAmount = openInvoices.reduce((sum, i) => sum + (i.amount - i.paidAmount), 0);
-        const overdue = openInvoices.some((i) => i.status === 'OVERDUE' || i.dueOn < todayISO());
-        customerDueStatus = overdue ? 'OVERDUE' : 'DUE';
-        customerDueOn = openInvoices[0]?.dueOn ?? null;
+        customerDueStatus = customerDueAmount > 0 ? (isOverdue ? 'OVERDUE' : 'DUE') : 'PAID';
+      } else {
+        // Multi-car account: allocate paid amounts prioritizing cars that have completed washes
+        const sortedCars = [...custCars].sort((a, b) => {
+          const doneA = doneVisits.filter((dv) => dv.carId === a.id).length;
+          const doneB = doneVisits.filter((dv) => dv.carId === b.id).length;
+          if ((doneA > 0) !== (doneB > 0)) {
+            return doneA > 0 ? -1 : 1;
+          }
+          if (doneA !== doneB) {
+            return doneB - doneA;
+          }
+          const startedA = a.serviceStartedAt
+            ? new Date(a.serviceStartedAt).getTime()
+            : a.serviceStarted ? 1 : 0;
+          const startedB = b.serviceStartedAt
+            ? new Date(b.serviceStartedAt).getTime()
+            : b.serviceStarted ? 1 : 0;
+          if (startedA !== startedB) {
+            return startedA - startedB;
+          }
+          return a.id.localeCompare(b.id);
+        });
+
+        let remainingPaid = totalPaid;
+        let carDue = 0;
+        for (const c of sortedCars) {
+          const pkg = packageById.get(c.packageId);
+          const price = pkg?.price ?? 0;
+          const allocated = Math.min(price, remainingPaid);
+          remainingPaid -= allocated;
+          const due = Math.max(0, price - allocated);
+          if (c.id === v.carId) {
+            carDue = due;
+            break;
+          }
+        }
+        customerDueAmount = carDue;
+        customerDueStatus = carDue > 0 ? (isOverdue ? 'OVERDUE' : 'DUE') : 'PAID';
       }
     }
 

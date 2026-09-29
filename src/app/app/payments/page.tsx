@@ -3,6 +3,7 @@ import { Row } from '@/components/ui/primitives';
 import {
   IconBox,
   IconCalendar,
+  IconCar,
   IconCreditCard,
   IconRupee,
   IconWallet,
@@ -163,6 +164,80 @@ export default async function CustomerPayments() {
           />
         </div>
       </div>
+
+      {/* 3.1 Per-Vehicle Subscription & Payment Status */}
+      {account.cars.length > 0 && (
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-2xs">
+          <div className="flex items-start sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+            <div className="flex items-start sm:items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-blue-100 bg-blue-50 text-blue-600">
+                <IconCar width={20} height={20} />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Vehicle Subscriptions &amp; Paid Status</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Package rate, payment allocation, and wash quota for each car</p>
+              </div>
+            </div>
+
+            <span className="shrink-0 whitespace-nowrap rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700 border border-slate-200/60">
+              {account.cars.length} {account.cars.length === 1 ? 'vehicle' : 'vehicles'}
+            </span>
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3.5">
+            {account.cars.map((car) => {
+              const isPaid = car.payment.due === 0;
+              return (
+                <div
+                  key={car.id}
+                  className={`rounded-xl border p-4 transition-all ${
+                    isPaid
+                      ? 'border-emerald-200/80 bg-emerald-50/30'
+                      : 'border-amber-200/80 bg-amber-50/30'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="font-bold text-sm text-slate-900 flex items-center gap-2">
+                        <span>{car.make} {car.model}</span>
+                        <span className="font-mono text-xs font-semibold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">
+                          {car.plate}
+                        </span>
+                      </div>
+                      <div className="text-xs text-slate-500 font-medium mt-1">
+                        Package: <strong className="text-slate-800">{car.package?.name ?? 'Plan'}</strong> · {car.package?.washesPerMonth ?? 8} washes/mo
+                      </div>
+                    </div>
+
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold shrink-0 border ${
+                        isPaid
+                          ? 'bg-emerald-100/90 text-emerald-800 border-emerald-300'
+                          : car.payment.status === 'OVERDUE'
+                          ? 'bg-rose-100 text-rose-800 border-rose-300'
+                          : 'bg-amber-100 text-amber-900 border-amber-300'
+                      }`}
+                    >
+                      {isPaid
+                        ? `✓ Paid (${money(car.payment.paid)})`
+                        : `Due: ${money(car.payment.due)}`}
+                    </span>
+                  </div>
+
+                  <div className="mt-3.5 pt-3 border-t border-slate-200/60 flex items-center justify-between text-xs">
+                    <span className="text-slate-500 font-medium">
+                      Monthly Package Rate: <strong className="text-slate-900">{money(car.payment.price)}</strong>
+                    </span>
+                    <span className="text-slate-600 font-semibold">
+                      {car.tally.done} of {car.package?.washesPerMonth ?? 0} washes done
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* 4. Account Summary Ledger */}
       <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-2xs">

@@ -55,15 +55,17 @@ export default async function CustomerHome() {
     ? account.cars.find((c) => c.id === account.nextVisit!.carId)
     : account.cars[0] ?? null;
 
-  const washesLeft = account.cars.reduce((sum, c) => sum + c.tally.remaining, 0);
-  const washesTotal = account.cars.reduce(
-    (sum, c) => sum + (c.package?.washesPerMonth ?? (c.tally.done + c.tally.remaining || 0)),
+  const activeCars = account.cars.filter((c) => c.active && (c.serviceStarted ?? true));
+  const washesLeft = activeCars.reduce((sum, c) => sum + c.tally.remaining, 0);
+  const washesDone = activeCars.reduce((sum, c) => sum + c.tally.done, 0);
+  const washesTotal = activeCars.reduce(
+    (sum, c) => sum + (c.package?.washesPerMonth ?? 8),
     0,
   );
 
   const washPercentage =
     washesTotal > 0
-      ? Math.min(100, Math.round(((washesTotal - washesLeft) / washesTotal) * 100))
+      ? Math.min(100, Math.max(0, Math.round((washesDone / washesTotal) * 100)))
       : 0;
 
   // Compile real recent bookings list with exact wash details
@@ -287,8 +289,8 @@ export default async function CustomerHome() {
             </div>
 
             <div className="mt-4 text-xs text-slate-500 font-medium">
-              across <strong className="text-slate-900 font-bold">{account.cars.length}</strong>{' '}
-              {account.cars.length === 1 ? 'car' : 'cars'}
+              across <strong className="text-slate-900 font-bold">{activeCars.length}</strong>{' '}
+              {activeCars.length === 1 ? 'car' : 'cars'}
             </div>
           </div>
 
@@ -380,6 +382,21 @@ export default async function CustomerHome() {
                         </div>
                         <div className="text-[11px] font-mono uppercase text-slate-400 font-medium mt-0.5 truncate">
                           {car.plate}
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <span className="text-[10.5px] font-medium text-slate-500 truncate max-w-[110px]">
+                            {car.package?.name ?? 'Plan'}
+                          </span>
+                          <span className="text-slate-300">•</span>
+                          {car.payment.due === 0 ? (
+                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded">
+                              ✓ Paid
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded">
+                              Due: ₹{car.payment.due.toLocaleString('en-IN')}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>

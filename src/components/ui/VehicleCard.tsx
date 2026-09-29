@@ -10,6 +10,12 @@ export interface VehicleCardProps {
   name?: string;
   plate?: string;
   package?: string;
+  paymentStatus?: {
+    price: number;
+    paid: number;
+    due: number;
+    status: 'PAID' | 'DUE' | 'OVERDUE';
+  };
   colour?: string;
   doneWashes: number;
   totalWashes: number;
@@ -30,6 +36,7 @@ export const VehicleCard: React.FC<VehicleCardProps> = ({
   name,
   plate,
   package: pkgName,
+  paymentStatus,
   colour,
   doneWashes,
   totalWashes,
@@ -121,6 +128,21 @@ export const VehicleCard: React.FC<VehicleCardProps> = ({
           <div className="flex items-center justify-between border-b border-slate-50 py-1">
             <span className="font-medium text-slate-500">Package</span>
             <span className="font-semibold text-slate-900">{pkgName}</span>
+          </div>
+        )}
+
+        {paymentStatus && (
+          <div className="flex items-center justify-between border-b border-slate-50 py-1">
+            <span className="font-medium text-slate-500">Payment</span>
+            {paymentStatus.due === 0 ? (
+              <span className="font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded text-[11px]">
+                ✓ Paid (₹{paymentStatus.paid.toLocaleString('en-IN')})
+              </span>
+            ) : (
+              <span className="font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded text-[11px]">
+                Due: ₹{paymentStatus.due.toLocaleString('en-IN')}
+              </span>
+            )}
           </div>
         )}
 

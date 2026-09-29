@@ -12,48 +12,57 @@ async function main() {
     throw new Error('No SUPER_ADMIN user found — aborting to avoid locking everyone out.');
   }
   const adminIds = admins.map((a) => a.id);
-  process.stdout.write(`Keeping ${admins.length} SUPER_ADMIN user(s): ${admins.map((a) => a.email).join(', ')}\n`);
+  process.stdout.write(`Keeping ${admins.length} SUPER_ADMIN user(s): ${admins.map((a) => a.email || a.name).join(', ')}\n\n`);
 
-  // Delete children before parents to satisfy FK constraints.
-  const deletions: Array<() => Promise<{ count: number }>> = [
-    () => prisma.notification.deleteMany({}),
-    () => prisma.stockIssue.deleteMany({}),
-    () => prisma.purchaseRequest.deleteMany({}),
-    () => prisma.stockLevel.deleteMany({}),
-    () => prisma.inventoryItem.deleteMany({}),
-    () => prisma.complaint.deleteMany({}),
-    () => prisma.staffPayout.deleteMany({}),
-    () => prisma.expense.deleteMany({}),
-    () => prisma.invoice.deleteMany({}),
-    () => prisma.payment.deleteMany({}),
-    () => prisma.washVisit.deleteMany({}),
-    () => prisma.car.deleteMany({}),
-    () => prisma.customer.deleteMany({}),
-    () => prisma.staffLeave.deleteMany({}),
-    () => prisma.pocketMoneyRequest.deleteMany({}),
-    () => prisma.attendance.deleteMany({}),
-    () => prisma.staff.deleteMany({}),
-    () => prisma.userCredential.deleteMany({ where: { userId: { notIn: adminIds } } }),
-    () => prisma.user.deleteMany({ where: { id: { notIn: adminIds } } }),
-    () => prisma.area.deleteMany({}),
-    () => prisma.region.deleteMany({}),
-    () => prisma.enquiry.deleteMany({}),
-    () => prisma.servicePackage.deleteMany({}),
-    () => prisma.appSettings.deleteMany({}),
-    () => prisma.payoutSettings.deleteMany({}),
-    () => prisma.siteContent.deleteMany({}),
-  ];
-
-  for (const del of deletions) {
-    const result = await del();
-    process.stdout.write(`  deleted ${result.count} rows\n`);
-  }
-
-  // Clean up any dangling regionId/areaId/customerId/staffId references on the admin users.
+  // First, sever any foreign key links on admin users so parent tables can be deleted later.
   await prisma.user.updateMany({
     where: { id: { in: adminIds } },
     data: { regionId: null, areaId: null, customerId: null, staffId: null },
   });
+  process.stdout.write('  cleared dangling references on SUPER_ADMIN accounts\n');
+
+  // Delete children before parents to satisfy FK constraints.
+  const deletions: Array<{ name: string; run: () => Promise<{ count: number }> }> = [
+    { name: 'notification', run: () => prisma.notification.deleteMany({}) },
+    { name: 'customerRequest', run: () => prisma.customerRequest.deleteMany({}) },
+    { name: 'staffReferral', run: () => prisma.staffReferral.deleteMany({}) },
+    { name: 'stockIssue', run: () => prisma.stockIssue.deleteMany({}) },
+    { name: 'purchaseRequest', run: () => prisma.purchaseRequest.deleteMany({}) },
+    { name: 'stockLevel', run: () => prisma.stockLevel.deleteMany({}) },
+    { name: 'inventoryItem', run: () => prisma.inventoryItem.deleteMany({}) },
+    { name: 'complaint', run: () => prisma.complaint.deleteMany({}) },
+    { name: 'staffPayout', run: () => prisma.staffPayout.deleteMany({}) },
+    { name: 'expense', run: () => prisma.expense.deleteMany({}) },
+    { name: 'washVisit', run: () => prisma.washVisit.deleteMany({}) },
+    { name: 'invoice', run: () => prisma.invoice.deleteMany({}) },
+    { name: 'payment', run: () => prisma.payment.deleteMany({}) },
+    { name: 'car', run: () => prisma.car.deleteMany({}) },
+    { name: 'customer', run: () => prisma.customer.deleteMany({}) },
+    { name: 'staffLeave', run: () => prisma.staffLeave.deleteMany({}) },
+    { name: 'pocketMoneyRequest', run: () => prisma.pocketMoneyRequest.deleteMany({}) },
+    { name: 'attendance', run: () => prisma.attendance.deleteMany({}) },
+    { name: 'staff', run: () => prisma.staff.deleteMany({}) },
+    {
+      name: 'userCredential',
+      run: () => prisma.userCredential.deleteMany({ where: { userId: { notIn: adminIds } } }),
+    },
+    {
+      name: 'user',
+      run: () => prisma.user.deleteMany({ where: { id: { notIn: adminIds } } }),
+    },
+    { name: 'area', run: () => prisma.area.deleteMany({}) },
+    { name: 'region', run: () => prisma.region.deleteMany({}) },
+    { name: 'enquiry', run: () => prisma.enquiry.deleteMany({}) },
+    { name: 'servicePackage', run: () => prisma.servicePackage.deleteMany({}) },
+    { name: 'appSettings', run: () => prisma.appSettings.deleteMany({}) },
+    { name: 'payoutSettings', run: () => prisma.payoutSettings.deleteMany({}) },
+    { name: 'siteContent', run: () => prisma.siteContent.deleteMany({}) },
+  ];
+
+  for (const del of deletions) {
+    const result = await del.run();
+    process.stdout.write(`  deleted ${result.count} rows from ${del.name}\n`);
+  }
 
   process.stdout.write('\nDatabase reset complete. Only SUPER_ADMIN user(s) remain.\n');
 }

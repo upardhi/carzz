@@ -75,6 +75,53 @@ export async function ConsoleCustomerDetail({
     .filter((v) => v.status !== 'PENDING')
     .slice(0, 12);
 
+  const activeCars = cars.filter((c) => c.active && (c.serviceStarted ?? true));
+  const sortedActiveCars = [...activeCars].sort((a, b) => {
+    const doneA = visits.filter((v) => v.carId === a.id && v.status === 'DONE').length;
+    const doneB = visits.filter((v) => v.carId === b.id && v.status === 'DONE').length;
+    if ((doneA > 0) !== (doneB > 0)) {
+      return doneA > 0 ? -1 : 1;
+    }
+    if (doneA !== doneB) {
+      return doneB - doneA;
+    }
+    const startedA = a.serviceStartedAt
+      ? new Date(a.serviceStartedAt).getTime()
+      : a.serviceStarted ? 1 : 0;
+    const startedB = b.serviceStartedAt
+      ? new Date(b.serviceStartedAt).getTime()
+      : b.serviceStarted ? 1 : 0;
+    if (startedA !== startedB) {
+      return startedA - startedB;
+    }
+    return a.id.localeCompare(b.id);
+  });
+
+  const totalInvoicePaid = invoices.reduce((sum, i) => sum + i.paidAmount, 0);
+  let remainingPaidForCars = totalInvoicePaid;
+  const carPaymentsMap = new Map<string, { price: number; paid: number; due: number }>();
+  for (const c of sortedActiveCars) {
+    const price = c.package?.price ?? 0;
+    const allocated = Math.min(price, remainingPaidForCars);
+    remainingPaidForCars -= allocated;
+    const due = Math.max(0, price - allocated);
+    carPaymentsMap.set(c.id, { price, paid: allocated, due });
+  }
+
+  const carsPaymentInfo = activeCars.map((c) => {
+    const payInfo = carPaymentsMap.get(c.id) || {
+      price: c.package?.price ?? 0,
+      paid: 0,
+      due: c.package?.price ?? 0,
+    };
+    return {
+      id: c.id,
+      name: `${c.make} ${c.model} (${c.plate})`,
+      price: payInfo.price,
+      due: payInfo.due,
+    };
+  });
+
   return (
     <>
       <PageHeader
@@ -302,6 +349,7 @@ export async function ConsoleCustomerDetail({
               {cars.map((car) => {
                 const isStarted = car.serviceStarted ?? true;
                 const today = todayISO();
+                const carPay = carPaymentsMap.get(car.id);
                 const todaysVisit = visits.find(
                   (v) => v.carId === car.id && v.scheduledDate === today,
                 );
@@ -335,6 +383,13 @@ export async function ConsoleCustomerDetail({
                             )}
                           </div>
                           <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                            {carPay && (
+                              carPay.due === 0 ? (
+                                <Tag tone="ok">✓ Paid (₹{carPay.price.toLocaleString('en-IN')})</Tag>
+                              ) : (
+                                <Tag tone="bad">Due: ₹{carPay.due.toLocaleString('en-IN')}</Tag>
+                              )
+                            )}
                             {isStarted ? (
                               car.serviceStartedBeforePayment ? (
                                 <Tag tone="warn">Started Before Payment (Override)</Tag>
@@ -665,6 +720,7 @@ export async function ConsoleCustomerDetail({
                   outstanding={account.outstanding}
                   monthly={account.monthly}
                   invoices={invoices}
+                  cars={carsPaymentInfo}
                 />
               </div>
             </Card>

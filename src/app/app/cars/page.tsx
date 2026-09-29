@@ -125,6 +125,7 @@ export default async function CustomerCars() {
                 name={`${car.make} ${car.model}`.trim() || car.plate}
                 plate={car.plate}
                 package={car.package?.name}
+                paymentStatus={car.payment}
                 colour={car.colour || undefined}
                 doneWashes={doneCount}
                 totalWashes={totalCount}

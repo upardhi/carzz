@@ -8,7 +8,7 @@ import type {
   Id,
   WashVisit,
 } from '../data/types';
-import { parsePackageServices, WEEKDAY_NUM } from '../data/types';
+import { WEEKDAY_NUM } from '../data/types';
 
 import { todayISO } from '../util/format';
 
@@ -79,10 +79,7 @@ export async function scheduleNextVisitForCar(
   }
 
   const pkg = await store.packages.get(car.packageId);
-  const parsedServices = parsePackageServices(pkg?.services, pkg?.washesPerMonth ?? 8);
-  const quota = parsedServices.length > 0
-    ? parsedServices.reduce((sum, s) => sum + s.washesPerMonth, 0)
-    : (pkg?.washesPerMonth ?? 8);
+  const quota = pkg?.washesPerMonth ?? 8;
 
   // Get all visits for this car in the cycle
   const existing = await store.visits.find({

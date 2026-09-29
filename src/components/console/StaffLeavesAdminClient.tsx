@@ -517,62 +517,125 @@ export function StaffLeavesAdminClient({
           {
             id: 'actions',
             header: 'ACTIONS',
-            render: (l) => (
-              <div className="flex items-center gap-2">
-                {l.status === 'PENDING' ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => handleApprove(l)}
-                      className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white shadow-2xs hover:bg-emerald-700"
-                    >
-                      Approve
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setRejectingLeave(l);
-                        setRejectionReason('');
-                      }}
-                      className="rounded-lg bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 border border-rose-200 hover:bg-rose-100"
-                    >
-                      Reject
-                    </button>
-                  </>
-                ) : l.status === 'APPROVED' ? (
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const ok = await confirm({
-                        title: 'Cancel Approved Leave?',
-                        message: `Are you sure you want to cancel the approved leave for ${l.staffName}?`,
-                        confirmText: 'Yes, Cancel Leave',
-                        tone: 'danger',
-                      });
-                      if (!ok) return;
-                      await fetch('/api/ops/leaves', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ action: 'cancel', leaveId: l.id }),
-                      });
-                      setLeaves((prev) =>
-                        prev.map((item) =>
-                          item.id === l.id
-                            ? { ...item, status: 'CANCELLED' as LeaveStatus }
-                            : item,
-                        ),
-                      );
-                      router.refresh();
-                    }}
-                    className="rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"
-                  >
-                    Cancel
-                  </button>
-                ) : (
-                  <span className="text-[11px] text-slate-400">—</span>
-                )}
-              </div>
-            ),
+            render: (l) => {
+              const isPast = l.endDate < today;
+              const isOngoing = l.startDate <= today && l.endDate >= today;
+
+              return (
+                <div className="flex items-center gap-2">
+                  {l.status === 'PENDING' ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleApprove(l)}
+                        className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white shadow-2xs hover:bg-emerald-700"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRejectingLeave(l);
+                          setRejectionReason('');
+                        }}
+                        className="rounded-lg bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 border border-rose-200 hover:bg-rose-100"
+                      >
+                        Reject
+                      </button>
+                    </>
+                  ) : l.status === 'APPROVED' ? (
+                    isPast ? (
+                      <span className="text-[11px] font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded">
+                        Completed
+                      </span>
+                    ) : isOngoing && l.startDate < today ? (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const ok = await confirm({
+                            title: 'End Leave Early & Resume Duty?',
+                            message: `${l.staffName} was on leave up to yesterday. Ending early will cancel the remaining days (from today onwards) and mark ${l.staffName} back on duty.`,
+                            confirmText: 'Yes, End Early & Resume Duty',
+                            tone: 'primary',
+                          });
+                          if (!ok) return;
+                          setActionError(null);
+                          setActionMessage(null);
+                          try {
+                            const res = await fetch('/api/ops/leaves', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ action: 'cancel', leaveId: l.id }),
+                            });
+                            const data = await res.json();
+                            if (!res.ok) {
+                              setActionError(data.error || 'Could not end leave early.');
+                              return;
+                            }
+                            setActionMessage(data.message || `Leave ended early for ${l.staffName}.`);
+                            if (data.leave) {
+                              setLeaves((prev) =>
+                                prev.map((item) => (item.id === l.id ? { ...item, ...data.leave } : item)),
+                              );
+                            }
+                            router.refresh();
+                          } catch {
+                            setActionError('Network error while ending leave early.');
+                          }
+                        }}
+                        className="rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-800 hover:bg-amber-100 transition-colors"
+                      >
+                        End Early
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const isStartsToday = l.startDate === today;
+                          const ok = await confirm({
+                            title: isStartsToday ? 'Cancel Leave Starting Today?' : 'Cancel Upcoming Leave?',
+                            message: `Are you sure you want to cancel the approved leave for ${l.staffName}? Attendance records will be restored.`,
+                            confirmText: 'Yes, Cancel Leave',
+                            tone: 'danger',
+                          });
+                          if (!ok) return;
+                          setActionError(null);
+                          setActionMessage(null);
+                          try {
+                            const res = await fetch('/api/ops/leaves', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ action: 'cancel', leaveId: l.id }),
+                            });
+                            const data = await res.json();
+                            if (!res.ok) {
+                              setActionError(data.error || 'Could not cancel leave.');
+                              return;
+                            }
+                            setActionMessage(data.message || `Leave cancelled for ${l.staffName}.`);
+                            setLeaves((prev) =>
+                              prev.map((item) =>
+                                item.id === l.id
+                                  ? { ...item, status: 'CANCELLED' as LeaveStatus }
+                                  : item,
+                              ),
+                            );
+                            router.refresh();
+                          } catch {
+                            setActionError('Network error while cancelling leave.');
+                          }
+                        }}
+                        className="rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    )
+                  ) : (
+                    <span className="text-[11px] text-slate-400">—</span>
+                  )}
+                </div>
+              );
+            },
           },
         ]}
       />
