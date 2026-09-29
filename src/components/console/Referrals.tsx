@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { PageHeader } from '@/components/shell/ConsoleShell';
 import { Card } from '@/components/ui/primitives';
 import { StatCard, StatGrid } from '@/components/ui/StatCard';
@@ -32,6 +33,12 @@ export async function ConsoleReferrals({ session }: { session: Session }) {
 
   const staffById = new Map(staff.map((s) => [s.id, s]));
   const isSuperAdmin = session.user.role === 'SUPER_ADMIN';
+  const basePath =
+    session.user.role === 'SUPER_ADMIN'
+      ? '/admin'
+      : session.user.role === 'AREA_ADMIN'
+      ? '/area'
+      : '/manager';
 
   const pending = referrals.filter((r) => r.status === 'PENDING' || r.status === 'AREA_APPROVED');
   const approved = referrals.filter((r) => r.status === 'APPROVED');
@@ -131,6 +138,42 @@ export async function ConsoleReferrals({ session }: { session: Session }) {
                           Reject
                         </ActionButton>
                       </>
+                    ) : r.status === 'APPROVED' ? (
+                      r.type === 'CUSTOMER' ? (
+                        r.convertedCustomerId ? (
+                          <Link
+                            href={`${basePath}/customers/${r.convertedCustomerId}`}
+                            className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 transition-colors"
+                          >
+                            <span>✓</span>
+                            <span>Customer Added</span>
+                          </Link>
+                        ) : (
+                          <Link
+                            href={`${basePath}/customers/new?referralId=${r.id}`}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 text-xs font-bold shadow-xs transition-colors"
+                          >
+                            <span>+</span>
+                            <span>Add Customer</span>
+                          </Link>
+                        )
+                      ) : r.convertedStaffId ? (
+                        <Link
+                          href={`${basePath}/staff`}
+                          className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 transition-colors"
+                        >
+                          <span>✓</span>
+                          <span>Staff Added</span>
+                        </Link>
+                      ) : (
+                        <Link
+                          href={`${basePath}/staff/new?referralId=${r.id}`}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 text-xs font-bold shadow-xs transition-colors"
+                        >
+                          <span>+</span>
+                          <span>Add Staff</span>
+                        </Link>
+                      )
                     ) : null}
                   </div>
                 </div>

@@ -16,8 +16,9 @@ export default async function ManagerAddCustomer({
   const areaFilter = scopeAreaFilter(session.scope);
   const resolvedParams = searchParams ? await searchParams : {};
   const enquiryId = resolvedParams.enquiryId;
+  const referralId = resolvedParams.referralId;
 
-  const [areas, packages, staff, enquiry, rules, pendingReferrals] = await Promise.all([
+  const [areas, packages, staff, enquiry, rules, pendingReferrals, referral] = await Promise.all([
     store.areas.find({ orderBy: [{ field: 'name' }] }),
     store.packages.find({ where: { active: true } }),
     store.staff.find({
@@ -29,6 +30,7 @@ export default async function ManagerAddCustomer({
     store.staffReferrals.find({
       where: { type: 'CUSTOMER', status: 'APPROVED', convertedCustomerId: null, ...areaFilter } as never,
     }),
+    referralId ? store.staffReferrals.get(referralId) : null,
   ]);
   const staffById = new Map(staff.map((s) => [s.id, s]));
 
@@ -50,6 +52,19 @@ export default async function ManagerAddCustomer({
       }
     : undefined;
 
+  const initialReferral =
+    referral && referral.type === 'CUSTOMER' && referral.status === 'APPROVED' && !referral.convertedCustomerId
+      ? {
+          id: referral.id,
+          name: referral.name,
+          phone: referral.phone,
+          areaId: referral.areaId,
+          referredByStaffId: referral.referredByStaffId,
+          referredByStaffName: staffById.get(referral.referredByStaffId)?.name ?? 'Unknown',
+          note: referral.note || undefined,
+        }
+      : undefined;
+
   return (
     <>
       <PageHeader
@@ -59,6 +74,7 @@ export default async function ManagerAddCustomer({
       <AddCustomerForm
         onSavedHref="/manager/customers"
         initialEnquiry={initialEnquiry}
+        initialReferral={initialReferral}
         options={{
           areas: scopedAreas.map((a) => ({ id: a.id, name: a.name, city: a.city })),
           packages: packages.map((p) => ({
@@ -71,8 +87,9 @@ export default async function ManagerAddCustomer({
             services: p.services,
           })),
           staff: staff.map((s) => ({ id: s.id, name: s.name, areaId: s.areaId })),
-          defaultAreaId: initialEnquiry?.areaId ?? scopedAreas[0]?.id ?? '',
+          defaultAreaId: initialReferral?.areaId ?? initialEnquiry?.areaId ?? scopedAreas[0]?.id ?? '',
           carReferralBonus: rules.carReferralBonus,
+          allowChangeReferrer: false,
           approvedReferrals: pendingReferrals.map((r) => ({
             id: r.id,
             areaId: r.areaId,
