@@ -410,16 +410,11 @@ export function CarWashHistoryModal({
                       )}
 
                       {/* Ratings & Comments */}
-                      {(visit.rating !== null || visit.managerRating !== null || visit.ratingComment) && (
+                      {(visit.rating !== null || visit.ratingComment) && (
                         <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center gap-3">
                           {visit.rating !== null && (
                             <span className="inline-flex items-center gap-1 font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded text-[11px]">
-                              <IconStar width={12} height={12} /> {visit.rating} ★ Customer
-                            </span>
-                          )}
-                          {visit.managerRating !== null && (
-                            <span className="inline-flex items-center gap-1 font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded text-[11px]">
-                              <IconStar width={12} height={12} /> {visit.managerRating} ★ Manager
+                              <IconStar width={12} height={12} /> {visit.rating} ★ Customer Rating
                             </span>
                           )}
                           {visit.ratingComment && (

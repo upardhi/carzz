@@ -359,16 +359,11 @@ export function FlaggedWashesModal({
                       )}
 
                       {/* Ratings or notes if any */}
-                      {(item.rating !== null || item.managerRating !== null || item.ratingComment) && (
+                      {(item.rating !== null || item.ratingComment) && (
                         <div className="mt-2 pt-2 border-t border-slate-100 flex flex-wrap items-center gap-3">
                           {item.rating !== null && (
                             <span className="inline-flex items-center gap-1 font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded text-[11px]">
-                              <IconStar width={12} height={12} /> {item.rating} ★ Customer
-                            </span>
-                          )}
-                          {item.managerRating !== null && (
-                            <span className="inline-flex items-center gap-1 font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded text-[11px]">
-                              <IconStar width={12} height={12} /> {item.managerRating} ★ Manager
+                              <IconStar width={12} height={12} /> {item.rating} ★ Customer Rating
                             </span>
                           )}
                           {item.ratingComment && (

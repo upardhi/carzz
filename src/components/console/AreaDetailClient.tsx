@@ -269,43 +269,6 @@ export function AreaDetailClient({
   // Photo modal state
   const [previewVisit, setPreviewVisit] = useState<WashItemData | null>(null);
 
-  // Manager rating of the wash currently open in the photo modal
-  const [ratingDraft, setRatingDraft] = useState(0);
-  const [ratingComment, setRatingComment] = useState('');
-  const [savingRating, setSavingRating] = useState(false);
-
-  useEffect(() => {
-    setRatingDraft(previewVisit?.managerRating ?? 0);
-    setRatingComment(previewVisit?.managerRatingComment ?? '');
-  }, [previewVisit]);
-
-  async function saveWashRating() {
-    if (!previewVisit || ratingDraft < 1) return;
-    setSavingRating(true);
-    try {
-      const res = await fetch('/api/ops/visits', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'rateWash',
-          visitId: previewVisit.id,
-          rating: ratingDraft,
-          comment: ratingComment.trim() || undefined,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not save the rating.');
-      toast.success('Rating saved.');
-      setPreviewVisit((v) =>
-        v ? { ...v, managerRating: ratingDraft, managerRatingComment: ratingComment.trim() || null } : v,
-      );
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not save the rating.');
-    } finally {
-      setSavingRating(false);
-    }
-  }
-
   // Reset wash page on search change
   useEffect(() => {
     setWashPage(1);
@@ -1572,51 +1535,20 @@ export function AreaDetailClient({
               </button>
             </div>
 
-            {/* Manager rating — how this wash was actually done, checked against
-                the photos above. Feeds the boy's performance record. */}
-            {previewVisit.status === 'DONE' ? (
-              <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50/60 p-4">
-                <p className="text-xs font-bold uppercase tracking-wider text-blue-800 mb-2">
-                  Your rating of this wash{previewVisit.staff ? ` — ${previewVisit.staff.name}` : ''}
-                </p>
-                <div className="flex items-center gap-1 mb-2.5">
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <button
-                      key={n}
-                      type="button"
-                      onClick={() => setRatingDraft(n)}
-                      className={clsx(
-                        'text-2xl leading-none transition-colors cursor-pointer',
-                        n <= ratingDraft ? 'text-amber-500' : 'text-slate-300 hover:text-amber-300',
-                      )}
-                      aria-label={`Rate ${n} star${n > 1 ? 's' : ''}`}
-                    >
-                      ★
-                    </button>
-                  ))}
+            {/* Customer Rating Display (Only customers rate washes) */}
+            {previewVisit.rating ? (
+              <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/70 p-3.5 space-y-1">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900">
+                  <span>Customer Rating:</span>
+                  <span className="text-amber-600 font-bold">
+                    {'★'.repeat(previewVisit.rating)} ({previewVisit.rating} / 5)
+                  </span>
                 </div>
-                <textarea
-                  value={ratingComment}
-                  onChange={(e) => setRatingComment(e.target.value)}
-                  placeholder="Optional note — what was good or wrong about this wash"
-                  rows={2}
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none"
-                />
-                <div className="mt-2.5 flex items-center justify-end gap-2">
-                  {previewVisit.managerRating ? (
-                    <span className="mr-auto text-[11px] font-semibold text-blue-700">
-                      Last saved: {previewVisit.managerRating} ★
-                    </span>
-                  ) : null}
-                  <button
-                    type="button"
-                    disabled={ratingDraft < 1 || savingRating}
-                    onClick={saveWashRating}
-                    className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 transition-colors disabled:opacity-50 cursor-pointer"
-                  >
-                    {savingRating ? 'Saving…' : 'Save Rating'}
-                  </button>
-                </div>
+                {previewVisit.ratingComment ? (
+                  <p className="text-xs text-amber-950 font-medium italic">
+                    &ldquo;{previewVisit.ratingComment}&rdquo;
+                  </p>
+                ) : null}
               </div>
             ) : null}
           </div>

@@ -102,47 +102,10 @@ export function ScheduleClient({
   // Wash inspection / rating modal
   const [visitList, setVisitList] = useState(visits);
   useEffect(() => setVisitList(visits), [visits]);
-  const [ratingVisit, setRatingVisit] = useState<ScheduleItem | null>(null);
-  const [ratingDraft, setRatingDraft] = useState(0);
-  const [ratingComment, setRatingComment] = useState('');
-  const [savingRating, setSavingRating] = useState(false);
+  const [inspectVisit, setInspectVisit] = useState<ScheduleItem | null>(null);
 
-  function openRatingModal(visit: ScheduleItem) {
-    setRatingVisit(visit);
-    setRatingDraft(visit.managerRating ?? 0);
-    setRatingComment(visit.managerRatingComment ?? '');
-  }
-
-  async function saveWashRating() {
-    if (!ratingVisit || ratingDraft < 1) return;
-    setSavingRating(true);
-    try {
-      const res = await fetch('/api/ops/visits', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'rateWash',
-          visitId: ratingVisit.id,
-          rating: ratingDraft,
-          comment: ratingComment.trim() || undefined,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not save the rating.');
-      toast.success('Rating saved.');
-      setVisitList((prev) =>
-        prev.map((v) =>
-          v.id === ratingVisit.id
-            ? { ...v, managerRating: ratingDraft, managerRatingComment: ratingComment.trim() || null }
-            : v,
-        ),
-      );
-      setRatingVisit(null);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not save the rating.');
-    } finally {
-      setSavingRating(false);
-    }
+  function openInspectModal(visit: ScheduleItem) {
+    setInspectVisit(visit);
   }
 
   useEffect(() => {
@@ -698,7 +661,7 @@ export function ScheduleClient({
               visit.rating ? (
                 <button
                   type="button"
-                  onClick={() => openRatingModal(visit)}
+                  onClick={() => openInspectModal(visit)}
                   className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors cursor-pointer"
                   title={visit.ratingComment || `${visit.rating} Stars by Customer (Click to inspect)`}
                 >
@@ -708,7 +671,7 @@ export function ScheduleClient({
               ) : visit.status === 'DONE' ? (
                 <button
                   type="button"
-                  onClick={() => openRatingModal(visit)}
+                  onClick={() => openInspectModal(visit)}
                   className="text-[11px] font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
                 >
                   Inspect
@@ -720,30 +683,30 @@ export function ScheduleClient({
         ]}
       />
 
-      {/* Wash inspection / rating modal */}
-      {ratingVisit ? (
+      {/* Wash inspection modal */}
+      {inspectVisit ? (
         <div
           role="dialog"
           aria-modal="true"
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-sm"
           onClick={(e) => {
-            if (e.target === e.currentTarget) setRatingVisit(null);
+            if (e.target === e.currentTarget) setInspectVisit(null);
           }}
         >
           <div className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
             <div className="mb-3 flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
                 <h3 className="text-base font-bold text-slate-900">
-                  Wash Inspection · {ratingVisit.carPlate}
+                  Wash Inspection · {inspectVisit.carPlate}
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  {ratingVisit.customerName} · {ratingVisit.carModel} ·{' '}
-                  {ratingVisit.staffName || 'Unassigned'}
+                  {inspectVisit.customerName} · {inspectVisit.carModel} ·{' '}
+                  {inspectVisit.staffName || 'Unassigned'}
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => setRatingVisit(null)}
+                onClick={() => setInspectVisit(null)}
                 className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-800 font-semibold transition-colors cursor-pointer"
                 aria-label="Close"
               >
@@ -756,10 +719,10 @@ export function ScheduleClient({
                 <p className="mb-1.5 text-[10.5px] font-bold uppercase tracking-wide text-slate-500">
                   Before
                 </p>
-                {ratingVisit.beforePhotoUrl ? (
+                {inspectVisit.beforePhotoUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={ratingVisit.beforePhotoUrl}
+                    src={inspectVisit.beforePhotoUrl}
                     alt="Before wash"
                     className="aspect-4/3 w-full rounded-lg object-cover"
                   />
@@ -773,10 +736,10 @@ export function ScheduleClient({
                 <p className="mb-1.5 text-[10.5px] font-bold uppercase tracking-wide text-slate-500">
                   After
                 </p>
-                {ratingVisit.afterPhotoUrl ? (
+                {inspectVisit.afterPhotoUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={ratingVisit.afterPhotoUrl}
+                    src={inspectVisit.afterPhotoUrl}
                     alt="After wash"
                     className="aspect-4/3 w-full rounded-lg object-cover"
                   />
@@ -791,51 +754,33 @@ export function ScheduleClient({
             <div className="mt-3 text-xs text-slate-500">
               {(() => {
                 const mins = washDurationMinutes({
-                  startedAt: ratingVisit.startedAt ?? null,
-                  completedAt: ratingVisit.completedAt ?? null,
+                  startedAt: inspectVisit.startedAt ?? null,
+                  completedAt: inspectVisit.completedAt ?? null,
                 });
                 return mins !== null ? `Took ${formatDurationMinutes(mins)}` : null;
               })()}
-              {ratingVisit.rating ? ` · Customer rated: ${ratingVisit.rating} ★` : ''}
             </div>
 
-            <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50/60 p-4">
-              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-blue-800">
-                Your rating of this wash
-              </p>
-              <div className="mb-2.5 flex items-center gap-1">
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={() => setRatingDraft(n)}
-                    className={`text-2xl leading-none transition-colors cursor-pointer ${
-                      n <= ratingDraft ? 'text-amber-500' : 'text-slate-300 hover:text-amber-300'
-                    }`}
-                    aria-label={`Rate ${n} star${n > 1 ? 's' : ''}`}
-                  >
-                    ★
-                  </button>
-                ))}
+            {/* Customer Rating Display (Only customers rate washes) */}
+            {inspectVisit.rating ? (
+              <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/70 p-3.5 space-y-1">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900">
+                  <span>Customer Rating:</span>
+                  <span className="text-amber-600 font-bold">
+                    {'★'.repeat(inspectVisit.rating)} ({inspectVisit.rating} / 5)
+                  </span>
+                </div>
+                {inspectVisit.ratingComment ? (
+                  <p className="text-xs text-amber-950 font-medium italic">
+                    &ldquo;{inspectVisit.ratingComment}&rdquo;
+                  </p>
+                ) : null}
               </div>
-              <textarea
-                value={ratingComment}
-                onChange={(e) => setRatingComment(e.target.value)}
-                placeholder="Optional note — what was good or wrong about this wash"
-                rows={2}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none"
-              />
-              <div className="mt-2.5 flex justify-end">
-                <button
-                  type="button"
-                  disabled={ratingDraft < 1 || savingRating}
-                  onClick={saveWashRating}
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 transition-colors disabled:opacity-50 cursor-pointer"
-                >
-                  {savingRating ? 'Saving…' : 'Save Rating'}
-                </button>
+            ) : (
+              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500 text-center">
+                No customer rating submitted for this wash yet.
               </div>
-            </div>
+            )}
           </div>
         </div>
       ) : null}
