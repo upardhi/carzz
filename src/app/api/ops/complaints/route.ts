@@ -6,6 +6,7 @@ import { scopeAreaFilter } from '@/lib/auth/rbac';
 import { getStore } from '@/lib/data';
 import type { ComplaintStatus, Complaint } from '@/lib/data/types';
 import type { Where } from '@/lib/data/ports/repository';
+import { invalidatePayoutRunCache } from '@/lib/services/payroll';
 import { assertInScope, opsError } from '../_guard';
 
 function revalidateComplaintPages() {
@@ -324,6 +325,36 @@ export async function POST(request: Request) {
         ? parsed.data.freeWashServices
         : (pkg?.services || ['Exterior wash']);
 
+      // Find the faulty visit that led to this complaint to revert washboy payment
+      let faultyVisit = complaint.visitId ? await store.visits.get(complaint.visitId) : null;
+      if (!faultyVisit) {
+        const recentCarVisits = await store.visits.find({
+          where: { carId: car.id, status: 'DONE' } as never,
+        });
+        faultyVisit = recentCarVisits.sort((a, b) =>
+          (b.completedAt || b.scheduledDate).localeCompare(a.completedAt || a.scheduledDate),
+        )[0] ?? null;
+      }
+
+      if (faultyVisit && !faultyVisit.payoutReverted) {
+        const revertReason = `Rewash booked due to customer complaint: ${parsed.data.resolution.trim()}`;
+        const updatedMissNote = faultyVisit.missNote
+          ? `${faultyVisit.missNote} · [Payout Reverted: ${revertReason}]`
+          : `[Payout Reverted: ${revertReason}]`;
+        try {
+          await store.visits.update(faultyVisit.id, {
+            payoutReverted: true,
+            payoutRevertReason: revertReason,
+            missNote: updatedMissNote,
+          });
+        } catch {
+          await store.visits.update(faultyVisit.id, {
+            missNote: updatedMissNote,
+          });
+        }
+        invalidatePayoutRunCache();
+      }
+
       freeWashVisit = await store.visits.create({
         carId: car.id,
         customerId: customer.id,
@@ -342,7 +373,7 @@ export async function POST(request: Request) {
         beforePhotoBytes: null,
         afterPhotoBytes: null,
         missReason: null,
-        missNote: `[Free Compensatory Wash] ${parsed.data.resolution.trim()}`,
+        missNote: `[Free Compensatory Wash] ${parsed.data.resolution.trim()}${faultyVisit ? ` (Replacement for faulty wash on ${faultyVisit.scheduledDate})` : ''}`,
         rescheduledToVisitId: null,
         rating: null,
         ratingComment: null,

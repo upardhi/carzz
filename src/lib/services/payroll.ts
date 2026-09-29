@@ -34,12 +34,20 @@ function calculatePayoutRecord({
   carsReferred: number;
   existing: StaffPayout | null;
 }): StaffPayout {
+  /* --- separate eligible and reverted washes --- */
+  const eligibleVisits = visits.filter(
+    (v) => !v.payoutReverted && !v.missNote?.includes('[Payout Reverted]'),
+  );
+  const revertedVisits = visits.filter(
+    (v) => Boolean(v.payoutReverted) || Boolean(v.missNote?.includes('[Payout Reverted]')),
+  );
+
   /* --- base pay, by whichever rule the owner has set --- */
   let base = 0;
   if (rules.baseMode === 'DAY_SLAB') {
     // A rising rate by the car's position in that day's route.
     const byDate = new Map<string, number>();
-    for (const visit of [...visits].sort((a, b) =>
+    for (const visit of [...eligibleVisits].sort((a, b) =>
       a.scheduledDate.localeCompare(b.scheduledDate) ||
       a.scheduledTime.localeCompare(b.scheduledTime),
     )) {
@@ -48,12 +56,12 @@ function calculatePayoutRecord({
       base += rules.slabByCarIndex[index] ?? rules.slabBeyond;
     }
   } else {
-    base = visits.length * rules.perWashRate;
+    base = eligibleVisits.length * rules.perWashRate;
   }
 
-  /* --- bonuses --- */
-  const onTime = visits.filter((v) => v.onTime).length;
-  const goodReviews = visits.filter(
+  /* --- bonuses (only for non-reverted successful washes) --- */
+  const onTime = eligibleVisits.filter((v) => v.onTime).length;
+  const goodReviews = eligibleVisits.filter(
     (v) => (v.rating ?? 0) >= rules.goodReviewMinStars,
   ).length;
 
@@ -89,7 +97,7 @@ function calculatePayoutRecord({
   const lines: PayoutLine[] = [
     {
       label: 'Washes completed',
-      qty: visits.length,
+      qty: eligibleVisits.length,
       rate: null,
       amount: base,
       kind: 'EARNING',
@@ -127,6 +135,17 @@ function calculatePayoutRecord({
       kind: 'EARNING',
     },
   ];
+
+  if (revertedVisits.length > 0) {
+    lines.push({
+      label: 'Rewash Reversals (Faulty Washes)',
+      qty: revertedVisits.length,
+      rate: null,
+      amount: 0,
+      kind: 'DEDUCTION',
+      detail: `${revertedVisits.length} wash${revertedVisits.length > 1 ? 'es' : ''} uncredited due to customer complaint & rewash booking`,
+    });
+  }
 
   if (offPenalty > 0) {
     lines.push({
@@ -167,7 +186,7 @@ function calculatePayoutRecord({
     staffId: staff.id,
     areaId: staff.areaId,
     cycle,
-    washes: visits.length,
+    washes: eligibleVisits.length,
     base,
     bonuses,
     referrals,

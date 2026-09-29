@@ -546,6 +546,8 @@ model WashVisit {
   managerRatingComment String?
   managerRatedAt       DateTime?
   managerRatedByUserId String?
+  payoutReverted       Boolean?    @default(false)
+  payoutRevertReason   String?
 
   car      Car      @relation(fields: [carId], references: [id], onDelete: Cascade)
   customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)

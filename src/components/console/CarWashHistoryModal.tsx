@@ -326,6 +326,12 @@ export function CarWashHistoryModal({
                         </span>
                       )}
 
+                      {(visit.payoutReverted || visit.missNote?.includes('[Payout Reverted]')) && (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-rose-300 bg-rose-50 px-2 py-0.5 text-[11px] font-bold text-rose-700">
+                          ⚠️ Earning Reverted (Rewash)
+                        </span>
+                      )}
+
                       {visit.status === 'DONE' ? (
                         <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
                           <IconCheck width={12} height={12} strokeWidth={3} /> Done

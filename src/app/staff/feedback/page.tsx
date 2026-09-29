@@ -40,6 +40,12 @@ export default async function StaffFeedback() {
       managerRating: v.managerRating,
       managerComment: v.managerRatingComment,
       onTime: v.onTime,
+      payoutReverted: Boolean(v.payoutReverted) || Boolean(v.missNote?.includes('[Payout Reverted]')),
+      payoutRevertReason:
+        v.payoutRevertReason ||
+        (v.missNote?.includes('[Payout Reverted:')
+          ? v.missNote.split('[Payout Reverted:')[1]?.replace(']', '').trim()
+          : null),
     };
   });
 
@@ -146,6 +152,19 @@ export default async function StaffFeedback() {
                     ) : null}
                   </div>
                 </div>
+
+                {f.payoutReverted && (
+                  <div className="mb-2.5 rounded-lg border border-rose-300 bg-rose-50 p-2.5 text-xs text-rose-950">
+                    <div className="flex items-center gap-1.5 font-bold text-rose-800">
+                      <span>⚠️ Wash Earning Reverted (Customer Complaint / Rewash)</span>
+                    </div>
+                    {f.payoutRevertReason && (
+                      <div className="mt-1 text-[11px] text-rose-700 leading-relaxed">
+                        {f.payoutRevertReason}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {f.servicesDone.length > 0 ? (
                   <div className="mb-2.5 flex flex-wrap gap-1">

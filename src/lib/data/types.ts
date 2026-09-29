@@ -496,6 +496,9 @@ export interface WashVisit {
   managerRatingComment: string | null;
   managerRatedAt: Timestamp | null;
   managerRatedByUserId: Id | null;
+  /** When a wash had complaints and a rewash was booked, this marks the faulty wash's payout as reverted */
+  payoutReverted?: boolean | null;
+  payoutRevertReason?: string | null;
 }
 
 /* -------------------------------------------------------------------------- */
