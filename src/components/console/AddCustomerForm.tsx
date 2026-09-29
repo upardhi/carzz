@@ -277,6 +277,7 @@ export function AddCustomerForm({
   });
 
   const areaReferrals = options.approvedReferrals.filter((r) => r.areaId === areaId);
+  const currentReferral = options.approvedReferrals.find((r) => r.id === referralId);
   const areaStaff = options.staff.filter((s) => s.areaId === areaId);
   const currentArea = options.areas.find((a) => a.id === areaId);
 
