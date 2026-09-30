@@ -1,25 +1,20 @@
-import Link from 'next/link';
 import {
   IconCalendar,
   IconCar,
-  IconCheck,
-  IconChevron,
-  IconMap,
   IconRupee,
   IconWallet,
 } from '@/components/shell/icons';
+import { StaffWashQueue, type WashQueueItem } from '@/components/staff/StaffWashQueue';
 import { requirePermission } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { computeDailyVisitsEarnings, computePayout } from '@/lib/services/payroll';
 import { visitsForDate } from '@/lib/services/schedule';
 import {
   currentCycle,
-  formatClock,
-  formatTime,
   money,
   todayISO,
 } from '@/lib/util/format';
-import { MISS_REASON_LABEL } from '@/lib/util/labels';
+import { resolvePublicPhotoUrl } from '@/lib/util/photoUrl';
 
 export const metadata = { title: 'Today' };
 
@@ -54,6 +49,33 @@ export default async function StaffToday() {
   ).length;
 
   const earnedToday = computeDailyVisitsEarnings(visits, rules);
+
+  const queueItems: WashQueueItem[] = visits.map((visit) => {
+    const customer = customerById.get(visit.customerId);
+    const car = carById.get(visit.carId);
+    return {
+      id: visit.id,
+      customerId: visit.customerId,
+      carId: visit.carId,
+      customerName: customer?.name || 'Customer',
+      customerAddress: customer?.address || '',
+      customerLandmark: customer?.landmark || null,
+      customerNote: customer?.note || null,
+      carPlate: car?.plate || '—',
+      carMake: car?.make || '',
+      carModel: car?.model || '',
+      scheduledTime: visit.scheduledTime,
+      status: visit.status,
+      startedAt: visit.startedAt,
+      completedAt: visit.completedAt,
+      beforePhotoUrl: resolvePublicPhotoUrl(visit.beforePhotoUrl),
+      afterPhotoUrl: resolvePublicPhotoUrl(visit.afterPhotoUrl),
+      plannedService: visit.plannedService,
+      servicesDone: visit.servicesDone || [],
+      missReason: visit.missReason,
+      missNote: visit.missNote,
+    };
+  });
 
   return (
     <div className="space-y-5">
@@ -168,7 +190,7 @@ export default async function StaffToday() {
             <div>
               <h3 className="text-base font-bold text-slate-900">Today&apos;s Route & Schedule</h3>
               <p className="text-xs text-slate-500">
-                Assigned wash queue in your area. Tap to open wash camera and checklist.
+                Assigned wash queue in your area with live cleaning timer and quick finish.
               </p>
             </div>
           </div>
@@ -178,138 +200,9 @@ export default async function StaffToday() {
           </span>
         </div>
 
-        {visits.length === 0 ? (
-          <div className="py-12 text-center">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
-              <IconCar width={24} height={24} />
-            </div>
-            <h4 className="mt-3 text-sm font-bold text-slate-900">No cars assigned today</h4>
-            <p className="mt-1 text-xs text-slate-500 max-w-sm mx-auto">
-              Your area manager will assign today&apos;s wash route shortly. Check back in a few minutes.
-            </p>
-          </div>
-        ) : (
-          <div className="mt-4 space-y-3">
-            {visits.map((visit) => {
-              const customer = customerById.get(visit.customerId);
-              const car = carById.get(visit.carId);
-
-              if (visit.status === 'DONE') {
-                return (
-                  <div
-                    key={visit.id}
-                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-slate-200/60 bg-slate-50/70 p-4 transition-all"
-                  >
-                    <div className="flex items-start gap-3.5 min-w-0">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
-                        <IconCheck width={20} height={20} />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-bold text-slate-900 truncate">
-                            {customer?.name}
-                          </span>
-                          <span className="rounded-md bg-slate-200/80 px-2 py-0.5 font-mono text-[11px] font-bold text-slate-700">
-                            {car?.plate}
-                          </span>
-                        </div>
-                        <div className="mt-0.5 text-xs text-slate-500">
-                          {car?.make} {car?.model} · Scheduled {formatTime(visit.scheduledTime)}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <span className="rounded-full bg-emerald-100/80 text-emerald-800 px-3 py-1 text-xs font-bold border border-emerald-200">
-                        Done at {formatClock(visit.completedAt)}
-                      </span>
-                    </div>
-                  </div>
-                );
-              }
-
-              if (visit.status === 'MISSED') {
-                return (
-                  <div
-                    key={visit.id}
-                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/50 p-4"
-                  >
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-slate-900 truncate">
-                          {customer?.name}
-                        </span>
-                        <span className="rounded-md bg-amber-100 px-2 py-0.5 font-mono text-[11px] font-bold text-amber-800">
-                          {car?.plate}
-                        </span>
-                      </div>
-                      <div className="mt-0.5 text-xs text-amber-700">
-                        {visit.missReason ? MISS_REASON_LABEL[visit.missReason] : 'Skipped / Car Not Available'}
-                      </div>
-                    </div>
-
-                    <span className="rounded-full bg-amber-100 text-amber-800 px-3 py-1 text-xs font-bold border border-amber-200">
-                      Moved to Next Slot
-                    </span>
-                  </div>
-                );
-              }
-
-              return (
-                <Link
-                  key={visit.id}
-                  href={`/staff/wash/${visit.id}`}
-                  className="group block rounded-xl border border-slate-200 bg-white p-4 shadow-2xs transition-all hover:border-blue-400 hover:shadow-sm"
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
-                          {customer?.name}
-                        </span>
-                        <span className="rounded-md bg-blue-50 px-2 py-0.5 font-mono text-[11px] font-bold text-blue-700 border border-blue-100">
-                          {car?.plate}
-                        </span>
-                        <span className="text-xs font-semibold text-slate-500">
-                          · {car?.make} {car?.model}
-                        </span>
-                      </div>
-
-                      <div className="mt-2 flex items-start gap-1.5 text-xs text-slate-500">
-                        <IconMap width={14} height={14} className="shrink-0 text-slate-400 mt-0.5" />
-                        <span className="line-clamp-2">
-                          {customer?.address}
-                          {customer?.landmark ? ` (${customer.landmark})` : ''}
-                        </span>
-                      </div>
-
-                      {customer?.note && (
-                        <div className="mt-2.5 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-800 border border-amber-100 inline-block">
-                          Note: {customer.note}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 shrink-0">
-                      <div className="text-left sm:text-right hidden sm:block">
-                        <div className="text-xs font-bold text-slate-900">
-                          {formatTime(visit.scheduledTime)}
-                        </div>
-                        <div className="text-[10.5px] text-slate-400 font-medium">Scheduled</div>
-                      </div>
-
-                      <div className="flex items-center justify-center gap-2 w-full sm:w-auto rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-xs group-hover:bg-blue-700 transition-colors">
-                        <span>{visit.status === 'IN_PROGRESS' ? 'Continue wash' : 'Start wash'}</span>
-                        <IconChevron width={14} height={14} />
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        )}
+        <StaffWashQueue initialVisits={queueItems} />
       </div>
     </div>
   );
 }
+

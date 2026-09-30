@@ -132,7 +132,11 @@ export function WashFlow({
         if (data.startedAt) {
           setWashStartedAt(data.startedAt);
         }
-        toast.success('Before photo saved! Cleaning timer is running.');
+        toast.success('Before photo saved & wash started! Returning to schedule to track cleaning time...');
+        setTimeout(() => {
+          router.push('/staff');
+          router.refresh();
+        }, 750);
       } else {
         setAfter(data.url);
         toast.success('After photo saved! Ready to complete wash.');
@@ -164,7 +168,11 @@ export function WashFlow({
       }
       const nowIso = data.startedAt || new Date().toISOString();
       setWashStartedAt(nowIso);
-      toast.success('Wash started! Cleaning timer is running.');
+      toast.success('Wash started! Cleaning timer is running. Returning to schedule...');
+      setTimeout(() => {
+        router.push('/staff');
+        router.refresh();
+      }, 750);
     } catch {
       setError('Network issue. Please tap start again.');
     } finally {
