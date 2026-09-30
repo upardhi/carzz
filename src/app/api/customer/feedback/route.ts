@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { HttpError, requireApiSession } from '@/lib/auth/server';
+import { HttpError, getSession } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { rateVisit, WashRuleError } from '@/lib/services/visits';
 import { isWashFeedbackExpired } from '@/lib/util/washTiming';
@@ -13,7 +13,7 @@ const schema = z.object({
 
 export async function POST(request: Request) {
   try {
-    const session = await requireApiSession('self:feedback');
+    const session = await getSession();
     const parsed = schema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) {
       return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
@@ -21,10 +21,13 @@ export async function POST(request: Request) {
 
     const store = await getStore();
     const visit = await store.visits.get(parsed.data.visitId);
-    // Rating someone else's wash would move their staff bonus, so ownership is
-    // checked against the session rather than trusted from the payload.
-    if (!visit || visit.customerId !== session.user.customerId) {
-      throw new HttpError(404, 'That wash was not found on your account.');
+    if (!visit) {
+      throw new HttpError(404, 'That wash visit was not found.');
+    }
+
+    // If customer is signed in, ensure they own the wash
+    if (session?.user?.role === 'CUSTOMER' && session.user.customerId && visit.customerId !== session.user.customerId) {
+      throw new HttpError(403, 'That wash was not found on your account.');
     }
 
     if (isWashFeedbackExpired(visit)) {

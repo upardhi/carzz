@@ -5,6 +5,11 @@ import { getStore } from '@/lib/data';
 import { MISS_REASONS } from '@/lib/data/types';
 import { completeWash, missWash, WashRuleError } from '@/lib/services/visits';
 import { resolvePublicPhotoUrl } from '@/lib/util/photoUrl';
+import {
+  notifyWashStarted,
+  notifyWashCompleted,
+  notifyWashSkipped,
+} from '@/lib/services/whatsappNotifications';
 
 const schema = z.discriminatedUnion('action', [
   z.object({
@@ -55,6 +60,12 @@ export async function POST(request: Request) {
         startedAt,
         staffId: session.user.staffId ?? visit.staffId ?? '',
       });
+
+      // Dispatch WhatsApp Wash Started notification to customer asynchronously
+      notifyWashStarted(store, updated.id).catch((err) =>
+        console.error('Failed to dispatch wash started WhatsApp notification:', err),
+      );
+
       return NextResponse.json({
         ok: true,
         visit: {
@@ -76,6 +87,12 @@ export async function POST(request: Request) {
         beforePhotoUrl: visit.beforePhotoUrl,
         afterPhotoUrl: visit.afterPhotoUrl,
       });
+
+      // Dispatch WhatsApp Wash Completed notification to the customer asynchronously
+      notifyWashCompleted(store, updated.id).catch((err) =>
+        console.error('Failed to dispatch wash completed WhatsApp notification:', err),
+      );
+
       return NextResponse.json({
         ok: true,
         visit: {
@@ -97,6 +114,11 @@ export async function POST(request: Request) {
       note: parsed.data.note,
       rescheduleTo: parsed.data.rescheduleTo,
     });
+
+    // Dispatch WhatsApp Skipped / Rescheduled notification to customer asynchronously
+    notifyWashSkipped(store, updated, parsed.data.reason, replacement?.scheduledDate).catch((err) =>
+      console.error('Failed to dispatch wash skipped WhatsApp notification:', err),
+    );
 
     return NextResponse.json({
       ok: true,

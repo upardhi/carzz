@@ -500,6 +500,7 @@ export interface RedAlert {
   amount: Rupees;
   daysOverdue: number;
   lastPaymentOn: string | null;
+  dueOn?: string;
 }
 
 async function _loadRedAlertsInternal(
@@ -582,6 +583,7 @@ async function _loadRedAlertsInternal(
               ? 'Payment overdue'
               : 'Month end, no payment',
       lastPaymentOn: lastPaymentMap.get(customerId)?.createdAt ?? null,
+      dueOn: agg.earliestDue,
     });
   }
 

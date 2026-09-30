@@ -634,6 +634,62 @@ export function EditCarModalButton({
                     </select>
                   </div>
                 </div>
+
+                {/* Package Inclusions and Services Details */}
+                {selectedPackage && (
+                  <div className="mt-2.5 rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50/70 to-indigo-50/40 p-3 text-xs space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 font-bold text-blue-950">
+                        <span>📦</span>
+                        <span>{selectedPackage.name}</span>
+                        <span className="text-[11px] text-blue-700 font-semibold">
+                          ({selectedPackage.washesPerMonth} washes/mo)
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-sm font-extrabold text-blue-900">
+                          ₹{selectedPackage.price.toLocaleString('en-IN')}
+                        </span>
+                        <span className="text-[10px] text-slate-500 font-medium ml-1">
+                          /{selectedPackage.billingPeriod?.toLowerCase() || 'mo'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Services Included */}
+                    {(() => {
+                      const parsed = parsePackageServices(
+                        selectedPackage.services,
+                        selectedPackage.washesPerMonth,
+                      );
+                      if (parsed.length === 0) return null;
+
+                      return (
+                        <div className="pt-2 border-t border-blue-200/60 space-y-1.5">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-blue-800/80 block">
+                            Plan Inclusions &amp; Services
+                          </span>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                            {parsed.map((svc, i) => (
+                              <div
+                                key={i}
+                                className="flex items-center justify-between rounded-lg bg-white/95 border border-blue-100/90 px-2.5 py-1 text-[11px] shadow-2xs"
+                              >
+                                <span className="font-semibold text-slate-700 flex items-center gap-1.5">
+                                  <span className="text-emerald-500 font-bold">✓</span>
+                                  {svc.name}
+                                </span>
+                                <span className="font-mono text-[10px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded">
+                                  {svc.washesPerMonth} / mo
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
               </div>
 
               {/* Section 3: Timing & Weekly Routine */}
@@ -942,6 +998,62 @@ export function AddCarModalButton({
                     </select>
                   </div>
                 </div>
+
+                {/* Package Inclusions and Services Details */}
+                {selectedPackage && (
+                  <div className="mt-2.5 rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50/70 to-indigo-50/40 p-3 text-xs space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 font-bold text-blue-950">
+                        <span>📦</span>
+                        <span>{selectedPackage.name}</span>
+                        <span className="text-[11px] text-blue-700 font-semibold">
+                          ({selectedPackage.washesPerMonth} washes/mo)
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-sm font-extrabold text-blue-900">
+                          ₹{selectedPackage.price.toLocaleString('en-IN')}
+                        </span>
+                        <span className="text-[10px] text-slate-500 font-medium ml-1">
+                          /{selectedPackage.billingPeriod?.toLowerCase() || 'mo'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Services Included */}
+                    {(() => {
+                      const parsed = parsePackageServices(
+                        selectedPackage.services,
+                        selectedPackage.washesPerMonth,
+                      );
+                      if (parsed.length === 0) return null;
+
+                      return (
+                        <div className="pt-2 border-t border-blue-200/60 space-y-1.5">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-blue-800/80 block">
+                            Plan Inclusions &amp; Services
+                          </span>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                            {parsed.map((svc, i) => (
+                              <div
+                                key={i}
+                                className="flex items-center justify-between rounded-lg bg-white/95 border border-blue-100/90 px-2.5 py-1 text-[11px] shadow-2xs"
+                              >
+                                <span className="font-semibold text-slate-700 flex items-center gap-1.5">
+                                  <span className="text-emerald-500 font-bold">✓</span>
+                                  {svc.name}
+                                </span>
+                                <span className="font-mono text-[10px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded">
+                                  {svc.washesPerMonth} / mo
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
               </div>
 
               {/* Section 3: Wash Routine & Schedule */}

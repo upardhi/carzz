@@ -24,6 +24,8 @@ import { MISS_REASON_LABEL } from '@/lib/util/labels';
 import { useDebounce } from '@/lib/util/debounce';
 import { washDurationMinutes, formatDurationMinutes } from '@/lib/util/washTiming';
 import { AssignSelect } from './AssignSelect';
+import { ActionButton } from './ActionButton';
+import { WhatsAppTrackRecord } from './WhatsAppTrackRecord';
 
 export interface ScheduleItem {
   id: string;
@@ -97,6 +99,7 @@ export function ScheduleClient({
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(20);
   const [isAutoAssigning, setIsAutoAssigning] = useState(false);
+  const [isWhatsAppLogOpen, setIsWhatsAppLogOpen] = useState(false);
 
   // Wash inspection / rating modal
   const [visitList, setVisitList] = useState(visits);
@@ -340,6 +343,67 @@ export function ScheduleClient({
         />
       </StatGrid>
 
+      {/* WhatsApp Communications & Broadcasts Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3.5 shadow-xs">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-2xs text-base">
+            💬
+          </div>
+          <div>
+            <h4 className="text-xs font-bold text-emerald-950">WhatsApp Auto-Dispatches</h4>
+            <p className="text-[11px] text-emerald-800">
+              Trigger instant WhatsApp messages to wash boys and scheduled customers
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <ActionButton
+            endpoint="/api/ops/notifications/dispatch"
+            variant="secondary"
+            size="sm"
+            className="border-emerald-300 bg-white font-semibold text-emerald-950 shadow-2xs hover:bg-emerald-100"
+            payload={{ action: 'washboy-schedule', date }}
+            confirm={`Send today's route to all active wash boys on WhatsApp?`}
+            confirmTitle="Broadcast Route to Wash Boys"
+          >
+            📲 Route to All Wash Boys
+          </ActionButton>
+
+          <ActionButton
+            endpoint="/api/ops/notifications/dispatch"
+            variant="secondary"
+            size="sm"
+            className="border-emerald-300 bg-white font-semibold text-emerald-950 shadow-2xs hover:bg-emerald-100"
+            payload={{ action: 'customer-same-day', date }}
+            confirm={`Send same-day wash reminders to all customers scheduled for today?`}
+            confirmTitle="Today's Customer Wash Reminders"
+          >
+            🔔 Today Customer Reminders
+          </ActionButton>
+
+          <ActionButton
+            endpoint="/api/ops/notifications/dispatch"
+            variant="secondary"
+            size="sm"
+            className="border-emerald-300 bg-white font-semibold text-emerald-950 shadow-2xs hover:bg-emerald-100"
+            payload={{ action: 'customer-day-before' }}
+            confirm={`Send 1-day advance reminders to tomorrow's scheduled customers?`}
+            confirmTitle="Tomorrow's Customer Reminders"
+          >
+            📅 Tomorrow Reminders (Advance)
+          </ActionButton>
+
+          <button
+            type="button"
+            onClick={() => setIsWhatsAppLogOpen(true)}
+            className="flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-100/90 px-3 py-1.5 text-xs font-bold text-emerald-950 shadow-2xs hover:bg-emerald-200 transition-colors"
+          >
+            📋 Delivery Log & Track Record
+          </button>
+        </div>
+      </div>
+
       {/* Auto-assign Gap Card if unassigned visits exist */}
       {unassignedCount > 0 && areaWithGaps ? (
         <div className="rounded-2xl border border-rose-200 bg-rose-50/70 p-4 text-xs shadow-sm">
@@ -455,6 +519,20 @@ export function ScheduleClient({
               })}
             </select>
           </div>
+
+          {staffFilter !== 'ALL' && (
+            <ActionButton
+              endpoint="/api/ops/notifications/dispatch"
+              variant="secondary"
+              size="sm"
+              className="border-blue-200 bg-blue-50 font-semibold text-blue-900 shadow-2xs hover:bg-blue-100"
+              payload={{ action: 'washboy-schedule', date, staffId: staffFilter }}
+              confirm={`Send today's route to ${staff.find((s) => s.id === staffFilter)?.name || 'this wash boy'} on WhatsApp?`}
+              confirmTitle="Send Route on WhatsApp"
+            >
+              📲 Send Route ({staff.find((s) => s.id === staffFilter)?.name?.split(' ')[0]})
+            </ActionButton>
+          )}
 
           {/* Area Filter */}
           {areas.length > 1 ? (
@@ -783,6 +861,12 @@ export function ScheduleClient({
           </div>
         </div>
       ) : null}
+
+      {/* WhatsApp Delivery Log & Track Record Modal */}
+      <WhatsAppTrackRecord
+        isOpen={isWhatsAppLogOpen}
+        onClose={() => setIsWhatsAppLogOpen(false)}
+      />
     </div>
   );
 }

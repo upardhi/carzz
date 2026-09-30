@@ -13,8 +13,9 @@ import { IconMapPin, IconSliders } from '@/components/shell/icons';
 import type { Session } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { loadRedAlerts } from '@/lib/services/accounts';
-import { formatDateFull, money } from '@/lib/util/format';
+import { formatDate, formatDateFull, money } from '@/lib/util/format';
 import { ActionButton } from './ActionButton';
+import { buildInvoiceDueMessage } from '@/lib/services/whatsappTemplates';
 
 /** The chase list — who owes what, worst first. */
 export async function ConsoleAlerts({
@@ -245,36 +246,70 @@ export async function ConsoleAlerts({
               {
                 id: 'action',
                 header: 'ACTION',
-                render: (alert) => (
-                  <div className="flex gap-1.5">
-                    <a
-                      href={`https://wa.me/91${alert.customer.phone.replace(/\D/g, '').slice(-10)}?text=${encodeURIComponent(
-                        `Hello ${alert.customer.name}, this is a reminder that ${money(alert.amount)} is pending on your Carz car wash account. Please pay at your convenience. Thank you.`,
-                      )}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center rounded-lg bg-navy-800 px-3 py-1.5 text-xs font-semibold text-white hover:bg-navy-700 transition-colors shadow-2xs"
-                    >
-                      Remind
-                    </a>
-                    {alert.customer.status === 'ACTIVE' ? (
+                render: (alert) => {
+                  const paymentUrl = `${
+                    process.env.NEXT_PUBLIC_APP_URL || 'https://carzs.vercel.app'
+                  }/app/payments`;
+                  const dueOnDate =
+                    alert.dueOn || new Date().toISOString().slice(0, 10);
+                  const reminderText = buildInvoiceDueMessage({
+                    customerName: alert.customer.name,
+                    amount: alert.amount,
+                    dueOnFormatted: formatDate(dueOnDate),
+                    paymentUrl,
+                  });
+
+                  return (
+                    <div className="flex items-center gap-1.5">
                       <ActionButton
-                        endpoint="/api/ops/customers"
-                        variant="secondary"
+                        endpoint="/api/ops/notifications/dispatch"
+                        variant="primary"
+                        size="sm"
                         payload={{
-                          action: 'setStatus',
+                          action: 'invoice-reminder',
                           customerId: alert.customer.id,
-                          status: 'HOLD',
+                          amount: alert.amount,
+                          dueOn: dueOnDate,
                         }}
-                        confirm={`Put ${alert.customer.name} on hold until they pay?`}
+                        confirm={`Send WhatsApp invoice reminder of ₹${alert.amount.toLocaleString(
+                          'en-IN',
+                        )} to ${alert.customer.name}?`}
+                        confirmTitle="WhatsApp Invoice Reminder"
                       >
-                        Hold
+                        📲 Send
                       </ActionButton>
-                    ) : (
-                      <Tag tone="warn">{alert.customer.status}</Tag>
-                    )}
-                  </div>
-                ),
+
+                      <a
+                        href={`https://wa.me/91${alert.customer.phone
+                          .replace(/\D/g, '')
+                          .slice(-10)}?text=${encodeURIComponent(reminderText)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs"
+                        title="Open in WhatsApp Web"
+                      >
+                        Open WA
+                      </a>
+
+                      {alert.customer.status === 'ACTIVE' ? (
+                        <ActionButton
+                          endpoint="/api/ops/customers"
+                          variant="secondary"
+                          payload={{
+                            action: 'setStatus',
+                            customerId: alert.customer.id,
+                            status: 'HOLD',
+                          }}
+                          confirm={`Put ${alert.customer.name} on hold until they pay?`}
+                        >
+                          Hold
+                        </ActionButton>
+                      ) : (
+                        <Tag tone="warn">{alert.customer.status}</Tag>
+                      )}
+                    </div>
+                  );
+                },
               },
             ]}
           />

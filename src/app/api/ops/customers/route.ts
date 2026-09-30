@@ -15,6 +15,11 @@ import {
 } from '@/lib/data/types';
 import { loadCustomerAccount, recordPayment } from '@/lib/services/accounts';
 import { generateVisitsForCar, plannedServiceFor, rescheduleVisit } from '@/lib/services/schedule';
+import {
+  notifyNewCustomerWelcome,
+  notifyWashScheduledToday,
+  notifyWashRescheduled,
+} from '@/lib/services/whatsappNotifications';
 import { currentCycle, nextCycle, todayISO } from '@/lib/util/format';
 import { scopeAreaFilter } from '@/lib/auth/rbac';
 import { assertInScope, opsError } from '../_guard';
@@ -427,6 +432,12 @@ export async function POST(request: Request) {
       });
 
       revalidateCustomerPages();
+
+      // Dispatch WhatsApp notification to customer (and assigned staff) that wash is scheduled for today
+      notifyWashScheduledToday(store, visit).catch((e) =>
+        console.error('Failed to send WhatsApp notification for Wash Today:', e),
+      );
+
       return NextResponse.json({
         ok: true,
         visit,
@@ -631,6 +642,16 @@ export async function POST(request: Request) {
       }
 
       revalidateCustomerPages();
+
+      // Dispatch welcome notification for the newly added vehicle
+      notifyNewCustomerWelcome(
+        store,
+        customer.id,
+        car.plate,
+        pkg?.name || 'Standard',
+        car.packageId,
+      ).catch((e) => console.error('Failed to send welcome WhatsApp message for new car:', e));
+
       return NextResponse.json({
         ok: true,
         car,
@@ -664,6 +685,17 @@ export async function POST(request: Request) {
       });
 
       revalidateCustomerPages();
+
+      // Dispatch WhatsApp notification to customer that wash has been rescheduled
+      notifyWashRescheduled(
+        store,
+        updated.id,
+        updated.scheduledDate,
+        updated.scheduledTime,
+      ).catch((e) =>
+        console.error('Failed to send WhatsApp notification for rescheduled wash:', e),
+      );
+
       return NextResponse.json({
         ok: true,
         visit: updated,
@@ -888,6 +920,20 @@ export async function POST(request: Request) {
 
       if (referral) {
         await store.staffReferrals.update(referral.id, { convertedCustomerId: customer.id });
+      }
+
+      // Dispatch New Customer Welcome WhatsApp notification asynchronously
+      if (data.cars && data.cars.length > 0) {
+        const firstCar = data.cars[0];
+        store.packages.get(firstCar.packageId).then((pkg) => {
+          notifyNewCustomerWelcome(
+            store,
+            customer.id,
+            firstCar.plate,
+            pkg?.name || 'Standard',
+            firstCar.packageId,
+          ).catch((e) => console.error('Failed to send welcome WhatsApp message:', e));
+        }).catch(() => {});
       }
     } catch (innerError) {
       try {

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { HttpError, requireApiSession } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { recordPayment } from '@/lib/services/accounts';
+import { notifyPaymentApproved } from '@/lib/services/whatsappNotifications';
 import { currentCycle } from '@/lib/util/format';
 import { assertInScope, opsError } from '../_guard';
 
@@ -82,6 +83,12 @@ export async function POST(request: Request) {
 
       revalidatePaymentPages();
       const receiptNo = `RCP-${settled.id.slice(-6).toUpperCase()}`;
+
+      // Dispatch WhatsApp Payment Approved notification to the customer asynchronously
+      notifyPaymentApproved(store, settled, receiptNo).catch((err) =>
+        console.error('Failed to dispatch payment approved WhatsApp notification:', err),
+      );
+
       return NextResponse.json({
         ok: true,
         payment: settled,
@@ -133,6 +140,12 @@ export async function POST(request: Request) {
 
     revalidatePaymentPages();
     const receiptNo = `RCP-${payment.id.slice(-6).toUpperCase()}`;
+
+    // Dispatch WhatsApp Payment Approved notification to the customer asynchronously
+    notifyPaymentApproved(store, payment, receiptNo).catch((err) =>
+      console.error('Failed to dispatch payment approved WhatsApp notification:', err),
+    );
+
     return NextResponse.json({
       ok: true,
       payment,

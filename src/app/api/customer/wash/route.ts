@@ -6,6 +6,7 @@ import { missWash } from '@/lib/services/visits';
 import { nextSlotAfter } from '@/lib/services/schedule';
 import { formatDateFull } from '@/lib/util/format';
 import { WEEKDAY_NUM, type DateOnly } from '@/lib/data/types';
+import { notifyWashRescheduled } from '@/lib/services/whatsappNotifications';
 
 const toIso = (d: Date) => d.toISOString().slice(0, 10);
 const toDate = (d: string) => new Date(`${d}T00:00:00.000Z`);
@@ -224,6 +225,17 @@ export async function POST(request: NextRequest) {
         note: parsed.data.reason || 'Customer rescheduled to custom date via app',
         rescheduleTo: targetDate,
       });
+
+      // Dispatch WhatsApp notification to customer that wash has been rescheduled
+      notifyWashRescheduled(
+        store,
+        result.replacement?.id || result.visit.id,
+        targetDate,
+        result.replacement?.scheduledTime || result.visit.scheduledTime,
+        parsed.data.reason || undefined,
+      ).catch((e) =>
+        console.error('Failed to send WhatsApp notification for customer rescheduled wash:', e),
+      );
 
       return NextResponse.json({
         ok: true,

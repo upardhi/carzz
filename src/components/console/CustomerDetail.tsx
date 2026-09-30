@@ -472,8 +472,15 @@ export async function ConsoleCustomerDetail({
                           <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                             Package
                           </span>
-                          <div className="mt-1.5 text-sm font-bold text-slate-900 break-words">
-                            {car.package?.name ?? '—'}
+                          <div className="mt-1.5 flex items-baseline justify-between gap-1 flex-wrap">
+                            <span className="text-sm font-bold text-slate-900 break-words">
+                              {car.package?.name ?? '—'}
+                            </span>
+                            {car.package?.price ? (
+                              <span className="text-xs font-bold text-blue-700">
+                                ₹{car.package.price.toLocaleString('en-IN')}/{car.package.billingPeriod?.toLowerCase() || 'mo'}
+                              </span>
+                            ) : null}
                           </div>
                         </div>
 
