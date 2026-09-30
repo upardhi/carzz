@@ -820,26 +820,83 @@ export async function ConsoleCustomerDetail({
               />
 
               {payments.some((p) => p.status === 'PENDING') ? (
-                <div className="space-y-2">
-                  <p className="text-xs font-bold text-gold-700">
-                    Declared by the customer, waiting for you to confirm the money arrived:
-                  </p>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-amber-800">
+                    <span className="text-sm">⏳</span>
+                    <span>Pending Payments Awaiting Approval:</span>
+                  </div>
                   {payments
                     .filter((p) => p.status === 'PENDING')
                     .map((payment) => (
                       <div
                         key={payment.id}
-                        className="flex items-center justify-between gap-2 rounded-lg border border-gold-200 bg-gold-50 p-2.5"
+                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/70 p-3.5 shadow-2xs"
                       >
-                        <span className="text-sm font-bold">
-                          {money(payment.amount)} · {PAYMENT_MODE_LABEL[payment.mode]}
-                        </span>
-                        <ActionButton
-                          endpoint="/api/ops/payments"
-                          payload={{ action: 'confirm', paymentId: payment.id }}
-                        >
-                          Confirm received
-                        </ActionButton>
+                        <div className="space-y-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-base font-extrabold text-slate-900">
+                              {money(payment.amount)}
+                            </span>
+                            <span
+                              className={`rounded-md px-2 py-0.5 text-[11px] font-bold ${
+                                payment.mode === 'GATEWAY'
+                                  ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                                  : payment.mode === 'MANUAL_UPI'
+                                    ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                                    : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                              }`}
+                            >
+                              {payment.mode === 'GATEWAY'
+                                ? '⚡ Online Razorpay'
+                                : PAYMENT_MODE_LABEL[payment.mode]}
+                            </span>
+                            <span className="text-[11px] text-slate-500 font-mono">
+                              {payment.createdAt
+                                ? new Date(payment.createdAt).toLocaleDateString('en-IN', {
+                                    day: 'numeric',
+                                    month: 'short',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })
+                                : ''}
+                            </span>
+                          </div>
+
+                          {payment.reference && (
+                            <p className="text-xs text-slate-600 font-mono">
+                              Ref / Txn ID: <strong className="text-slate-800">{payment.reference}</strong>
+                            </p>
+                          )}
+                          {payment.note && (
+                            <p className="text-xs text-slate-500 italic line-clamp-1">
+                              {payment.note}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <ActionButton
+                            endpoint="/api/ops/payments"
+                            payload={{ action: 'reject', paymentId: payment.id }}
+                            variant="danger"
+                            confirm={`Are you sure you want to reject this ${money(payment.amount)} payment? No credit will be added to the customer's account.`}
+                            confirmTitle="Reject Payment"
+                            confirmTone="danger"
+                          >
+                            Reject
+                          </ActionButton>
+
+                          <ActionButton
+                            endpoint="/api/ops/payments"
+                            payload={{ action: 'confirm', paymentId: payment.id }}
+                            variant="primary"
+                            confirm={`Confirm that ${money(payment.amount)} via ${payment.mode === 'GATEWAY' ? 'Razorpay' : payment.mode} has been received? This will settle open invoices and credit the customer's account.`}
+                            confirmTitle="Approve Payment"
+                            confirmTone="primary"
+                          >
+                            Approve & Credit
+                          </ActionButton>
+                        </div>
                       </div>
                     ))}
                 </div>

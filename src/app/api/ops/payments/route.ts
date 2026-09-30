@@ -40,6 +40,11 @@ const schema = z.discriminatedUnion('action', [
     action: z.literal('confirm'),
     paymentId: z.string().min(1),
   }),
+  z.object({
+    action: z.literal('reject'),
+    paymentId: z.string().min(1),
+    reason: z.string().max(300).optional(),
+  }),
 ]);
 
 export async function POST(request: Request) {
@@ -82,6 +87,31 @@ export async function POST(request: Request) {
         payment: settled,
         receiptNo,
         message: `Payment confirmed successfully. Receipt #${receiptNo}`,
+      });
+    }
+
+    if (parsed.data.action === 'reject') {
+      const payment = await store.payments.get(parsed.data.paymentId);
+      if (!payment) throw new HttpError(404, 'Payment not found.');
+      assertInScope(session, payment.areaId);
+      if (payment.status === 'CONFIRMED') {
+        throw new HttpError(400, 'Cannot reject an already confirmed payment.');
+      }
+
+      const reasonNote = parsed.data.reason
+        ? `Rejection reason: ${parsed.data.reason}`
+        : 'Rejected by manager/admin';
+
+      const updated = await store.payments.update(payment.id, {
+        status: 'FAILED',
+        note: payment.note ? `${payment.note} (${reasonNote})` : reasonNote,
+      });
+
+      revalidatePaymentPages();
+      return NextResponse.json({
+        ok: true,
+        payment: updated,
+        message: 'Payment rejected. No credit was added to the customer account.',
       });
     }
 
