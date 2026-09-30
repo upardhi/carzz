@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
   IconCheckCircle,
   IconClock,
@@ -27,6 +28,7 @@ export function WhatsAppTrackRecord({
   initialBatchId,
   initialStatusFilter = 'ALL',
 }: WhatsAppTrackRecordProps) {
+  const [mounted, setMounted] = useState(false);
   const [logs, setLogs] = useState<WhatsAppMessageRecord[]>([]);
   const [stats, setStats] = useState<WhatsAppStats | null>(null);
   const [loading, setLoading] = useState(false);
@@ -46,6 +48,10 @@ export function WhatsAppTrackRecord({
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [previewMessage, setPreviewMessage] = useState<WhatsAppMessageRecord | null>(null);
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const fetchLogs = useCallback(async () => {
     try {
@@ -584,7 +590,7 @@ export function WhatsAppTrackRecord({
                           <button
                             type="button"
                             onClick={() => setPreviewMessage(item)}
-                            className="inline-flex items-center gap-1 text-emerald-700 hover:text-emerald-900 hover:underline"
+                            className="inline-flex items-center gap-1 text-emerald-700 hover:text-emerald-900 hover:underline font-bold"
                             title="Open full message in WhatsApp preview modal"
                           >
                             <span>👁 Full WhatsApp Preview</span>
@@ -703,65 +709,82 @@ export function WhatsAppTrackRecord({
           </button>
         </div>
       </div>
+    </div>
+  );
 
-      {/* ========================================================================= */}
-      {/* WHATSAPP FULL MESSAGE PREVIEW MODAL */}
-      {/* ========================================================================= */}
-      {previewMessage && (
+  return (
+    <>
+      {standalone ? (
+        content
+      ) : (
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-6 bg-navy-950/80 backdrop-blur-xs animate-fade-in"
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-navy-950/80 backdrop-blur-sm"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && onClose) onClose();
+          }}
+        >
+          {content}
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* WHATSAPP FULL MESSAGE PREVIEW MODAL (PORTALED TO BODY TO PREVENT Z-INDEX BUGS) */}
+      {/* ========================================================================= */}
+      {previewMessage && mounted && createPortal(
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-navy-950/85 backdrop-blur-sm animate-fade-in"
           onClick={(e) => {
             if (e.target === e.currentTarget) setPreviewMessage(null);
           }}
         >
-          <div className="relative flex flex-col w-full max-w-lg overflow-hidden rounded-2xl border border-slate-300 bg-[#e5ddd5] shadow-2xl">
+          <div className="relative flex flex-col w-full max-w-lg overflow-hidden rounded-2xl border border-slate-600/50 bg-[#e5ddd5] shadow-2xl max-h-[90vh]">
             {/* WhatsApp App Bar */}
             <div className="flex items-center justify-between bg-[#075e54] px-4 py-3 text-white shadow-md">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-white font-bold text-sm">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20 text-white font-bold text-sm">
                   {previewMessage.recipientName.slice(0, 2).toUpperCase()}
                 </div>
-                <div>
+                <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-sm leading-tight text-white">
+                    <h3 className="font-bold text-sm leading-tight text-white truncate">
                       {previewMessage.recipientName}
                     </h3>
-                    <span className="rounded bg-white/20 px-1.5 py-0.2 text-[9px] font-bold uppercase tracking-wider text-emerald-100">
+                    <span className="shrink-0 rounded bg-white/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-100">
                       {previewMessage.recipientType}
                     </span>
                   </div>
-                  <p className="text-[11px] text-emerald-100 font-mono">
+                  <p className="text-[11px] text-emerald-100/90 font-mono">
                     +{previewMessage.to}
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setPreviewMessage(null)}
-                  className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
-                  aria-label="Close"
-                >
-                  ✕
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewMessage(null)}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/25 transition-colors font-bold text-sm"
+                aria-label="Close"
+              >
+                ✕
+              </button>
             </div>
 
             {/* Chat Body Wallpaper */}
-            <div className="p-4 overflow-y-auto max-h-[60vh] flex flex-col gap-3">
+            <div className="p-4 overflow-y-auto flex-1 flex flex-col gap-3">
               {/* Event Badge in chat */}
-              <div className="self-center rounded-lg bg-white/80 backdrop-blur-xs border border-slate-200/60 px-3 py-1 text-[11px] font-bold text-slate-700 shadow-2xs">
+              <div className="self-center rounded-lg bg-white/90 backdrop-blur-xs border border-slate-200/80 px-3 py-1 text-[11px] font-bold text-slate-700 shadow-2xs">
                 Trigger: {previewMessage.event}
               </div>
 
               {/* Message Bubble (Outgoing) */}
-              <div className="self-end max-w-[90%] rounded-xl rounded-tr-none bg-[#d9fdd3] text-slate-900 p-3 shadow-md border border-emerald-200/50">
+              <div className="self-end max-w-[88%] rounded-2xl rounded-tr-none bg-[#d9fdd3] text-slate-900 p-3.5 shadow-sm border border-emerald-300/40">
                 {/* Media Preview if attached */}
                 {previewMessage.mediaUrl && (
-                  <div className="mb-2 overflow-hidden rounded-lg border border-emerald-200 bg-white">
+                  <div className="mb-2 overflow-hidden rounded-xl border border-emerald-200 bg-white">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={previewMessage.mediaUrl}
@@ -774,7 +797,7 @@ export function WhatsAppTrackRecord({
                         href={previewMessage.mediaUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="underline hover:text-emerald-950"
+                        className="underline hover:text-emerald-950 font-bold"
                       >
                         Open Full
                       </a>
@@ -788,7 +811,7 @@ export function WhatsAppTrackRecord({
                 </p>
 
                 {/* Timestamp and Double Checkmark */}
-                <div className="mt-1.5 flex items-center justify-end gap-1 text-[10px] text-slate-500 font-medium">
+                <div className="mt-2 flex items-center justify-end gap-1 text-[10px] text-slate-500 font-medium">
                   <span>
                     {formatTime(new Date(previewMessage.sentAt || previewMessage.createdAt).toTimeString().slice(0, 5))}
                   </span>
@@ -878,25 +901,9 @@ export function WhatsAppTrackRecord({
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
-    </div>
-  );
-
-  if (standalone) {
-    return content;
-  }
-
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-navy-950/80 backdrop-blur-sm"
-      onClick={(e) => {
-        if (e.target === e.currentTarget && onClose) onClose();
-      }}
-    >
-      {content}
-    </div>
+    </>
   );
 }
