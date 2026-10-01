@@ -49,9 +49,9 @@ export function WhatsAppChatView({
   const composerInputRef = useRef<HTMLTextAreaElement>(null);
 
   // Fetch all recent messages
-  async function fetchMessages(isBackground = false) {
+  async function fetchMessages(isBackground = false, isSilent = false) {
     if (!isBackground) setLoading(true);
-    else setRefreshing(true);
+    else if (!isSilent) setRefreshing(true);
 
     try {
       const res = await fetch('/api/ops/notifications/queue?limit=1000&page=1');
@@ -70,6 +70,10 @@ export function WhatsAppChatView({
 
   useEffect(() => {
     fetchMessages();
+    const interval = setInterval(() => {
+      fetchMessages(true, true);
+    }, 3000);
+    return () => clearInterval(interval);
   }, []);
 
   // Auto-resize composer textarea as user types or templates are inserted
@@ -245,6 +249,34 @@ export function WhatsAppChatView({
     if (!activeThread || !composerText.trim() || isSending) return;
 
     const messageText = composerText.trim();
+    const tempId = `temp_${Date.now()}`;
+    const nowIso = new Date().toISOString();
+
+    // 1. Immediately clear input & auto-resize
+    setComposerText('');
+    setShowQuickTemplates(false);
+    if (composerInputRef.current) {
+      composerInputRef.current.style.height = 'auto';
+    }
+
+    // 2. Optimistic UI update: Immediately append message with status 'PROCESSING' (clock icon 🕒)
+    const optimisticMessage: WhatsAppMessageRecord = {
+      id: tempId,
+      to: activeThread.phone,
+      direction: 'OUTBOUND',
+      recipientName: activeThread.name,
+      recipientType: activeThread.recipientType,
+      recipientId: activeThread.recipientId,
+      event: 'Direct Message',
+      message: messageText,
+      status: 'PROCESSING', // WhatsApp clock icon 🕒
+      retryCount: 0,
+      maxRetries: 3,
+      createdAt: nowIso,
+      sentAt: nowIso,
+    };
+
+    setMessages((prev) => [...prev, optimisticMessage]);
     setIsSending(true);
 
     try {
@@ -262,19 +294,32 @@ export function WhatsAppChatView({
       });
 
       if (res.ok) {
-        setComposerText('');
-        setShowQuickTemplates(false);
-        if (composerInputRef.current) {
-          composerInputRef.current.style.height = 'auto';
-        }
-        setNotificationToast({ message: `Message sent to ${activeThread.name}!`, tone: 'success' });
-        await fetchMessages(true);
+        // Transition optimistic message to 'SENT' (single tick ✓ "one right")
+        setMessages((prev) =>
+          prev.map((m) => (m.id === tempId ? { ...m, status: 'SENT' } : m)),
+        );
+        // Note: No popup success toast shown per user preference
+        await fetchMessages(true, true);
         composerInputRef.current?.focus();
       } else {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === tempId
+              ? { ...m, status: 'FAILED', error: err?.error || 'Failed to send' }
+              : m,
+          ),
+        );
         setNotificationToast({ message: err?.error || 'Failed to send message', tone: 'error' });
       }
     } catch {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === tempId
+            ? { ...m, status: 'FAILED', error: 'Network error' }
+            : m,
+        ),
+      );
       setNotificationToast({ message: 'Network error sending WhatsApp message.', tone: 'error' });
     } finally {
       setIsSending(false);
@@ -447,47 +492,47 @@ export function WhatsAppChatView({
               )}
             </div>
 
-            {/* WhatsApp Filter Chips */}
+            {/* WhatsApp Filter Chips with dynamic counts */}
             <div className="flex items-center gap-1.5 mt-2 px-1 overflow-x-auto">
               <button
                 type="button"
                 onClick={() => setFilterType('ALL')}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors shrink-0 ${
                   filterType === 'ALL'
-                    ? 'bg-[#00a884] text-white'
+                    ? 'bg-[#00a884] text-white font-semibold'
                     : 'bg-[#f0f2f5] text-[#54656f] hover:bg-[#e9edef]'
                 }`}
               >
-                All
+                All ({threads.length})
               </button>
               <button
                 type="button"
                 onClick={() => setFilterType('CUSTOMER')}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors shrink-0 ${
                   filterType === 'CUSTOMER'
-                    ? 'bg-[#00a884] text-white'
+                    ? 'bg-[#00a884] text-white font-semibold'
                     : 'bg-[#f0f2f5] text-[#54656f] hover:bg-[#e9edef]'
                 }`}
               >
-                Customers
+                Customers ({threads.filter((t) => t.recipientType === 'CUSTOMER').length})
               </button>
               <button
                 type="button"
                 onClick={() => setFilterType('STAFF')}
-                className={`rounded-lg px-3 py-1 text-xs font-medium transition-colors ${
+                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors shrink-0 ${
                   filterType === 'STAFF'
-                    ? 'bg-[#00a884] text-white'
+                    ? 'bg-[#00a884] text-white font-semibold'
                     : 'bg-[#f0f2f5] text-[#54656f] hover:bg-[#e9edef]'
                 }`}
               >
-                Staff
+                Staff ({threads.filter((t) => t.recipientType === 'STAFF').length})
               </button>
               <button
                 type="button"
                 onClick={() => setFilterType('FAILED')}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors flex items-center gap-1 ${
+                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors flex items-center gap-1 shrink-0 ${
                   filterType === 'FAILED'
-                    ? 'bg-[#ea0038] text-white'
+                    ? 'bg-[#ea0038] text-white font-semibold'
                     : 'bg-[#fee2e2] text-[#b91c1c] hover:bg-[#fecaca]'
                 }`}
               >
@@ -556,10 +601,21 @@ export function WhatsAppChatView({
                     {/* Chat Info */}
                     <div className="flex-1 min-w-0 flex flex-col justify-center">
                       <div className="flex items-center justify-between mb-0.5">
-                        <h4 className="text-[15px] font-normal text-[#111b21] truncate">
-                          {thread.name}
-                        </h4>
-                        <span className="text-[11px] text-[#667781] shrink-0 font-normal">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <h4 className="text-[15px] font-normal text-[#111b21] truncate">
+                            {thread.name}
+                          </h4>
+                          <span
+                            className={`rounded px-1.5 py-0.2 text-[9px] font-bold shrink-0 ${
+                              thread.recipientType === 'STAFF'
+                                ? 'bg-indigo-100 text-indigo-800'
+                                : 'bg-emerald-100 text-emerald-800'
+                            }`}
+                          >
+                            {thread.recipientType === 'STAFF' ? 'Staff' : 'Customer'}
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-[#667781] shrink-0 font-normal ml-1">
                           {formatClockCompact(thread.lastMessage.createdAt)}
                         </span>
                       </div>
@@ -874,11 +930,6 @@ export function WhatsAppChatView({
 
                       {/* Bubble Bottom: Time + WhatsApp Signature Double Ticks (Only on outbound) */}
                       <div className="mt-1 flex items-center justify-end gap-1 text-[11px] text-[#667781] leading-none">
-                        {isQueued && (
-                          <span className="text-[9px] font-semibold text-sky-800 bg-sky-100 rounded px-1 mr-0.5">
-                            Queued
-                          </span>
-                        )}
                         <span>{formatTime(msg.sentAt || msg.createdAt)}</span>
                         {!isInbound && <WhatsAppDeliveryTick status={msg.status} />}
                       </div>
@@ -979,13 +1030,34 @@ export function WhatsAppChatView({
 // ============================================================================
 
 function WhatsAppDeliveryTick({ status }: { status: WhatsAppJobStatus }) {
-  if (status === 'SENT') {
-    // Signature WhatsApp Blue Double Tick (#53bdeb)
+  if (status === 'READ') {
+    // Signature WhatsApp Blue Double Tick (#53bdeb) - Message Seen / Read
     return (
-      <span title="Delivered via WhatsApp" className="inline-flex items-center">
+      <span title="Read / Seen" className="inline-flex items-center text-[#53bdeb]">
         <svg viewBox="0 0 16 11" width="16" height="11" fill="none" className="inline-block shrink-0">
           <path d="M11.07.93a.75.75 0 0 0-1.06 0L5.75 5.19 4.22 3.66a.75.75 0 0 0-1.06 1.06l2.06 2.06a.75.75 0 0 0 1.06 0l4.79-4.79a.75.75 0 0 0 0-1.06z" fill="#53bdeb"/>
           <path d="M15.07.93a.75.75 0 0 0-1.06 0L9.75 5.19l.78.78 4.54-4.54a.75.75 0 0 0 0-1.06z" fill="#53bdeb"/>
+        </svg>
+      </span>
+    );
+  }
+  if (status === 'DELIVERED') {
+    // WhatsApp Double Grey Tick - Delivered to recipient's phone
+    return (
+      <span title="Delivered" className="inline-flex items-center text-[#8696a0]">
+        <svg viewBox="0 0 16 11" width="16" height="11" fill="none" className="inline-block shrink-0">
+          <path d="M11.07.93a.75.75 0 0 0-1.06 0L5.75 5.19 4.22 3.66a.75.75 0 0 0-1.06 1.06l2.06 2.06a.75.75 0 0 0 1.06 0l4.79-4.79a.75.75 0 0 0 0-1.06z" fill="#8696a0"/>
+          <path d="M15.07.93a.75.75 0 0 0-1.06 0L9.75 5.19l.78.78 4.54-4.54a.75.75 0 0 0 0-1.06z" fill="#8696a0"/>
+        </svg>
+      </span>
+    );
+  }
+  if (status === 'SENT') {
+    // WhatsApp Single Grey Tick - Dispatched to WhatsApp server ("One right" ✓)
+    return (
+      <span title="Sent" className="inline-flex items-center text-[#8696a0]">
+        <svg viewBox="0 0 12 11" width="12" height="11" fill="none" className="inline-block shrink-0">
+          <path d="M11.07.93a.75.75 0 0 0-1.06 0L5.75 5.19 4.22 3.66a.75.75 0 0 0-1.06 1.06l2.06 2.06a.75.75 0 0 0 1.06 0l4.79-4.79a.75.75 0 0 0 0-1.06z" fill="#8696a0"/>
         </svg>
       </span>
     );
@@ -997,12 +1069,12 @@ function WhatsAppDeliveryTick({ status }: { status: WhatsAppJobStatus }) {
       </span>
     );
   }
-  // Grey double ticks (Queued/Sent to server)
+  // Sending / Queued / Processing: Authentic WhatsApp Clock Icon 🕒
   return (
-    <span title="Sent to WhatsApp" className="inline-flex items-center">
-      <svg viewBox="0 0 16 11" width="16" height="11" fill="none" className="inline-block shrink-0">
-        <path d="M11.07.93a.75.75 0 0 0-1.06 0L5.75 5.19 4.22 3.66a.75.75 0 0 0-1.06 1.06l2.06 2.06a.75.75 0 0 0 1.06 0l4.79-4.79a.75.75 0 0 0 0-1.06z" fill="#8696a0"/>
-        <path d="M15.07.93a.75.75 0 0 0-1.06 0L9.75 5.19l.78.78 4.54-4.54a.75.75 0 0 0 0-1.06z" fill="#8696a0"/>
+    <span title="Sending..." className="inline-flex items-center text-[#8696a0]">
+      <svg viewBox="0 0 12 12" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.4" className="inline-block shrink-0">
+        <circle cx="6" cy="6" r="5" />
+        <path d="M6 3v3l2 1" strokeLinecap="round" />
       </svg>
     </span>
   );

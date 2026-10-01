@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
-import { recordInboundWhatsAppMessage } from '@/lib/services/whatsappQueue';
+import {
+  recordInboundWhatsAppMessage,
+  updateWhatsAppMessageStatus,
+} from '@/lib/services/whatsappQueue';
 
 /**
  * Meta WhatsApp Cloud API Official Webhook Handler
@@ -84,6 +87,34 @@ export async function POST(request: Request) {
 
                 console.log(
                   `[WhatsApp Inbound] Received reply from ${senderName} (${from}): "${messageText}" (ID: ${recorded.id})`,
+                );
+              }
+            }
+          }
+
+          // Parse delivery and read receipts (sent -> delivered -> read -> failed) from Meta
+          if (Array.isArray(value.statuses)) {
+            for (const st of value.statuses) {
+              const metaMessageId = st.id;
+              const statusName = String(st.status || '').toLowerCase();
+              const timestamp = st.timestamp
+                ? new Date(Number(st.timestamp) * 1000).toISOString()
+                : undefined;
+              const error = st.errors?.[0]?.message || st.errors?.[0]?.title;
+
+              if (
+                metaMessageId &&
+                ['sent', 'delivered', 'read', 'failed'].includes(statusName)
+              ) {
+                updateWhatsAppMessageStatus({
+                  metaMessageId,
+                  status: statusName as 'sent' | 'delivered' | 'read' | 'failed',
+                  timestamp,
+                  errorMessage: error,
+                });
+
+                console.log(
+                  `[WhatsApp Webhook] Receipt update for ${metaMessageId}: status="${statusName}"`,
                 );
               }
             }

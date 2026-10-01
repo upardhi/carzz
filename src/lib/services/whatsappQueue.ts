@@ -6,7 +6,13 @@ import { sendWhatsAppMessage, normalizePhoneNumber, getWhatsAppConfig } from './
 
 export type WhatsAppRecipientType = 'CUSTOMER' | 'STAFF';
 
-export type WhatsAppJobStatus = 'QUEUED' | 'PROCESSING' | 'SENT' | 'FAILED';
+export type WhatsAppJobStatus =
+  | 'QUEUED'
+  | 'PROCESSING'
+  | 'SENT'
+  | 'DELIVERED'
+  | 'READ'
+  | 'FAILED';
 
 export interface WhatsAppMessageRecord {
   id: string;
@@ -363,6 +369,43 @@ export function recordInboundWhatsAppMessage(
   return job;
 }
 
+export interface UpdateStatusOptions {
+  metaMessageId: string;
+  status: 'sent' | 'delivered' | 'read' | 'failed';
+  timestamp?: string;
+  errorMessage?: string;
+}
+
+/** Update message status from Meta Cloud API webhook delivery/read receipts */
+export function updateWhatsAppMessageStatus(options: UpdateStatusOptions): boolean {
+  initStore();
+  const { metaMessageId, status, timestamp, errorMessage } = options;
+
+  let found = false;
+  for (const record of messageStore.values()) {
+    if (record.metaMessageId === metaMessageId) {
+      if (status === 'sent' && (record.status === 'QUEUED' || record.status === 'PROCESSING')) {
+        record.status = 'SENT';
+        record.sentAt = timestamp || record.sentAt || new Date().toISOString();
+      } else if (status === 'delivered' && record.status !== 'READ') {
+        record.status = 'DELIVERED';
+      } else if (status === 'read') {
+        record.status = 'READ';
+      } else if (status === 'failed') {
+        record.status = 'FAILED';
+        if (errorMessage) record.error = errorMessage;
+      }
+      found = true;
+      break;
+    }
+  }
+
+  if (found) {
+    schedulePersist();
+  }
+  return found;
+}
+
 // ============================================================================
 // RATE-LIMITED WORKER PROCESSOR
 // ============================================================================
@@ -582,7 +625,7 @@ export function getWhatsAppStats(): WhatsAppStats {
   let totalProcessing = 0;
 
   for (const r of messageStore.values()) {
-    if (r.status === 'SENT') totalSent++;
+    if (r.status === 'SENT' || r.status === 'DELIVERED' || r.status === 'READ') totalSent++;
     else if (r.status === 'FAILED') totalFailed++;
     else if (r.status === 'QUEUED') totalQueued++;
     else if (r.status === 'PROCESSING') totalProcessing++;
@@ -619,7 +662,7 @@ export function getBatchProgress(batchId: string) {
   let processing = 0;
 
   for (const j of batchJobs) {
-    if (j.status === 'SENT') sent++;
+    if (j.status === 'SENT' || j.status === 'DELIVERED' || j.status === 'READ') sent++;
     else if (j.status === 'FAILED') failed++;
     else if (j.status === 'QUEUED') queued++;
     else if (j.status === 'PROCESSING') processing++;

@@ -35,8 +35,11 @@ export async function GET(request: Request) {
     // Multi-tenant Scoping: If not SUPER_ADMIN (areaIds is not null), restrict to manager's or area admin's area
     if (session.scope.areaIds !== null) {
       const store = await getStore();
-      const [scopedCustomers, scopedUsers] = await Promise.all([
+      const [scopedCustomers, scopedStaff, scopedUsers] = await Promise.all([
         store.customers.find({
+          where: { areaId: { in: session.scope.areaIds } } as never,
+        }),
+        store.staff.find({
           where: { areaId: { in: session.scope.areaIds } } as never,
         }),
         store.users.find({
@@ -50,6 +53,12 @@ export async function GET(request: Request) {
       for (const c of scopedCustomers) {
         if (c.id) allowedRecipientIds.add(c.id);
         if (c.phone) allowedPhones.add(normalizePhoneNumber(c.phone));
+      }
+
+      for (const s of scopedStaff) {
+        if (s.id) allowedRecipientIds.add(s.id);
+        if (s.userId) allowedRecipientIds.add(s.userId);
+        if (s.phone) allowedPhones.add(normalizePhoneNumber(s.phone));
       }
 
       for (const u of scopedUsers) {
@@ -149,8 +158,11 @@ export async function POST(request: Request) {
       // Multi-tenant Scoping: If not SUPER_ADMIN, ensure manager or area admin only sends to their own area
       if (session.scope.areaIds !== null) {
         const store = await getStore();
-        const [scopedCustomers, scopedUsers] = await Promise.all([
+        const [scopedCustomers, scopedStaff, scopedUsers] = await Promise.all([
           store.customers.find({
+            where: { areaId: { in: session.scope.areaIds } } as never,
+          }),
+          store.staff.find({
             where: { areaId: { in: session.scope.areaIds } } as never,
           }),
           store.users.find({
@@ -163,6 +175,11 @@ export async function POST(request: Request) {
             (c) =>
               (c.phone && normalizePhoneNumber(c.phone) === normalizedTo) ||
               (targetRecipientId && c.id === targetRecipientId),
+          ) ||
+          scopedStaff.some(
+            (s) =>
+              (s.phone && normalizePhoneNumber(s.phone) === normalizedTo) ||
+              (targetRecipientId && (s.id === targetRecipientId || s.userId === targetRecipientId)),
           ) ||
           scopedUsers.some(
             (u) =>
