@@ -37,16 +37,29 @@ export async function GET() {
         : [],
     ]);
 
+    const packageIds = [...new Set(cars.map((c) => c.packageId).filter(Boolean))];
+    const packages = packageIds.length
+      ? await store.packages.find({ where: { id: { in: packageIds } } as never })
+      : [];
+
     const customerById = new Map(customers.map((c) => [c.id, c]));
     const carById = new Map(cars.map((c) => [c.id, c]));
+    const packageById = new Map(packages.map((p) => [p.id, p]));
 
-    const enrichedVisits = visits.map((v) => ({
-      ...v,
-      beforePhotoUrl: resolvePublicPhotoUrl(v.beforePhotoUrl),
-      afterPhotoUrl: resolvePublicPhotoUrl(v.afterPhotoUrl),
-      customer: customerById.get(v.customerId) ?? null,
-      car: carById.get(v.carId) ?? null,
-    }));
+    const enrichedVisits = visits.map((v) => {
+      const rawCar = carById.get(v.carId);
+      const enrichedCar = rawCar ? {
+        ...rawCar,
+        package: packageById.get(rawCar.packageId) ?? null,
+      } : null;
+      return {
+        ...v,
+        beforePhotoUrl: resolvePublicPhotoUrl(v.beforePhotoUrl),
+        afterPhotoUrl: resolvePublicPhotoUrl(v.afterPhotoUrl),
+        customer: customerById.get(v.customerId) ?? null,
+        car: enrichedCar,
+      };
+    });
 
     const doneCount = visits.filter((v) => v.status === 'DONE').length;
     const pendingCount = visits.filter(
