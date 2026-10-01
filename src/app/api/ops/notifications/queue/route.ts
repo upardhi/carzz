@@ -6,6 +6,7 @@ import {
   getWhatsAppStats,
   getBatchProgress,
   retryFailedJobs,
+  enqueueWhatsAppMessage,
   type WhatsAppJobStatus,
   type WhatsAppRecipientType,
 } from '@/lib/services/whatsappQueue';
@@ -17,7 +18,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
 
     const page = Math.max(1, Number(searchParams.get('page')) || 1);
-    const limit = Math.min(100, Math.max(5, Number(searchParams.get('limit')) || 20));
+    const limit = Math.min(1000, Math.max(5, Number(searchParams.get('limit')) || 20));
     const status = (searchParams.get('status') || 'ALL') as WhatsAppJobStatus | 'ALL';
     const recipientType = (searchParams.get('recipientType') || 'ALL') as WhatsAppRecipientType | 'ALL';
     const event = searchParams.get('event') || undefined;
@@ -55,6 +56,14 @@ const postSchema = z.discriminatedUnion('action', [
     action: z.literal('retry'),
     jobIds: z.array(z.string()).optional(),
   }),
+  z.object({
+    action: z.literal('send'),
+    to: z.string().min(5),
+    recipientName: z.string().optional(),
+    recipientType: z.enum(['CUSTOMER', 'STAFF']).default('CUSTOMER'),
+    recipientId: z.string().optional(),
+    message: z.string().min(1),
+  }),
 ]);
 
 export async function POST(request: Request) {
@@ -74,6 +83,23 @@ export async function POST(request: Request) {
         ok: true,
         retriedCount,
         message: `Re-queued ${retriedCount} failed message${retriedCount === 1 ? '' : 's'} for delivery.`,
+      });
+    }
+
+    if (parsed.data.action === 'send') {
+      const job = enqueueWhatsAppMessage({
+        to: parsed.data.to,
+        recipientName: parsed.data.recipientName || 'Recipient',
+        recipientType: parsed.data.recipientType,
+        recipientId: parsed.data.recipientId,
+        event: 'Direct Message',
+        message: parsed.data.message.trim(),
+      });
+
+      return NextResponse.json({
+        ok: true,
+        job,
+        message: `Message queued for delivery to ${parsed.data.recipientName || parsed.data.to}.`,
       });
     }
 

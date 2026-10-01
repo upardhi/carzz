@@ -11,7 +11,7 @@ export default async function AdminWhatsAppMessagesPage() {
   await requirePermission('visit:view');
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <PageHeader
         title="WhatsApp Messages & Delivery Log"
         description="Inspect all outbound customer and staff WhatsApp notifications, track real-time delivery status, and retry failed messages."

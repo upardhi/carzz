@@ -12,6 +12,7 @@ import {
 import { StatCard, StatGrid } from '@/components/ui/primitives';
 import { formatDateFull, formatTime } from '@/lib/util/format';
 import type { WhatsAppMessageRecord, WhatsAppStats } from '@/lib/services/whatsappQueue';
+import { WhatsAppChatView } from './WhatsAppChatView';
 
 interface WhatsAppTrackRecordProps {
   isOpen?: boolean;
@@ -48,6 +49,10 @@ export function WhatsAppTrackRecord({
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [previewMessage, setPreviewMessage] = useState<WhatsAppMessageRecord | null>(null);
   const [copied, setCopied] = useState(false);
+
+  // View Mode: 'chat' (WhatsApp Web Style) vs 'table' (Audit Log Table)
+  const [viewMode, setViewMode] = useState<'chat' | 'table'>('chat');
+  const [chatSelectedPhone, setChatSelectedPhone] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     setMounted(true);
@@ -171,6 +176,47 @@ export function WhatsAppTrackRecord({
 
   if (!isOpen) return null;
 
+  if (viewMode === 'chat') {
+    const chatContent = (
+      <WhatsAppChatView
+        initialContactKey={chatSelectedPhone}
+        onSwitchToTable={() => setViewMode('table')}
+      />
+    );
+
+    return (
+      <>
+        {standalone ? (
+          <div className="w-full">
+            {chatContent}
+          </div>
+        ) : (
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-navy-950/80 backdrop-blur-sm"
+            onClick={(e) => {
+              if (e.target === e.currentTarget && onClose) onClose();
+            }}
+          >
+            <div className="relative w-full max-w-6xl">
+              {onClose && (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="absolute -top-9 right-0 text-white font-bold text-xs bg-white/20 hover:bg-white/30 rounded-full px-3 py-1 shadow-xs"
+                >
+                  ✕ Close
+                </button>
+              )}
+              {chatContent}
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }
+
   const content = (
     <div className={`relative flex flex-col w-full ${standalone ? 'min-h-[700px] rounded-2xl border border-slate-200 bg-white shadow-sm' : 'max-w-6xl h-[90vh] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl'}`}>
       {/* Header */}
@@ -190,6 +236,26 @@ export function WhatsAppTrackRecord({
         </div>
 
         <div className="flex items-center gap-2">
+          {/* View Mode Switcher */}
+          <div className="flex items-center gap-1 rounded-xl bg-slate-200/90 p-1 mr-1">
+            <button
+              type="button"
+              onClick={() => setViewMode('chat')}
+              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all text-slate-600 hover:text-slate-900"
+            >
+              <span>💬</span>
+              <span>WhatsApp Web</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('table')}
+              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all bg-white text-slate-900 shadow-xs"
+            >
+              <span>📋</span>
+              <span>Delivery Table</span>
+            </button>
+          </div>
+
           {actionSuccessMessage && (
             <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-emerald-100 border border-emerald-300 px-3 py-1 text-xs font-semibold text-emerald-800 animate-fade-in">
               ✓ {actionSuccessMessage}
@@ -651,31 +717,44 @@ export function WhatsAppTrackRecord({
                     </td>
 
                     <td className="py-3 px-4 whitespace-nowrap text-right align-top">
-                      {item.status === 'FAILED' ? (
+                      <div className="flex items-center justify-end gap-1.5">
                         <button
                           type="button"
-                          onClick={() => handleRetrySingle(item.id)}
-                          disabled={retryingIds.has(item.id)}
-                          className="inline-flex items-center gap-1 rounded-lg border border-rose-300 bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-700 hover:bg-rose-100 hover:border-rose-400 active:scale-95 transition-all shadow-2xs disabled:opacity-50"
-                          title="Retry sending this message now"
+                          onClick={() => {
+                            setChatSelectedPhone(item.to);
+                            setViewMode('chat');
+                          }}
+                          className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-2 py-1 text-[11px] font-bold text-emerald-800 hover:bg-emerald-100 transition-colors shadow-2xs"
+                          title="Open conversation in WhatsApp Chat view"
                         >
-                          {retryingIds.has(item.id) ? (
-                            <>
-                              <span className="inline-block animate-spin">↻</span>
-                              <span>Resending...</span>
-                            </>
-                          ) : (
-                            <>
-                              <span>↻</span>
-                              <span>Resend</span>
-                            </>
-                          )}
+                          💬 Chat
                         </button>
-                      ) : item.status === 'SENT' ? (
-                        <span className="text-[11px] text-slate-400 font-medium">Delivered</span>
-                      ) : (
-                        <span className="text-[11px] text-amber-600 font-medium">In Queue</span>
-                      )}
+                        {item.status === 'FAILED' ? (
+                          <button
+                            type="button"
+                            onClick={() => handleRetrySingle(item.id)}
+                            disabled={retryingIds.has(item.id)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-rose-300 bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-700 hover:bg-rose-100 hover:border-rose-400 active:scale-95 transition-all shadow-2xs disabled:opacity-50"
+                            title="Retry sending this message now"
+                          >
+                            {retryingIds.has(item.id) ? (
+                              <>
+                                <span className="inline-block animate-spin">↻</span>
+                                <span>Resending...</span>
+                              </>
+                            ) : (
+                              <>
+                                <span>↻</span>
+                                <span>Resend</span>
+                              </>
+                            )}
+                          </button>
+                        ) : item.status === 'SENT' ? (
+                          <span className="text-[11px] text-slate-400 font-medium">Delivered</span>
+                        ) : (
+                          <span className="text-[11px] text-amber-600 font-medium">In Queue</span>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
