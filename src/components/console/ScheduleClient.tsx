@@ -387,7 +387,7 @@ export function ScheduleClient({
             onClick={() => setIsWhatsAppLogOpen(true)}
             className="flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-100/90 px-3 py-1.5 text-xs font-bold text-emerald-950 shadow-2xs hover:bg-emerald-200 transition-colors"
           >
-            📋 Delivery Log & Track Record
+            💬 WhatsApp Web
           </button>
         </div>
       </div>

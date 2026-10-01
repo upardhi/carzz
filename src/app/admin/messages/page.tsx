@@ -3,7 +3,7 @@ import { WhatsAppTrackRecord } from '@/components/console/WhatsAppTrackRecord';
 import { requirePermission } from '@/lib/auth/server';
 
 export const metadata = {
-  title: 'WhatsApp Messages & Delivery Log',
+  title: 'WhatsApp Web',
   robots: { index: false, follow: false },
 };
 
@@ -13,8 +13,8 @@ export default async function AdminWhatsAppMessagesPage() {
   return (
     <div className="space-y-3">
       <PageHeader
-        title="WhatsApp Messages & Delivery Log"
-        description="Inspect all outbound customer and staff WhatsApp notifications, track real-time delivery status, and retry failed messages."
+        title="WhatsApp Web"
+        description="Direct chat with customers and wash boys, real-time message delivery, and instant retry."
       />
 
       <WhatsAppTrackRecord standalone={true} />

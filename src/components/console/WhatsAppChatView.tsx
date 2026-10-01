@@ -19,13 +19,11 @@ interface ChatThread {
 interface WhatsAppChatViewProps {
   initialContactKey?: string;
   onSelectContact?: (phone: string) => void;
-  onSwitchToTable?: () => void;
 }
 
 export function WhatsAppChatView({
   initialContactKey,
   onSelectContact,
-  onSwitchToTable,
 }: WhatsAppChatViewProps) {
   const [messages, setMessages] = useState<WhatsAppMessageRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -74,17 +72,14 @@ export function WhatsAppChatView({
     fetchMessages();
   }, []);
 
-  // Poll periodically if there are pending or queued messages
-  useEffect(() => {
-    const hasPending = messages.some((m) => m.status === 'QUEUED' || m.status === 'PROCESSING');
-    if (!hasPending) return;
-
-    const interval = setInterval(() => {
-      fetchMessages(true);
-    }, 3500);
-
-    return () => clearInterval(interval);
-  }, [messages]);
+  // Auto-resize composer textarea as user types or templates are inserted
+  const adjustTextareaHeight = () => {
+    if (composerInputRef.current) {
+      composerInputRef.current.style.height = 'auto';
+      const scrollHeight = composerInputRef.current.scrollHeight;
+      composerInputRef.current.style.height = `${Math.min(Math.max(scrollHeight, 24), 180)}px`;
+    }
+  };
 
   // Group messages into contact threads
   const threads = useMemo<ChatThread[]>(() => {
@@ -267,6 +262,9 @@ export function WhatsAppChatView({
       if (res.ok) {
         setComposerText('');
         setShowQuickTemplates(false);
+        if (composerInputRef.current) {
+          composerInputRef.current.style.height = 'auto';
+        }
         setNotificationToast({ message: `Message sent to ${activeThread.name}!`, tone: 'success' });
         await fetchMessages(true);
         composerInputRef.current?.focus();
@@ -290,7 +288,10 @@ export function WhatsAppChatView({
   function handleSelectTemplate(text: string) {
     setComposerText(text);
     setShowQuickTemplates(false);
-    composerInputRef.current?.focus();
+    setTimeout(() => {
+      adjustTextareaHeight();
+      composerInputRef.current?.focus();
+    }, 0);
   }
 
   // Quick preset templates for car wash operations
@@ -362,17 +363,6 @@ export function WhatsAppChatView({
             <span>↻</span>
             <span>{refreshing ? 'Syncing...' : 'Sync'}</span>
           </button>
-
-          {onSwitchToTable && (
-            <button
-              type="button"
-              onClick={onSwitchToTable}
-              className="flex items-center gap-1 rounded-lg bg-white/20 hover:bg-white/30 text-white text-xs font-semibold px-2.5 py-1 transition-colors ml-1"
-            >
-              <span>📋</span>
-              <span className="hidden sm:inline">Audit Table</span>
-            </button>
-          )}
         </div>
       </div>
 
@@ -858,14 +848,17 @@ export function WhatsAppChatView({
               <div ref={messagesEndRef} />
             </div>
 
-            {/* WhatsApp Bottom Composer (62px) */}
-            <div className="flex items-center gap-2 h-[62px] px-4 bg-[#f0f2f5] border-t border-[#e9edef] shrink-0">
+            {/* WhatsApp Bottom Composer (Auto-growing height for multi-line messages) */}
+            <div className="flex items-end gap-2 min-h-[62px] py-2.5 px-4 bg-[#f0f2f5] border-t border-[#e9edef] shrink-0">
               {/* Emoji Icon */}
               <button
                 type="button"
                 title="Emojis"
-                onClick={() => setComposerText((prev) => `${prev} 👍`)}
-                className="text-[#54656f] hover:text-[#111b21] transition-colors p-1"
+                onClick={() => {
+                  setComposerText((prev) => `${prev} 👍`);
+                  setTimeout(adjustTextareaHeight, 0);
+                }}
+                className="text-[#54656f] hover:text-[#111b21] transition-colors p-1.5 mb-1"
               >
                 <WhatsAppEmojiIcon />
               </button>
@@ -875,18 +868,21 @@ export function WhatsAppChatView({
                 type="button"
                 title="Attach"
                 onClick={() => setShowQuickTemplates((prev) => !prev)}
-                className="text-[#54656f] hover:text-[#111b21] transition-colors p-1"
+                className="text-[#54656f] hover:text-[#111b21] transition-colors p-1.5 mb-1"
               >
                 <WhatsAppAttachIcon />
               </button>
 
-              {/* Message Input Box */}
-              <div className="flex-1 bg-white rounded-lg px-4 py-2 flex items-center shadow-2xs border border-transparent focus-within:border-[#00a884]">
+              {/* Message Input Box (Single crisp border, zero double outline, auto-expanding) */}
+              <div className="flex-1 bg-white rounded-lg px-3.5 py-2.5 flex items-center shadow-2xs border border-transparent transition-colors focus-within:border-[#00a884]">
                 <textarea
                   ref={composerInputRef}
                   rows={1}
                   value={composerText}
-                  onChange={(e) => setComposerText(e.target.value)}
+                  onChange={(e) => {
+                    setComposerText(e.target.value);
+                    adjustTextareaHeight();
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
@@ -894,7 +890,14 @@ export function WhatsAppChatView({
                     }
                   }}
                   placeholder={`Type a message to ${activeThread.name}...`}
-                  className="w-full resize-none border-0 bg-transparent text-[14.5px] text-[#111b21] placeholder-[#8696a0] focus:outline-hidden max-h-24"
+                  style={{
+                    outline: 'none',
+                    border: 'none',
+                    boxShadow: 'none',
+                    minHeight: '24px',
+                    maxHeight: '180px',
+                  }}
+                  className="w-full resize-none border-none bg-transparent text-[14.5px] leading-[20px] text-[#111b21] placeholder-[#8696a0] focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 p-0 m-0 overflow-y-auto"
                 />
               </div>
 
@@ -903,7 +906,7 @@ export function WhatsAppChatView({
                 type="button"
                 onClick={handleSendMessage}
                 disabled={!composerText.trim() || isSending}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#00a884] hover:bg-[#008f6f] text-white shadow-xs transition-transform active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#00a884] hover:bg-[#008f6f] text-white shadow-xs transition-transform active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed mb-0.5"
                 title="Send Message (Enter)"
               >
                 {isSending ? (
