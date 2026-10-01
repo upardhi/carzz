@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireApiSession } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { todayISO, addDays } from '@/lib/util/format';
+import { businessToday } from '@/lib/util/time';
 import {
   broadcastWashboySchedules,
   broadcastCustomerDayBeforeReminders,
@@ -62,27 +63,9 @@ export async function POST(request: Request) {
       });
     }
 
-    if (parsed.data.action === 'customer-day-before') {
-      // Default target date is tomorrow
-      const tomorrow =
-        parsed.data.date || addDays(todayISO(), 1).toISOString().slice(0, 10);
-      const { total, queuedCount, batchId } = await broadcastCustomerDayBeforeReminders(
-        store,
-        tomorrow,
-      );
-
-      return NextResponse.json({
-        ok: true,
-        total,
-        queuedCount,
-        batchId,
-        message: `Queued 1-day advance WhatsApp reminders for ${queuedCount} customer${queuedCount === 1 ? '' : 's'}. Worker is delivering in background.`,
-      });
-    }
-
     if (parsed.data.action === 'customer-same-day') {
-      // Default target date is today
-      const targetDate = parsed.data.date || todayISO();
+      // Default target date is today in business timezone (Asia/Kolkata)
+      const targetDate = parsed.data.date || businessToday();
       const { total, queuedCount, batchId } = await broadcastCustomerSameDayReminders(
         store,
         targetDate,
@@ -93,7 +76,25 @@ export async function POST(request: Request) {
         total,
         queuedCount,
         batchId,
-        message: `Queued same-day WhatsApp reminders for ${queuedCount} customer${queuedCount === 1 ? '' : 's'}. Worker is delivering in background.`,
+        message: `Queued 6:00 AM morning WhatsApp reminders for ${queuedCount} customer${queuedCount === 1 ? '' : 's'}. Worker is delivering in background.`,
+      });
+    }
+
+    if (parsed.data.action === 'customer-day-before') {
+      // Per business policy: 1-day advance reminders are disabled in favor of same-day 6:00 AM morning reminders.
+      // Redirect to today's morning reminders so tomorrow's customers are not messaged 1 day early.
+      const targetDate = businessToday();
+      const { total, queuedCount, batchId } = await broadcastCustomerSameDayReminders(
+        store,
+        targetDate,
+      );
+
+      return NextResponse.json({
+        ok: true,
+        total,
+        queuedCount,
+        batchId,
+        message: `Queued 6:00 AM morning WhatsApp reminders for ${queuedCount} customer${queuedCount === 1 ? '' : 's'} scheduled today. (1-day advance reminders have been retired).`,
       });
     }
 

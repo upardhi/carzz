@@ -4,6 +4,7 @@ import type { DataStore } from '@/lib/data/ports/store';
 import type { Payment, WashVisit } from '@/lib/data/types';
 import { MISS_REASON_LABEL } from '@/lib/util/labels';
 import { formatClock, formatDate, formatDateFull, formatTime } from '@/lib/util/format';
+import { slotInstant } from '@/lib/util/time';
 import { resolvePublicPhotoUrl } from '@/lib/util/photoUrl';
 import {
   enqueueWhatsAppMessage,
@@ -360,47 +361,19 @@ export async function notifyWashboyMorningSchedule(
 }
 
 // ============================================================================
-// 7. 1 DAY BEFORE WASH REMINDER (Advance customer alert)
+// 7. SAME-DAY MORNING WASH REMINDER (Replaces 1-day-before per business policy)
 // ============================================================================
 export async function notifyCustomerDayBeforeReminder(
   store: DataStore,
   visit: WashVisit,
 ) {
-  try {
-    const [customer, car] = await Promise.all([
-      store.customers.get(visit.customerId),
-      store.cars.get(visit.carId),
-    ]);
-    if (!customer?.phone || !car) return false;
-
-    const formattedTime = formatTime(visit.scheduledTime);
-    const tomorrowFormatted = formatDateFull(visit.scheduledDate);
-
-    const message = buildAdvanceReminderMessage({
-      customerName: customer.name,
-      carPlate: car.plate,
-      scheduledDateFormatted: tomorrowFormatted,
-      scheduledTimeFormatted: formattedTime,
-    });
-
-    enqueueWhatsAppMessage({
-      to: customer.phone,
-      recipientName: customer.name,
-      recipientType: 'CUSTOMER',
-      recipientId: customer.id,
-      event: 'Advance Wash Reminder',
-      message,
-      dedupKey: `day_before_${visit.id}_${visit.scheduledDate}`,
-    });
-    return true;
-  } catch (err) {
-    console.error('Error queueing Day-Before Wash Reminder:', err);
-    return false;
-  }
+  // NOTE: Reminders are no longer sent 1 day before.
+  // They are sent on the same day at 6:00 AM in the morning.
+  return notifyCustomerSameDayReminder(store, visit);
 }
 
 // ============================================================================
-// 8. SAME DAY BEFORE WASH REMINDER (Day-of customer reminder)
+// 8. SAME DAY 6:00 AM WASH REMINDER (Day-of morning customer reminder)
 // ============================================================================
 export async function notifyCustomerSameDayReminder(
   store: DataStore,
@@ -425,6 +398,10 @@ export async function notifyCustomerSameDayReminder(
       portalUrl,
     });
 
+    // Schedule for 6:00 AM on the scheduled day in business timezone
+    const sixAm = slotInstant(visit.scheduledDate, '06:00');
+    const delayMs = Math.max(0, sixAm.getTime() - Date.now());
+
     enqueueWhatsAppMessage({
       to: customer.phone,
       recipientName: customer.name,
@@ -433,6 +410,7 @@ export async function notifyCustomerSameDayReminder(
       event: 'Today Wash Reminder',
       message,
       dedupKey: `same_day_${visit.id}_${visit.scheduledDate}`,
+      delayMs,
     });
     return true;
   } catch (err) {
@@ -579,58 +557,20 @@ export async function broadcastWashboySchedules(
   return results;
 }
 
-/** Broadcast 1-day advance reminder to all customers scheduled for tomorrow (Batched) */
+/**
+ * Broadcast customer reminders.
+ * NOTE: 1-day advance reminders are disabled per business policy.
+ * Customers receive reminders on the same day at 6:00 AM.
+ * Kept for backwards compatibility; redirects to same-day 6:00 AM reminder.
+ */
 export async function broadcastCustomerDayBeforeReminders(
   store: DataStore,
   targetDate: string,
 ) {
-  const visits = await store.visits.find({
-    where: { scheduledDate: targetDate, status: 'PENDING' } as never,
-  });
-
-  const seenCars = new Set<string>();
-  const jobs: EnqueueWhatsAppOptions[] = [];
-
-  for (const v of visits) {
-    if (seenCars.has(v.carId)) continue;
-    seenCars.add(v.carId);
-
-    const [customer, car] = await Promise.all([
-      store.customers.get(v.customerId),
-      store.cars.get(v.carId),
-    ]);
-    if (!customer?.phone || !car) continue;
-
-    const formattedTime = formatTime(v.scheduledTime);
-    const tomorrowFormatted = formatDateFull(v.scheduledDate);
-    const message = buildAdvanceReminderMessage({
-      customerName: customer.name,
-      carPlate: car.plate,
-      scheduledDateFormatted: tomorrowFormatted,
-      scheduledTimeFormatted: formattedTime,
-    });
-
-    jobs.push({
-      to: customer.phone,
-      recipientName: customer.name,
-      recipientType: 'CUSTOMER',
-      recipientId: customer.id,
-      event: 'Advance Wash Reminder',
-      message,
-      dedupKey: `day_before_${v.id}_${v.scheduledDate}`,
-    });
-  }
-
-  const batchResult = enqueueWhatsAppBatch(jobs, 'advance_wash_reminders');
-
-  return {
-    total: visits.length,
-    queuedCount: jobs.length,
-    batchId: batchResult.batchId,
-  };
+  return broadcastCustomerSameDayReminders(store, targetDate);
 }
 
-/** Broadcast same-day wash reminder to all customers scheduled for today (Batched) */
+/** Broadcast same-day 6:00 AM morning wash reminder to all customers scheduled for today (Batched) */
 export async function broadcastCustomerSameDayReminders(
   store: DataStore,
   targetDate: string,
@@ -641,6 +581,10 @@ export async function broadcastCustomerSameDayReminders(
 
   const seenCars = new Set<string>();
   const jobs: EnqueueWhatsAppOptions[] = [];
+
+  // Calculate delay until 6:00 AM on the target date (Asia/Kolkata business time)
+  const sixAm = slotInstant(targetDate, '06:00');
+  const delayMs = Math.max(0, sixAm.getTime() - Date.now());
 
   for (const v of visits) {
     if (seenCars.has(v.carId)) continue;
@@ -671,6 +615,7 @@ export async function broadcastCustomerSameDayReminders(
       event: 'Today Wash Reminder',
       message,
       dedupKey: `same_day_${v.id}_${v.scheduledDate}`,
+      delayMs,
     });
   }
 

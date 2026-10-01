@@ -376,22 +376,10 @@ export function ScheduleClient({
             size="sm"
             className="border-emerald-300 bg-white font-semibold text-emerald-950 shadow-2xs hover:bg-emerald-100"
             payload={{ action: 'customer-same-day', date }}
-            confirm={`Send same-day wash reminders to all customers scheduled for today?`}
-            confirmTitle="Today's Customer Wash Reminders"
+            confirm={`Send today's 6:00 AM morning wash reminders to all scheduled customers? (Reminders also dispatch automatically at 6:00 AM every morning)`}
+            confirmTitle="Today's 6:00 AM Customer Wash Reminders"
           >
-            🔔 Today Customer Reminders
-          </ActionButton>
-
-          <ActionButton
-            endpoint="/api/ops/notifications/dispatch"
-            variant="secondary"
-            size="sm"
-            className="border-emerald-300 bg-white font-semibold text-emerald-950 shadow-2xs hover:bg-emerald-100"
-            payload={{ action: 'customer-day-before' }}
-            confirm={`Send 1-day advance reminders to tomorrow's scheduled customers?`}
-            confirmTitle="Tomorrow's Customer Reminders"
-          >
-            📅 Tomorrow Reminders (Advance)
+            🌅 Send Today 6 AM Reminders
           </ActionButton>
 
           <button

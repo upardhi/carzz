@@ -273,7 +273,9 @@ export function enqueueWhatsAppBatch(
       batchId,
       createdAt: now.toISOString(),
       sentAt: null,
-      scheduledFor: now.toISOString(),
+      scheduledFor: item.delayMs
+        ? new Date(now.getTime() + item.delayMs).toISOString()
+        : now.toISOString(),
       dedupKey,
     };
 
@@ -366,11 +368,11 @@ async function dispatchSingleJob(job: WhatsAppMessageRecord) {
       message: job.message,
       ...(job.mediaUrl
         ? {
-            media: {
-              type: 'image',
-              url: job.mediaUrl,
-            },
-          }
+          media: {
+            type: 'image',
+            url: job.mediaUrl,
+          },
+        }
         : {}),
     });
 
