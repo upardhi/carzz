@@ -439,6 +439,7 @@ export interface Car {
   serviceStartedBeforePayment: boolean;
   serviceStartedByUserId: string | null;
   serviceStartNote?: string | null;
+  createdAt?: Timestamp;
 }
 
 /* -------------------------------------------------------------------------- */

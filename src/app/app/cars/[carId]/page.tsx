@@ -322,16 +322,34 @@ export default async function CarDetail({
             <span className="text-slate-500 font-medium">Monthly Rate</span>
             <span className="font-semibold text-slate-900">₹{(car.payment?.price ?? car.package?.price ?? 0).toLocaleString('en-IN')}</span>
           </div>
-          <div className="flex items-center justify-between py-2">
-            <span className="text-slate-500 font-medium">Payment Status</span>
-            {car.payment?.due === 0 ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
-                ✓ Paid (₹{car.payment.paid.toLocaleString('en-IN')})
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2.5 py-0.5 text-xs font-bold text-amber-800">
-                Due: ₹{(car.payment?.due ?? car.package?.price ?? 0).toLocaleString('en-IN')}
-              </span>
+          <div className="py-2 space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500 font-medium">Payment Status</span>
+              {car.payment?.awaitingFirstWash ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-300 px-2.5 py-0.5 text-xs font-bold text-amber-800">
+                  ⏳ Unpaid (Awaiting 1st Wash)
+                </span>
+              ) : car.payment?.due === 0 ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
+                  ✓ Paid (₹{car.payment.paid.toLocaleString('en-IN')})
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2.5 py-0.5 text-xs font-bold text-amber-800">
+                  Due: ₹{(car.payment?.due ?? car.package?.price ?? 0).toLocaleString('en-IN')}
+                </span>
+              )}
+            </div>
+            {car.payment?.awaitingFirstWash && (
+              <div className="rounded-lg bg-amber-50/70 border border-amber-200/70 p-2 text-xs text-amber-900 mt-1">
+                <p className="font-semibold text-amber-950 flex items-center gap-1">
+                  <span>⏳</span>
+                  <span>First Wash Pending</span>
+                </p>
+                <p className="mt-0.5 text-[11.5px] text-amber-800">
+                  {car.payment.advanceMessage ||
+                    'Payment will automatically be distributed to this car once the 1st wash is completed.'}
+                </p>
+              </div>
             )}
           </div>
           <div className="flex items-center justify-between py-2">

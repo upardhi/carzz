@@ -14,7 +14,11 @@ export interface VehicleCardProps {
     price: number;
     paid: number;
     due: number;
-    status: 'PAID' | 'DUE' | 'OVERDUE';
+    status: 'PAID' | 'DUE' | 'OVERDUE' | 'AWAITING_FIRST_WASH';
+    awaitingFirstWash?: boolean;
+    isAdvanceCovered?: boolean;
+    advanceHeld?: number;
+    advanceMessage?: string;
   };
   colour?: string;
   doneWashes: number;
@@ -132,16 +136,28 @@ export const VehicleCard: React.FC<VehicleCardProps> = ({
         )}
 
         {paymentStatus && (
-          <div className="flex items-center justify-between border-b border-slate-50 py-1">
-            <span className="font-medium text-slate-500">Payment</span>
-            {paymentStatus.due === 0 ? (
-              <span className="font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded text-[11px]">
-                ✓ Paid (₹{paymentStatus.paid.toLocaleString('en-IN')})
-              </span>
-            ) : (
-              <span className="font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded text-[11px]">
-                Due: ₹{paymentStatus.due.toLocaleString('en-IN')}
-              </span>
+          <div className="border-b border-slate-50 py-1.5 space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="font-medium text-slate-500">Payment</span>
+              {paymentStatus.awaitingFirstWash ? (
+                <span className="font-bold text-amber-800 bg-amber-50 border border-amber-300 px-2 py-0.5 rounded text-[11px] flex items-center gap-1">
+                  <span>⏳</span>
+                  <span>Unpaid (Awaiting 1st Wash)</span>
+                </span>
+              ) : paymentStatus.due === 0 ? (
+                <span className="font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded text-[11px]">
+                  ✓ Paid (₹{paymentStatus.paid.toLocaleString('en-IN')})
+                </span>
+              ) : (
+                <span className="font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded text-[11px]">
+                  Due: ₹{paymentStatus.due.toLocaleString('en-IN')}
+                </span>
+              )}
+            </div>
+            {paymentStatus.awaitingFirstWash && (
+              <p className="text-[11px] text-amber-800/90 bg-amber-50/60 border border-amber-200/60 rounded px-2 py-1 leading-snug">
+                ℹ️ {paymentStatus.advanceMessage || 'Payment will be distributed to this car once the 1st wash is completed.'}
+              </p>
             )}
           </div>
         )}

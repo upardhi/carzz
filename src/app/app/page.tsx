@@ -331,7 +331,13 @@ export default async function CustomerHome() {
           </div>
 
           <div className="mt-4 text-xs text-slate-400 font-medium">
-            {(account.balance ?? 0) >= 0 ? 'advance balance' : 'payment due'}
+            {(account.balance ?? 0) > 0
+              ? account.cars.some((c) => c.payment.awaitingFirstWash)
+                ? 'advance in wallet (reserved for 1st washes)'
+                : 'advance in wallet'
+              : (account.balance ?? 0) === 0
+              ? 'wallet balance'
+              : 'payment due'}
           </div>
         </div>
       </div>
@@ -395,7 +401,12 @@ export default async function CustomerHome() {
                             {car.package?.name ?? 'Plan'}
                           </span>
                           <span className="text-slate-300">•</span>
-                          {car.payment.due === 0 ? (
+                          {car.payment.awaitingFirstWash ? (
+                            <span className="text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-300 px-1.5 py-0.5 rounded flex items-center gap-1" title={car.payment.advanceMessage}>
+                              <span>⏳</span>
+                              <span>Unpaid (Awaiting 1st Wash)</span>
+                            </span>
+                          ) : car.payment.due === 0 ? (
                             <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded">
                               ✓ Paid
                             </span>

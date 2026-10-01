@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { HttpError, requireApiSession } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
-import { recordPayment } from '@/lib/services/accounts';
+import { loadCustomerAccount, recordPayment } from '@/lib/services/accounts';
 import { notifyPaymentApproved } from '@/lib/services/whatsappNotifications';
 import { currentCycle } from '@/lib/util/format';
 import { assertInScope, opsError } from '../_guard';
@@ -65,21 +65,13 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: true, payment });
       }
 
-      // Confirming a declared cash or UPI payment is what actually settles it
-      // against the customer's invoices, so re-run it through recordPayment
-      // rather than just flipping a flag.
-      await store.payments.delete(payment.id);
-      const settled = await recordPayment(store, {
-        customerId: payment.customerId,
-        amount: payment.amount,
-        mode: payment.mode,
-        kind: payment.kind,
-        cycle: payment.cycle,
-        recordedByUserId: session.user.id,
-        note: payment.note,
-        reference: payment.reference,
+      // Confirming a declared cash or UPI payment marks it CONFIRMED in place
+      // preserving the unique Payment ID, and loadCustomerAccount reconciles the ledger.
+      const settled = await store.payments.update(payment.id, {
         status: 'CONFIRMED',
+        recordedByUserId: session.user.id,
       });
+      await loadCustomerAccount(store, payment.customerId, payment.cycle);
 
       revalidatePaymentPages();
       const receiptNo = `RCP-${settled.id.slice(-6).toUpperCase()}`;
@@ -125,6 +117,15 @@ export async function POST(request: Request) {
     const customer = await store.customers.get(parsed.data.customerId);
     if (!customer) throw new HttpError(404, 'Customer not found.');
     assertInScope(session, customer.areaId);
+
+    if (parsed.data.reference?.trim()) {
+      const existingRef = await store.payments.find({
+        where: { reference: parsed.data.reference.trim() } as never,
+      });
+      if (existingRef.length > 0) {
+        throw new HttpError(409, `A payment with reference "${parsed.data.reference.trim()}" has already been recorded.`);
+      }
+    }
 
     const payment = await recordPayment(store, {
       customerId: customer.id,

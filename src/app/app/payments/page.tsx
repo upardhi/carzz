@@ -132,13 +132,15 @@ export default async function CustomerPayments() {
             </div>
             <div>
               <div className="text-[10.5px] font-bold uppercase tracking-wider text-slate-500">
-                ACCOUNT BALANCE
+                WALLET ADVANCE
               </div>
               <div className="mt-0.5 text-2xl font-black tracking-tight text-purple-700">
                 {money(Math.max(0, account.balance))}
               </div>
               <div className="mt-0.5 text-xs font-medium text-slate-500">
-                Advance credit in account
+                {account.cars.some((c) => c.payment.awaitingFirstWash)
+                  ? 'Reserved for upcoming 1st washes'
+                  : 'Advance credit in wallet'}
               </div>
             </div>
           </div>
@@ -186,14 +188,17 @@ export default async function CustomerPayments() {
 
           <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3.5">
             {account.cars.map((car) => {
-              const isPaid = car.payment.due === 0;
+              const isAwaiting = Boolean(car.payment.awaitingFirstWash);
+              const isPaid = !isAwaiting && car.payment.due === 0;
               return (
                 <div
                   key={car.id}
                   className={`rounded-xl border p-4 transition-all ${
                     isPaid
                       ? 'border-emerald-200/80 bg-emerald-50/30'
-                      : 'border-amber-200/80 bg-amber-50/30'
+                      : isAwaiting
+                      ? 'border-amber-200/90 bg-amber-50/40'
+                      : 'border-rose-200/80 bg-rose-50/30'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -211,18 +216,35 @@ export default async function CustomerPayments() {
 
                     <span
                       className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold shrink-0 border ${
-                        isPaid
+                        isAwaiting
+                          ? 'bg-amber-100 text-amber-900 border-amber-300'
+                          : isPaid
                           ? 'bg-emerald-100/90 text-emerald-800 border-emerald-300'
                           : car.payment.status === 'OVERDUE'
                           ? 'bg-rose-100 text-rose-800 border-rose-300'
                           : 'bg-amber-100 text-amber-900 border-amber-300'
                       }`}
                     >
-                      {isPaid
+                      {isAwaiting
+                        ? '⏳ Unpaid · Awaiting 1st Wash'
+                        : isPaid
                         ? `✓ Paid (${money(car.payment.paid)})`
                         : `Due: ${money(car.payment.due)}`}
                     </span>
                   </div>
+
+                  {isAwaiting && (
+                    <div className="mt-3 rounded-lg bg-white/90 border border-amber-200/90 p-2.5 text-xs text-amber-900">
+                      <div className="font-bold flex items-center gap-1.5 text-amber-950">
+                        <span>⏳</span>
+                        <span>First wash not completed yet</span>
+                      </div>
+                      <p className="mt-1 text-[11.5px] text-amber-800 leading-relaxed">
+                        {car.payment.advanceMessage ||
+                          'First wash not completed yet. Once the 1st wash is completed, your payment will automatically get distributed to this car.'}
+                      </p>
+                    </div>
+                  )}
 
                   <div className="mt-3.5 pt-3 border-t border-slate-200/60 flex items-center justify-between text-xs">
                     <span className="text-slate-500 font-medium">
@@ -362,11 +384,27 @@ export default async function CustomerPayments() {
                     </div>
 
                     <div className="min-w-0">
-                      <div className="text-sm font-black text-slate-900">
-                        {money(payment.amount)}
+                      <div className="text-sm font-black text-slate-900 flex items-center gap-2">
+                        <span>{money(payment.amount)}</span>
+                        {payment.kind === 'ADVANCE' && (
+                          <span className="rounded bg-purple-100 text-purple-800 text-[10px] font-bold px-1.5 py-0.5">
+                            Advance
+                          </span>
+                        )}
                       </div>
                       <div className="text-[11.5px] text-slate-500 font-medium truncate mt-0.5">
                         {PAYMENT_MODE_LABEL[payment.mode]} · {payment.kind === 'ADVANCE' ? 'Security Advance' : 'Monthly Subscription'}
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                        <span className="inline-flex items-center gap-1 font-mono text-[11px] font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200/80 px-2 py-0.5 rounded border border-slate-200 transition-colors select-all">
+                          <span className="text-slate-400 font-normal">Payment ID:</span>
+                          <strong className="text-slate-900 font-bold">{payment.reference || payment.id}</strong>
+                        </span>
+                        {payment.reference && payment.id !== payment.reference && (
+                          <span className="font-mono text-[10px] text-slate-400" title={`Internal ID: ${payment.id}`}>
+                            (Receipt #{payment.id.slice(-6).toUpperCase()})
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>

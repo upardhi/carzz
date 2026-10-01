@@ -34,6 +34,7 @@ import { RecordPaymentForm } from './RecordPaymentForm';
 import { StartCarServiceAction } from './StartCarServiceAction';
 import { WashTodayAction } from './WashTodayAction';
 import { QuickAssignStaff } from './QuickAssignStaff';
+import { PendingPaymentsSection } from './PendingPaymentsSection';
 import {
   AddCarModalButton,
   CarWashHistoryButton,
@@ -76,51 +77,12 @@ export async function ConsoleCustomerDetail({
     .slice(0, 12);
 
   const activeCars = cars.filter((c) => c.active && (c.serviceStarted ?? true));
-  const sortedActiveCars = [...activeCars].sort((a, b) => {
-    const doneA = visits.filter((v) => v.carId === a.id && v.status === 'DONE').length;
-    const doneB = visits.filter((v) => v.carId === b.id && v.status === 'DONE').length;
-    if ((doneA > 0) !== (doneB > 0)) {
-      return doneA > 0 ? -1 : 1;
-    }
-    if (doneA !== doneB) {
-      return doneB - doneA;
-    }
-    const startedA = a.serviceStartedAt
-      ? new Date(a.serviceStartedAt).getTime()
-      : a.serviceStarted ? 1 : 0;
-    const startedB = b.serviceStartedAt
-      ? new Date(b.serviceStartedAt).getTime()
-      : b.serviceStarted ? 1 : 0;
-    if (startedA !== startedB) {
-      return startedA - startedB;
-    }
-    return a.id.localeCompare(b.id);
-  });
-
-  const totalInvoicePaid = invoices.reduce((sum, i) => sum + i.paidAmount, 0);
-  let remainingPaidForCars = totalInvoicePaid;
-  const carPaymentsMap = new Map<string, { price: number; paid: number; due: number }>();
-  for (const c of sortedActiveCars) {
-    const price = c.package?.price ?? 0;
-    const allocated = Math.min(price, remainingPaidForCars);
-    remainingPaidForCars -= allocated;
-    const due = Math.max(0, price - allocated);
-    carPaymentsMap.set(c.id, { price, paid: allocated, due });
-  }
-
-  const carsPaymentInfo = activeCars.map((c) => {
-    const payInfo = carPaymentsMap.get(c.id) || {
-      price: c.package?.price ?? 0,
-      paid: 0,
-      due: c.package?.price ?? 0,
-    };
-    return {
-      id: c.id,
-      name: `${c.make} ${c.model} (${c.plate})`,
-      price: payInfo.price,
-      due: payInfo.due,
-    };
-  });
+  const carsPaymentInfo = activeCars.map((c) => ({
+    id: c.id,
+    name: `${c.make} ${c.model} (${c.plate})`,
+    price: c.payment?.price ?? c.package?.price ?? 0,
+    due: c.payment?.due ?? c.package?.price ?? 0,
+  }));
 
   return (
     <>
@@ -354,7 +316,7 @@ export async function ConsoleCustomerDetail({
                 const isScheduledDayToday = (car.weeklyDays && car.weeklyDays.length > 0 ? car.weeklyDays : ['MON', 'THU']).some(
                   (d) => (WEEKDAY_NUM as Record<string, number>)[d] === todayDayNum,
                 );
-                const carPay = carPaymentsMap.get(car.id);
+                const carPay = car.payment;
                 const todaysVisit = visits.find(
                   (v) => v.carId === car.id && v.scheduledDate === today,
                 );
@@ -391,8 +353,10 @@ export async function ConsoleCustomerDetail({
                           </div>
                           <div className="mt-1 flex flex-wrap items-center gap-1.5">
                             {carPay && (
-                              carPay.due === 0 ? (
-                                <Tag tone="ok">✓ Paid (₹{carPay.price.toLocaleString('en-IN')})</Tag>
+                              carPay.awaitingFirstWash ? (
+                                <Tag tone="warn">⏳ Unpaid · Awaiting 1st Wash</Tag>
+                              ) : carPay.due === 0 ? (
+                                <Tag tone="ok">✓ Paid (₹{carPay.paid.toLocaleString('en-IN')})</Tag>
                               ) : (
                                 <Tag tone="bad">Due: ₹{carPay.due.toLocaleString('en-IN')}</Tag>
                               )
@@ -418,6 +382,12 @@ export async function ConsoleCustomerDetail({
                                 <Tag tone="ok">📅 Today&apos;s Booking</Tag>
                               ))}
                           </div>
+                          {carPay?.awaitingFirstWash && (
+                            <div className="mt-2 text-xs rounded-lg bg-amber-50/80 border border-amber-200/80 p-2 text-amber-900">
+                              <span className="font-bold">⏳ Awaiting 1st Wash:</span>{' '}
+                              <span>{carPay.advanceMessage || 'Payment will be distributed once the first wash is completed.'}</span>
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -781,19 +751,17 @@ export async function ConsoleCustomerDetail({
                     id: 'reference',
                     header: 'REF / NOTE',
                     render: (payment) => (
-                      <div className="text-xs max-w-[200px]">
-                        {payment.reference ? (
-                          <span className="font-mono text-[11px] font-semibold text-slate-700 block truncate">
-                            Ref: {payment.reference}
-                          </span>
-                        ) : null}
+                      <div className="text-xs max-w-[240px]">
+                        <span
+                          className="font-mono text-[11px] font-bold text-slate-800 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 block truncate select-all"
+                          title={payment.reference || payment.id}
+                        >
+                          {payment.reference ? `ID: ${payment.reference}` : `ID: ${payment.id}`}
+                        </span>
                         {payment.note ? (
-                          <span className="text-[11px] text-slate-500 italic block truncate">
+                          <span className="text-[11px] text-slate-500 italic block truncate mt-0.5" title={payment.note}>
                             {payment.note}
                           </span>
-                        ) : null}
-                        {!payment.reference && !payment.note ? (
-                          <span className="text-slate-300">—</span>
                         ) : null}
                       </div>
                     ),
@@ -826,88 +794,7 @@ export async function ConsoleCustomerDetail({
                 ]}
               />
 
-              {payments.some((p) => p.status === 'PENDING') ? (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-amber-800">
-                    <span className="text-sm">⏳</span>
-                    <span>Pending Payments Awaiting Approval:</span>
-                  </div>
-                  {payments
-                    .filter((p) => p.status === 'PENDING')
-                    .map((payment) => (
-                      <div
-                        key={payment.id}
-                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/70 p-3.5 shadow-2xs"
-                      >
-                        <div className="space-y-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-base font-extrabold text-slate-900">
-                              {money(payment.amount)}
-                            </span>
-                            <span
-                              className={`rounded-md px-2 py-0.5 text-[11px] font-bold ${
-                                payment.mode === 'GATEWAY'
-                                  ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                                  : payment.mode === 'MANUAL_UPI'
-                                    ? 'bg-purple-100 text-purple-800 border border-purple-200'
-                                    : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                              }`}
-                            >
-                              {payment.mode === 'GATEWAY'
-                                ? '⚡ Online Razorpay'
-                                : PAYMENT_MODE_LABEL[payment.mode]}
-                            </span>
-                            <span className="text-[11px] text-slate-500 font-mono">
-                              {payment.createdAt
-                                ? new Date(payment.createdAt).toLocaleDateString('en-IN', {
-                                    day: 'numeric',
-                                    month: 'short',
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                  })
-                                : ''}
-                            </span>
-                          </div>
-
-                          {payment.reference && (
-                            <p className="text-xs text-slate-600 font-mono">
-                              Ref / Txn ID: <strong className="text-slate-800">{payment.reference}</strong>
-                            </p>
-                          )}
-                          {payment.note && (
-                            <p className="text-xs text-slate-500 italic line-clamp-1">
-                              {payment.note}
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-2 shrink-0">
-                          <ActionButton
-                            endpoint="/api/ops/payments"
-                            payload={{ action: 'reject', paymentId: payment.id }}
-                            variant="danger"
-                            confirm={`Are you sure you want to reject this ${money(payment.amount)} payment? No credit will be added to the customer's account.`}
-                            confirmTitle="Reject Payment"
-                            confirmTone="danger"
-                          >
-                            Reject
-                          </ActionButton>
-
-                          <ActionButton
-                            endpoint="/api/ops/payments"
-                            payload={{ action: 'confirm', paymentId: payment.id }}
-                            variant="primary"
-                            confirm={`Confirm that ${money(payment.amount)} via ${payment.mode === 'GATEWAY' ? 'Razorpay' : payment.mode} has been received? This will settle open invoices and credit the customer's account.`}
-                            confirmTitle="Approve Payment"
-                            confirmTone="primary"
-                          >
-                            Approve & Credit
-                          </ActionButton>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              ) : null}
+              <PendingPaymentsSection payments={payments} />
             </div>
           </div>
         </section>

@@ -29,7 +29,11 @@ export interface CustomerAccount {
       price: number;
       paid: number;
       due: number;
-      status: 'PAID' | 'DUE' | 'OVERDUE';
+      status: 'PAID' | 'DUE' | 'OVERDUE' | 'AWAITING_FIRST_WASH';
+      awaitingFirstWash?: boolean;
+      isAdvanceCovered?: boolean;
+      advanceHeld?: number;
+      advanceMessage?: string;
     };
     serviceStartedByUser?: { id: Id; name: string; role: string; email?: string } | null;
     pendingRequest?: (CustomerRequest & {
@@ -181,7 +185,48 @@ export async function loadCustomerAccount(
     }
   }
 
-  const effectiveCycleVisits = effectiveVisits.filter((v) => v.cycle === cycle);
+  // Determine which cars are already covered by an existing fully-paid package whose washes
+  // are still in progress, versus cars that need billing for the current cycle (newly added cars
+  // or cars whose previous package washes are finished).
+  const pastInvoices = invoices
+    .filter((inv) => inv.cycle < cycle && inv.status !== 'WRITTEN_OFF')
+    .sort((a, b) => b.cycle.localeCompare(a.cycle)); // newest past cycle first
+
+  const hasUnpaidPastInvoice = pastInvoices.some((inv) => inv.paidAmount < inv.amount);
+  const latestPastInvoice = pastInvoices[0];
+
+  function isCarCoveredByPaidPackage(car: (typeof cars)[number]): boolean {
+    if (!latestPastInvoice || latestPastInvoice.paidAmount < latestPastInvoice.amount) {
+      return false;
+    }
+    // A car is only covered by that past invoice if the car was already registered in or before that cycle.
+    // If it was created in a later cycle, it is a newly added car and must be billed.
+    const carTimestamp = car.serviceStartedAt || car.createdAt;
+    const carCycle = carTimestamp ? carTimestamp.slice(0, 7) : latestPastInvoice.cycle;
+    if (carCycle > latestPastInvoice.cycle) {
+      return false;
+    }
+    const pkg = packageById.get(car.packageId);
+    const quota = pkg?.washesPerMonth ?? 8;
+    const completedWashes = effectiveVisits.filter(
+      (v) => v.carId === car.id && v.cycle >= latestPastInvoice.cycle && v.status === 'DONE',
+    ).length;
+    // A car is only covered by that past invoice if it completed at least 1 wash and hasn't exhausted quota.
+    // If completedWashes === 0, the first wash was never completed.
+    return completedWashes > 0 && completedWashes < quota;
+  }
+
+  const activeCarsRaw = cars.filter((c) => c.active && (c.serviceStarted ?? true));
+  const carsNeedingBilling = activeCarsRaw.filter((c) => !isCarCoveredByPaidPackage(c));
+  const currentCycleBill = hasUnpaidPastInvoice
+    ? 0
+    : carsNeedingBilling.reduce((sum, c) => sum + (packageById.get(c.packageId)?.price ?? 0), 0);
+
+  const activePackageCycle = latestPastInvoice && carsNeedingBilling.length === 0
+    ? latestPastInvoice.cycle
+    : cycle;
+
+  const effectiveCycleVisits = effectiveVisits.filter((v) => v.cycle >= activePackageCycle);
 
   const carsWithDetail = cars.map((car) => {
     const starterUser = car.serviceStartedByUserId
@@ -203,12 +248,20 @@ export async function loadCustomerAccount(
         }
       : null;
 
+    const carActiveCycle = isCarCoveredByPaidPackage(car) && latestPastInvoice
+      ? latestPastInvoice.cycle
+      : cycle;
+
+    const carVisits = effectiveVisits.filter(
+      (v) => v.carId === car.id && v.cycle >= carActiveCycle,
+    );
+
     return {
       ...car,
       package: pkg,
       pendingRequest,
       tally: tallyVisits(
-        effectiveCycleVisits.filter((v) => v.carId === car.id),
+        carVisits,
         effectiveQuota,
       ),
       serviceStartedByUser: starterUser
@@ -226,17 +279,30 @@ export async function loadCustomerAccount(
     .filter((c) => c.active && (c.serviceStarted ?? true))
     .reduce((sum, c) => sum + (packageById.get(c.packageId)?.price ?? 0), 0);
 
-  // Keep current cycle's invoice perfectly synchronized with active cars' monthly subscription total
+  // Keep current cycle's invoice perfectly synchronized with cars needing billing this cycle
   let effectiveInvoices = invoices;
-  if (monthly > 0 && customer.status !== 'INACTIVE') {
+  if (currentCycleBill <= 0) {
+    // If no cars need billing for the current cycle (all cars are covered by in-progress paid packages),
+    // delete any premature invoice for current cycle so the customer is not double-billed or shown false dues.
+    const prematureInvoiceIndex = effectiveInvoices.findIndex((inv) => inv.cycle === cycle);
+    if (prematureInvoiceIndex >= 0) {
+      const prematureInv = effectiveInvoices[prematureInvoiceIndex];
+      try {
+        await store.invoices.delete(prematureInv.id);
+      } catch {
+        // ignore
+      }
+      effectiveInvoices = effectiveInvoices.filter((inv) => inv.id !== prematureInv.id);
+    }
+  } else if (customer.status !== 'INACTIVE') {
     const currentInvoiceIndex = effectiveInvoices.findIndex((inv) => inv.cycle === cycle);
     if (currentInvoiceIndex >= 0) {
       const currentInvoice = effectiveInvoices[currentInvoiceIndex];
-      if (currentInvoice.amount < monthly) {
+      if (currentInvoice.amount !== currentCycleBill) {
         try {
           const updatedInvoice = await store.invoices.update(currentInvoice.id, {
-            amount: monthly,
-            status: currentInvoice.paidAmount >= monthly ? 'PAID' : currentInvoice.paidAmount > 0 ? 'PARTIAL' : 'OPEN',
+            amount: currentCycleBill,
+            status: currentInvoice.paidAmount >= currentCycleBill ? 'PAID' : currentInvoice.paidAmount > 0 ? 'PARTIAL' : 'OPEN',
           });
           effectiveInvoices[currentInvoiceIndex] = updatedInvoice;
         } catch {
@@ -250,7 +316,7 @@ export async function loadCustomerAccount(
           customerId: customer.id,
           areaId: customer.areaId,
           cycle,
-          amount: monthly,
+          amount: currentCycleBill,
           dueOn: firstDueOn,
           paidAmount: 0,
           status: 'OPEN',
@@ -274,23 +340,139 @@ export async function loadCustomerAccount(
     .filter((p) => p.kind !== 'REFUND')
     .reduce((sum, p) => sum + p.amount, 0);
 
-  // Auto-apply unapplied confirmed payments or advance credits to open invoices (oldest cycle first)
-  const totalInvoicePaid = effectiveInvoices.reduce((sum, i) => sum + i.paidAmount, 0);
-  let unappliedCredit = Math.max(0, totalPaid - totalInvoicePaid);
-  if (unappliedCredit > 0) {
-    const openInvoices = effectiveInvoices
-      .filter((i) => i.paidAmount < i.amount && i.status !== 'WRITTEN_OFF')
-      .sort((a, b) => a.cycle.localeCompare(b.cycle));
-    for (const inv of openInvoices) {
-      if (unappliedCredit <= 0) break;
-      const owed = inv.amount - inv.paidAmount;
-      const applied = Math.min(owed, unappliedCredit);
-      unappliedCredit -= applied;
-      const newPaid = inv.paidAmount + applied;
+  const activeCars = carsWithDetail.filter((c) => c.active && (c.serviceStarted ?? true));
+
+  // Determine which active cars have completed at least one wash
+  function hasCarDoneFirstWash(carId: string): boolean {
+    return effectiveVisits.some((v) => v.carId === carId && v.status === 'DONE');
+  }
+
+  // Sort active cars: cars with completed first washes first, then highest washes done, then startedAt
+  const sortedActiveCars = [...activeCars].sort((a, b) => {
+    const firstA = hasCarDoneFirstWash(a.id);
+    const firstB = hasCarDoneFirstWash(b.id);
+    if (firstA !== firstB) {
+      return firstA ? -1 : 1;
+    }
+    const doneA = effectiveCycleVisits.filter((v) => v.carId === a.id && v.status === 'DONE').length;
+    const doneB = effectiveCycleVisits.filter((v) => v.carId === b.id && v.status === 'DONE').length;
+    if (doneA !== doneB) {
+      return doneB - doneA;
+    }
+    const startedA = a.serviceStartedAt
+      ? new Date(a.serviceStartedAt).getTime()
+      : a.serviceStarted ? 1 : 0;
+    const startedB = b.serviceStartedAt
+      ? new Date(b.serviceStartedAt).getTime()
+      : b.serviceStarted ? 1 : 0;
+    if (startedA !== startedB) {
+      return startedA - startedB;
+    }
+    return a.id.localeCompare(b.id);
+  });
+
+  const isOverdue = effectiveInvoices.some(
+    (i) => (i.status === 'OVERDUE' || (i.dueOn < today && i.paidAmount < i.amount)) && i.status !== 'WRITTEN_OFF',
+  );
+
+  let remainingConfirmedPaidToDistribute = totalPaid;
+  const carPaymentsMap = new Map<
+    string,
+    {
+      price: number;
+      paid: number;
+      due: number;
+      status: 'PAID' | 'DUE' | 'OVERDUE' | 'AWAITING_FIRST_WASH';
+      awaitingFirstWash: boolean;
+      isAdvanceCovered?: boolean;
+      advanceHeld?: number;
+      advanceMessage?: string;
+    }
+  >();
+
+  // Pass 1: Distribute available confirmed funds ONLY to cars that have completed their first wash
+  for (const c of sortedActiveCars) {
+    const price = c.package?.price ?? 0;
+    const hasFirstWash = hasCarDoneFirstWash(c.id);
+
+    if (hasFirstWash) {
+      if (isCarCoveredByPaidPackage(c)) {
+        carPaymentsMap.set(c.id, {
+          price,
+          paid: price,
+          due: 0,
+          status: 'PAID',
+          awaitingFirstWash: false,
+        });
+        remainingConfirmedPaidToDistribute = Math.max(0, remainingConfirmedPaidToDistribute - price);
+      } else {
+        const allocated = Math.min(price, remainingConfirmedPaidToDistribute);
+        remainingConfirmedPaidToDistribute -= allocated;
+        const due = Math.max(0, price - allocated);
+        const status = due === 0 ? 'PAID' : isOverdue ? 'OVERDUE' : 'DUE';
+        carPaymentsMap.set(c.id, {
+          price,
+          paid: allocated,
+          due,
+          status,
+          awaitingFirstWash: false,
+        });
+      }
+    }
+  }
+
+  // Pass 2: Any confirmed funds left over remain in the customer's wallet as advance payment!
+  // For cars that have NOT completed their first wash, amount is NOT distributed to that car/package.
+  // The car shows Unpaid (Awaiting 1st Wash), and we check how much advance is reserved in wallet.
+  const walletAdvanceBalance = remainingConfirmedPaidToDistribute;
+  let remainingAdvanceToReserve = walletAdvanceBalance;
+
+  for (const c of sortedActiveCars) {
+    const hasFirstWash = hasCarDoneFirstWash(c.id);
+    if (!hasFirstWash) {
+      const price = c.package?.price ?? 0;
+      const advanceHeld = Math.min(price, remainingAdvanceToReserve);
+      remainingAdvanceToReserve -= advanceHeld;
+      const isAdvanceCovered = advanceHeld >= price && price > 0;
+
+      carPaymentsMap.set(c.id, {
+        price,
+        paid: 0,
+        due: price,
+        status: 'AWAITING_FIRST_WASH',
+        awaitingFirstWash: true,
+        isAdvanceCovered,
+        advanceHeld,
+        advanceMessage: isAdvanceCovered
+          ? `Advance payment of ₹${price.toLocaleString('en-IN')} is reserved in your wallet. Once the first wash is completed, it will automatically be distributed to this car.`
+          : advanceHeld > 0
+          ? `₹${advanceHeld.toLocaleString('en-IN')} advance is reserved in your wallet. Once the first wash is completed, it will be distributed to this car (remaining due: ₹${(price - advanceHeld).toLocaleString('en-IN')}).`
+          : 'First wash not completed yet. Once your 1st wash is completed, payment will automatically be distributed to this vehicle.',
+      });
+    }
+  }
+
+  // Pass 3: Invoices should reflect only the money distributed to cars with completed washes.
+  const totalDistributedToCars = [...carPaymentsMap.values()].reduce(
+    (sum, p) => sum + p.paid,
+    0,
+  );
+
+  let remainingDistributedToApply = totalDistributedToCars;
+  const sortedInvoices = [...effectiveInvoices]
+    .filter((i) => i.status !== 'WRITTEN_OFF')
+    .sort((a, b) => a.cycle.localeCompare(b.cycle));
+
+  for (const inv of sortedInvoices) {
+    const targetPaid = Math.min(inv.amount, remainingDistributedToApply);
+    remainingDistributedToApply -= targetPaid;
+    const targetStatus = targetPaid >= inv.amount ? 'PAID' : targetPaid > 0 ? 'PARTIAL' : 'OPEN';
+
+    if (inv.paidAmount !== targetPaid || inv.status !== targetStatus) {
       try {
         const updated = await store.invoices.update(inv.id, {
-          paidAmount: newPaid,
-          status: newPaid >= inv.amount ? 'PAID' : 'PARTIAL',
+          paidAmount: targetPaid,
+          status: targetStatus,
         });
         const idx = effectiveInvoices.findIndex((x) => x.id === inv.id);
         if (idx >= 0) effectiveInvoices[idx] = updated;
@@ -300,11 +482,28 @@ export async function loadCustomerAccount(
     }
   }
 
+  const finalCarsWithDetail = carsWithDetail.map((c) => ({
+    ...c,
+    payment: carPaymentsMap.get(c.id) || {
+      price: c.package?.price ?? 0,
+      paid: 0,
+      due: c.active && (c.serviceStarted ?? true) ? (c.package?.price ?? 0) : 0,
+      status: (c.active && (c.serviceStarted ?? true) ? (isOverdue ? 'OVERDUE' : 'DUE') : 'PAID') as 'PAID' | 'DUE' | 'OVERDUE' | 'AWAITING_FIRST_WASH',
+      awaitingFirstWash: false,
+    },
+  }));
+
   const totalBilled = effectiveInvoices.reduce((sum, i) => sum + i.amount, 0);
-  const outstanding = effectiveInvoices.reduce(
-    (sum, i) => sum + Math.max(0, i.amount - i.paidAmount),
-    0,
-  );
+
+  // Outstanding: only uncovered dues (if advance covers the due, customer owes nothing out of pocket)
+  const outstanding = sortedActiveCars.reduce((sum, c) => {
+    const pay = carPaymentsMap.get(c.id);
+    if (!pay) return sum;
+    if (pay.awaitingFirstWash) {
+      return sum + Math.max(0, pay.due - (pay.advanceHeld ?? 0));
+    }
+    return sum + pay.due;
+  }, 0);
 
   const nextDue =
     effectiveInvoices
@@ -334,53 +533,6 @@ export async function loadCustomerAccount(
       }
     : null;
 
-  const activeCars = carsWithDetail.filter((c) => c.active && (c.serviceStarted ?? true));
-  const sortedActiveCars = [...activeCars].sort((a, b) => {
-    const doneA = effectiveCycleVisits.filter((v) => v.carId === a.id && v.status === 'DONE').length;
-    const doneB = effectiveCycleVisits.filter((v) => v.carId === b.id && v.status === 'DONE').length;
-    if ((doneA > 0) !== (doneB > 0)) {
-      return doneA > 0 ? -1 : 1;
-    }
-    if (doneA !== doneB) {
-      return doneB - doneA;
-    }
-    const startedA = a.serviceStartedAt
-      ? new Date(a.serviceStartedAt).getTime()
-      : a.serviceStarted ? 1 : 0;
-    const startedB = b.serviceStartedAt
-      ? new Date(b.serviceStartedAt).getTime()
-      : b.serviceStarted ? 1 : 0;
-    if (startedA !== startedB) {
-      return startedA - startedB;
-    }
-    return a.id.localeCompare(b.id);
-  });
-
-  const finalInvoicePaid = effectiveInvoices.reduce((sum, i) => sum + i.paidAmount, 0);
-  const openInvoices = effectiveInvoices.filter((i) => i.status !== 'PAID' && i.status !== 'WRITTEN_OFF');
-  const isOverdue = openInvoices.some((i) => i.status === 'OVERDUE' || i.dueOn < today);
-
-  let remainingPaidForCars = finalInvoicePaid;
-  const carPaymentsMap = new Map<string, { price: number; paid: number; due: number; status: 'PAID' | 'DUE' | 'OVERDUE' }>();
-  for (const c of sortedActiveCars) {
-    const price = c.package?.price ?? 0;
-    const allocated = Math.min(price, remainingPaidForCars);
-    remainingPaidForCars -= allocated;
-    const due = Math.max(0, price - allocated);
-    const status = due === 0 ? 'PAID' : (isOverdue ? 'OVERDUE' : 'DUE');
-    carPaymentsMap.set(c.id, { price, paid: allocated, due, status });
-  }
-
-  const finalCarsWithDetail = carsWithDetail.map((c) => ({
-    ...c,
-    payment: carPaymentsMap.get(c.id) || {
-      price: c.package?.price ?? 0,
-      paid: 0,
-      due: c.active && (c.serviceStarted ?? true) ? (c.package?.price ?? 0) : 0,
-      status: (c.active && (c.serviceStarted ?? true) ? (isOverdue ? 'OVERDUE' : 'DUE') : 'PAID') as 'PAID' | 'DUE' | 'OVERDUE',
-    },
-  }));
-
   const totalAccountQuota = cars
     .filter((c) => c.active && (c.serviceStarted ?? true))
     .reduce((sum, c) => {
@@ -393,13 +545,13 @@ export async function loadCustomerAccount(
     cars: finalCarsWithDetail,
     visits: resolvedVisits,
     payments,
-    invoices,
+    invoices: effectiveInvoices,
     pendingRequests,
     monthly,
     advanceDeposited,
     totalPaid,
     totalBilled,
-    balance: totalPaid - (totalBilled - outstanding),
+    balance: walletAdvanceBalance,
     outstanding,
     nextDue,
     nextVisit: resolvedNextVisit,
@@ -433,6 +585,47 @@ export async function recordPayment(
   if (!customer) throw new Error('Customer not found');
   if (input.amount <= 0) throw new Error('Amount must be more than zero');
 
+  // 1. Deduplication guard by unique reference (e.g. Razorpay payment ID "pay_..." or UPI UTR)
+  const trimmedRef = input.reference?.trim();
+  if (trimmedRef) {
+    const existingWithRef = await store.payments.find({
+      where: { reference: trimmedRef } as never,
+    });
+    if (existingWithRef.length > 0) {
+      console.warn(`Payment with reference "${trimmedRef}" already recorded. Skipping duplicate.`);
+      const existing = existingWithRef[0];
+      if (existing.status === 'PENDING' && input.status === 'CONFIRMED') {
+        const updated = await store.payments.update(existing.id, {
+          status: 'CONFIRMED',
+          recordedByUserId: input.recordedByUserId ?? existing.recordedByUserId,
+        });
+        await loadCustomerAccount(store, input.customerId, input.cycle);
+        return updated;
+      }
+      return existing;
+    }
+  }
+
+  // 2. Anti double-click / rapid replay guard (same customer, amount, mode within 30 seconds)
+  const nowMs = Date.now();
+  const recentPayments = await store.payments.find({
+    where: {
+      customerId: input.customerId,
+      amount: input.amount,
+      mode: input.mode,
+      cycle: input.cycle,
+    } as never,
+  });
+  const recentDuplicate = recentPayments.find((p) => {
+    if (!p.createdAt) return false;
+    const createdMs = new Date(p.createdAt).getTime();
+    return Math.abs(nowMs - createdMs) < 30000;
+  });
+  if (recentDuplicate) {
+    console.warn(`Identical payment detected within 30s for customer ${input.customerId}. Skipping duplicate.`);
+    return recentDuplicate;
+  }
+
   const payment = await store.payments.create({
     customerId: input.customerId,
     areaId: customer.areaId,
@@ -442,31 +635,18 @@ export async function recordPayment(
     status: input.status ?? 'CONFIRMED',
     cycle: input.cycle,
     recordedByUserId: input.recordedByUserId,
-    reference: input.reference ?? null,
+    reference: trimmedRef ?? null,
     note: input.note ?? null,
     createdAt: new Date().toISOString(),
   });
 
   if (payment.status !== 'CONFIRMED') return payment;
 
-  let remaining = input.amount;
-  const open = (
-    await store.invoices.find({
-      where: { customerId: input.customerId },
-      orderBy: [{ field: 'cycle' }],
-    })
-  ).filter((i) => i.paidAmount < i.amount && i.status !== 'WRITTEN_OFF');
-
-  for (const invoice of open) {
-    if (remaining <= 0) break;
-    const owed = invoice.amount - invoice.paidAmount;
-    const applied = Math.min(owed, remaining);
-    remaining -= applied;
-    const paidAmount = invoice.paidAmount + applied;
-    await store.invoices.update(invoice.id, {
-      paidAmount,
-      status: paidAmount >= invoice.amount ? 'PAID' : 'PARTIAL',
-    });
+  // Reconcile account and invoices: funds stay in wallet advance until 1st wash is completed
+  try {
+    await loadCustomerAccount(store, input.customerId, input.cycle);
+  } catch (err) {
+    console.error('Failed to reconcile customer account in recordPayment:', err);
   }
 
   // Auto-activate service for pending cars and immediately generate wash visits for this cycle
