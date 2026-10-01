@@ -34,7 +34,7 @@ export async function GET() {
           ratedVisits.reduce((acc, v) => acc + (v.rating || 0), 0) /
           ratedVisits.length
         ).toFixed(1)
-      : '5.0';
+      : '0';
 
     return NextResponse.json({
       ok: true,
@@ -52,7 +52,7 @@ export async function GET() {
         washesThisMonth: doneVisits.length,
         onTimeRate: doneVisits.length
           ? Math.round((onTimeVisits.length / doneVisits.length) * 100)
-          : 100,
+          : 0,
         averageRating: avgRating,
         missedWashes: missedVisits.length,
       },
