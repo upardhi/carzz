@@ -38,6 +38,9 @@ export function WhatsAppChatView({
   const [composerText, setComposerText] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [showQuickTemplates, setShowQuickTemplates] = useState(false);
+  const [showSimulateModal, setShowSimulateModal] = useState(false);
+  const [simulatedText, setSimulatedText] = useState('ok');
+  const [isSimulating, setIsSimulating] = useState(false);
   const [retryingIds, setRetryingIds] = useState<Set<string>>(new Set());
   const [notificationToast, setNotificationToast] = useState<{ message: string; tone: 'success' | 'error' } | null>(null);
 
@@ -276,6 +279,45 @@ export function WhatsAppChatView({
       setNotificationToast({ message: 'Network error sending WhatsApp message.', tone: 'error' });
     } finally {
       setIsSending(false);
+    }
+  }
+
+  // Actions: Simulate customer reply (for local testing without needing ngrok/tunnel)
+  async function handleSimulateReply() {
+    if (!activeThread || !simulatedText.trim() || isSimulating) return;
+
+    setIsSimulating(true);
+    try {
+      const res = await fetch('/api/ops/notifications/queue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'simulate_reply',
+          from: activeThread.phone,
+          senderName: activeThread.name,
+          message: simulatedText.trim(),
+        }),
+      });
+
+      if (res.ok) {
+        setNotificationToast({
+          message: `Received reply from ${activeThread.name}!`,
+          tone: 'success',
+        });
+        setSimulatedText('');
+        setShowSimulateModal(false);
+        await fetchMessages(true);
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }, 150);
+      } else {
+        const err = await res.json();
+        setNotificationToast({ message: err?.error || 'Failed to record reply', tone: 'error' });
+      }
+    } catch {
+      setNotificationToast({ message: 'Error simulating reply.', tone: 'error' });
+    } finally {
+      setIsSimulating(false);
     }
   }
 
@@ -575,7 +617,11 @@ export function WhatsAppChatView({
                       <div className="flex items-center justify-between gap-1">
                         {/* Snippet + Tick icon */}
                         <div className="flex items-center gap-1 text-[13px] text-[#667781] truncate min-w-0">
-                          <WhatsAppDeliveryTick status={status} />
+                          {thread.lastMessage.direction === 'INBOUND' ? (
+                            <span className="text-[#00a884] font-medium shrink-0">↙</span>
+                          ) : (
+                            <WhatsAppDeliveryTick status={status} />
+                          )}
                           <span className="truncate">
                             {thread.lastMessage.message.replace(/\n/g, ' ')}
                           </span>
@@ -678,6 +724,19 @@ export function WhatsAppChatView({
 
                 <button
                   type="button"
+                  onClick={() => setShowSimulateModal((prev) => !prev)}
+                  title="Simulate customer reply (testing on localhost)"
+                  className={`p-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors ${
+                    showSimulateModal
+                      ? 'bg-amber-600 text-white'
+                      : 'hover:bg-slate-200/80 text-[#54656f] border border-dashed border-slate-300'
+                  }`}
+                >
+                  <span>🧪 Test Reply</span>
+                </button>
+
+                <button
+                  type="button"
                   title="Menu"
                   className="hover:text-[#111b21] transition-colors p-1"
                 >
@@ -716,6 +775,51 @@ export function WhatsAppChatView({
               </div>
             )}
 
+            {/* Simulate Customer Reply Drawer (for quick testing on localhost) */}
+            {showSimulateModal && (
+              <div className="bg-amber-50 border-b border-amber-200 px-4 py-3 z-20 shadow-xs animate-fade-in">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-1.5 text-amber-900 font-semibold text-xs">
+                    <span>🧪</span>
+                    <span>Simulate Incoming WhatsApp Reply from {activeThread.name}:</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowSimulateModal(false)}
+                    className="text-xs text-amber-700 hover:text-amber-950 font-bold"
+                  >
+                    ✕ Close
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={simulatedText}
+                    onChange={(e) => setSimulatedText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleSimulateReply();
+                      }
+                    }}
+                    placeholder="e.g. ok, thanks, car is clean!"
+                    className="flex-1 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSimulateReply}
+                    disabled={!simulatedText.trim() || isSimulating}
+                    className="rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-semibold px-3 py-1.5 text-xs shadow-xs transition-colors disabled:opacity-50"
+                  >
+                    {isSimulating ? 'Receiving...' : 'Simulate Customer Reply'}
+                  </button>
+                </div>
+                <p className="text-[11px] text-amber-700 mt-1.5">
+                  💡 On localhost, Meta Cloud API cannot send webhooks directly without a public tunnel (like ngrok). This lets you test incoming customer replies right now!
+                </p>
+              </div>
+            )}
+
             {/* WhatsApp Wallpaper Messages Stream */}
             <div
               className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-3.5"
@@ -735,51 +839,87 @@ export function WhatsAppChatView({
 
               {/* Message Bubbles */}
               {activeThread.messages.map((msg) => {
-                const isFailed = msg.status === 'FAILED';
-                const isQueued = msg.status === 'QUEUED' || msg.status === 'PROCESSING';
+                const isInbound = msg.direction === 'INBOUND';
+                const isFailed = !isInbound && msg.status === 'FAILED';
+                const isQueued = !isInbound && (msg.status === 'QUEUED' || msg.status === 'PROCESSING');
                 const isRetrying = retryingIds.has(msg.id);
 
                 return (
-                  <div key={msg.id} className="flex flex-col items-end my-1">
-                    {/* Outgoing Message Bubble with WhatsApp Tail */}
+                  <div
+                    key={msg.id}
+                    className={`flex flex-col my-1.5 ${
+                      isInbound ? 'items-start pr-10' : 'items-end pl-10'
+                    }`}
+                  >
+                    {/* Message Bubble with WhatsApp Tail */}
                     <div
                       className={`relative max-w-lg sm:max-w-xl rounded-lg px-3 py-2 text-[#111b21] shadow-2xs transition-all ${
-                        isFailed
+                        isInbound
+                          ? 'bg-white border border-[#e9edef]'
+                          : isFailed
                           ? 'bg-[#ffebee] border border-[#ffcdd2]'
                           : 'bg-[#d9fdd3] border border-[#d1f4cb]'
                       }`}
                       style={{
-                        borderTopRightRadius: 0,
+                        borderTopRightRadius: isInbound ? 8 : 0,
+                        borderTopLeftRadius: isInbound ? 0 : 8,
                       }}
                     >
                       {/* Tail shape */}
-                      <span
-                        className={`absolute -top-0 -right-2 w-2 h-3.5 ${
-                          isFailed ? 'text-[#ffebee]' : 'text-[#d9fdd3]'
-                        }`}
-                        style={{
-                          clipPath: 'polygon(0 0, 0 100%, 100% 0)',
-                          backgroundColor: isFailed ? '#ffebee' : '#d9fdd3',
-                        }}
-                      />
-
-                      {/* Event Tag Pill Header */}
-                      <div className="flex items-center justify-between gap-2 mb-1">
+                      {isInbound ? (
                         <span
-                          className={`rounded-full px-2 py-0.2 text-[10px] font-bold uppercase tracking-wider ${
-                            isFailed
-                              ? 'bg-rose-200 text-rose-900'
-                              : 'bg-emerald-200/80 text-[#005c4b]'
+                          className="absolute -top-0 -left-2 w-2 h-3.5"
+                          style={{
+                            clipPath: 'polygon(100% 0, 100% 100%, 0 0)',
+                            backgroundColor: '#ffffff',
+                          }}
+                        />
+                      ) : (
+                        <span
+                          className={`absolute -top-0 -right-2 w-2 h-3.5 ${
+                            isFailed ? 'text-[#ffebee]' : 'text-[#d9fdd3]'
                           }`}
-                        >
-                          {getEventBadge(msg.event)}
-                        </span>
+                          style={{
+                            clipPath: 'polygon(0 0, 0 100%, 100% 0)',
+                            backgroundColor: isFailed ? '#ffebee' : '#d9fdd3',
+                          }}
+                        />
+                      )}
+
+                      {/* Header Info: Event badge + Employee Sender Info + Copy */}
+                      <div className="flex items-center justify-between gap-3 mb-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span
+                            className={`rounded-full px-2 py-0.2 text-[10px] font-bold uppercase tracking-wider ${
+                              isInbound
+                                ? 'bg-slate-100 text-slate-700'
+                                : isFailed
+                                ? 'bg-rose-200 text-rose-900'
+                                : 'bg-emerald-200/80 text-[#005c4b]'
+                            }`}
+                          >
+                            {isInbound ? '💬 Customer Reply' : getEventBadge(msg.event)}
+                          </span>
+
+                          {/* EMPLOYEE SENDER ATTRIBUTION (Admin & Owner visibility) */}
+                          {!isInbound && (
+                            <span
+                              title={`Sent by: ${msg.senderUserName || 'System Automation'}`}
+                              className="rounded bg-black/5 px-1.5 py-0.2 text-[10px] font-medium text-[#54656f] flex items-center gap-1"
+                            >
+                              <span>👤</span>
+                              <span className="font-semibold text-[#111b21]">
+                                {msg.senderUserName || 'System'}
+                              </span>
+                            </span>
+                          )}
+                        </div>
 
                         <button
                           type="button"
                           onClick={() => handleCopyText(msg.id, msg.message)}
                           title="Copy message"
-                          className="text-[10px] text-[#667781] hover:text-[#111b21]"
+                          className="text-[10px] text-[#667781] hover:text-[#111b21] shrink-0"
                         >
                           {copiedId === msg.id ? '✓ Copied' : '📋 Copy'}
                         </button>
@@ -830,7 +970,7 @@ export function WhatsAppChatView({
                         </div>
                       )}
 
-                      {/* Bubble Bottom: Time + WhatsApp Signature Double Ticks */}
+                      {/* Bubble Bottom: Time + WhatsApp Signature Double Ticks (Only on outbound) */}
                       <div className="mt-1 flex items-center justify-end gap-1 text-[11px] text-[#667781] leading-none">
                         {isQueued && (
                           <span className="text-[9px] font-semibold text-sky-800 bg-sky-100 rounded px-1 mr-0.5">
@@ -838,7 +978,7 @@ export function WhatsAppChatView({
                           </span>
                         )}
                         <span>{formatTime(msg.sentAt || msg.createdAt)}</span>
-                        <WhatsAppDeliveryTick status={msg.status} />
+                        {!isInbound && <WhatsAppDeliveryTick status={msg.status} />}
                       </div>
                     </div>
                   </div>
@@ -1120,6 +1260,7 @@ function formatClockCompact(dateStr: string): string {
 
 function getEventBadge(event: string): string {
   const lower = event.toLowerCase();
+  if (lower.includes('reply') || lower.includes('inbound') || lower.includes('customer')) return '💬 Customer Reply';
   if (lower.includes('payment')) return '💳 Payment Approved';
   if (lower.includes('started')) return '🚿 Wash Started';
   if (lower.includes('completed')) return '✨ Wash Completed';

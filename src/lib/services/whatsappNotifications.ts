@@ -52,6 +52,10 @@ export async function notifyWashStarted(store: DataStore, visitId: string) {
       portalUrl: `${getAppBaseUrl()}/app`,
     });
 
+    const washBoy = visit.staffId
+      ? await store.users.get(visit.staffId)
+      : null;
+
     enqueueWhatsAppMessage({
       to: customer.phone,
       recipientName: customer.name,
@@ -60,6 +64,9 @@ export async function notifyWashStarted(store: DataStore, visitId: string) {
       event: 'Wash Started',
       message,
       dedupKey: `wash_started_${visitId}`,
+      senderUserId: washBoy?.id,
+      senderUserName: washBoy ? `${washBoy.name} (Wash Boy)` : 'System Automation',
+      senderRole: washBoy?.role || 'SYSTEM',
     });
   } catch (err) {
     console.error('Error queueing Wash Started WhatsApp notification:', err);
@@ -103,6 +110,10 @@ export async function notifyWashCompleted(store: DataStore, visitId: string) {
       feedbackUrl,
     });
 
+    const washBoy = visit.staffId
+      ? await store.users.get(visit.staffId)
+      : null;
+
     enqueueWhatsAppMessage({
       to: customer.phone,
       recipientName: customer.name,
@@ -112,6 +123,9 @@ export async function notifyWashCompleted(store: DataStore, visitId: string) {
       message,
       mediaUrl: afterUrl || undefined,
       dedupKey: `wash_completed_${visitId}`,
+      senderUserId: washBoy?.id,
+      senderUserName: washBoy ? `${washBoy.name} (Wash Boy)` : 'System Automation',
+      senderRole: washBoy?.role || 'SYSTEM',
     });
   } catch (err) {
     console.error('Error queueing Wash Completed WhatsApp notification:', err);

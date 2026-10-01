@@ -7,6 +7,7 @@ import {
   getBatchProgress,
   retryFailedJobs,
   enqueueWhatsAppMessage,
+  recordInboundWhatsAppMessage,
   type WhatsAppJobStatus,
   type WhatsAppRecipientType,
 } from '@/lib/services/whatsappQueue';
@@ -64,6 +65,12 @@ const postSchema = z.discriminatedUnion('action', [
     recipientId: z.string().optional(),
     message: z.string().min(1),
   }),
+  z.object({
+    action: z.literal('simulate_reply'),
+    from: z.string().min(5),
+    senderName: z.string().optional(),
+    message: z.string().min(1),
+  }),
 ]);
 
 export async function POST(request: Request) {
@@ -86,6 +93,20 @@ export async function POST(request: Request) {
       });
     }
 
+    if (parsed.data.action === 'simulate_reply') {
+      const recorded = recordInboundWhatsAppMessage({
+        from: parsed.data.from,
+        senderName: parsed.data.senderName,
+        message: parsed.data.message.trim(),
+      });
+
+      return NextResponse.json({
+        ok: true,
+        record: recorded,
+        message: `Simulated customer reply recorded from ${parsed.data.senderName || parsed.data.from}.`,
+      });
+    }
+
     if (parsed.data.action === 'send') {
       const job = enqueueWhatsAppMessage({
         to: parsed.data.to,
@@ -94,6 +115,9 @@ export async function POST(request: Request) {
         recipientId: parsed.data.recipientId,
         event: 'Direct Message',
         message: parsed.data.message.trim(),
+        senderUserId: session.user.id,
+        senderUserName: session.user.name,
+        senderRole: session.user.role,
       });
 
       return NextResponse.json({

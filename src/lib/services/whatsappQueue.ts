@@ -11,6 +11,8 @@ export type WhatsAppJobStatus = 'QUEUED' | 'PROCESSING' | 'SENT' | 'FAILED';
 export interface WhatsAppMessageRecord {
   id: string;
   to: string;
+  from?: string;
+  direction?: 'OUTBOUND' | 'INBOUND';
   recipientName: string;
   recipientType: WhatsAppRecipientType;
   recipientId?: string;
@@ -27,6 +29,9 @@ export interface WhatsAppMessageRecord {
   sentAt?: string | null;
   scheduledFor?: string | null;
   dedupKey?: string | null;
+  senderUserId?: string | null;
+  senderUserName?: string | null;
+  senderRole?: string | null;
 }
 
 export interface EnqueueWhatsAppOptions {
@@ -42,6 +47,9 @@ export interface EnqueueWhatsAppOptions {
   delayMs?: number;
   dedupKey?: string;
   dedupWindowSeconds?: number;
+  senderUserId?: string | null;
+  senderUserName?: string | null;
+  senderRole?: string | null;
 }
 
 export interface BatchEnqueueResult {
@@ -192,6 +200,7 @@ export function enqueueWhatsAppMessage(options: EnqueueWhatsAppOptions): WhatsAp
   const job: WhatsAppMessageRecord = {
     id: generateId('wq'),
     to: normalizedTo,
+    direction: 'OUTBOUND',
     recipientName: options.recipientName || 'Recipient',
     recipientType: options.recipientType,
     recipientId: options.recipientId,
@@ -208,6 +217,9 @@ export function enqueueWhatsAppMessage(options: EnqueueWhatsAppOptions): WhatsAp
     sentAt: null,
     scheduledFor,
     dedupKey,
+    senderUserId: options.senderUserId ?? null,
+    senderUserName: options.senderUserName ?? (options.event.includes('Direct') ? 'Staff Member' : 'System Automation'),
+    senderRole: options.senderRole ?? null,
   };
 
   messageStore.set(job.id, job);
@@ -259,6 +271,7 @@ export function enqueueWhatsAppBatch(
     const job: WhatsAppMessageRecord = {
       id: generateId('wq'),
       to: normalizedTo,
+      direction: 'OUTBOUND',
       recipientName: item.recipientName || 'Recipient',
       recipientType: item.recipientType,
       recipientId: item.recipientId,
@@ -291,6 +304,61 @@ export function enqueueWhatsAppBatch(
     total: queuedCount,
     queuedAt: now.toISOString(),
   };
+}
+
+export interface RecordInboundWhatsAppOptions {
+  from: string;
+  senderName?: string;
+  message: string;
+  mediaUrl?: string;
+  metaMessageId?: string;
+  timestamp?: string;
+}
+
+/** Record an inbound reply from a customer received via WhatsApp Webhook or manual simulation */
+export function recordInboundWhatsAppMessage(
+  options: RecordInboundWhatsAppOptions,
+): WhatsAppMessageRecord {
+  initStore();
+
+  const now = new Date();
+  const normalizedFrom = normalizePhoneNumber(options.from);
+
+  // Deduplicate if Meta sends webhook multiple times with same message ID
+  if (options.metaMessageId) {
+    for (const existing of messageStore.values()) {
+      if (existing.metaMessageId === options.metaMessageId) {
+        return existing;
+      }
+    }
+  }
+
+  const job: WhatsAppMessageRecord = {
+    id: generateId('wq_in'),
+    to: normalizedFrom, // Group into the same customer thread by phone number
+    from: normalizedFrom,
+    direction: 'INBOUND',
+    recipientName: options.senderName || 'Customer',
+    recipientType: 'CUSTOMER',
+    event: 'Customer Reply',
+    message: options.message,
+    mediaUrl: options.mediaUrl,
+    status: 'SENT',
+    metaMessageId: options.metaMessageId || null,
+    error: null,
+    retryCount: 0,
+    maxRetries: 0,
+    batchId: null,
+    createdAt: options.timestamp || now.toISOString(),
+    sentAt: options.timestamp || now.toISOString(),
+    scheduledFor: null,
+    dedupKey: null,
+  };
+
+  messageStore.set(job.id, job);
+  schedulePersist();
+
+  return job;
 }
 
 // ============================================================================
