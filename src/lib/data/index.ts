@@ -191,11 +191,14 @@ function warnIfEphemeral(): void {
  * testing and then fails under real traffic with "too many connections". Say
  * so at boot, while the cause is still obvious.
  */
+let hasWarnedUnpooled = false;
 function warnIfUnpooled(provider: DataProvider): void {
+  if (hasWarnedUnpooled) return;
   if (provider !== 'prisma') return;
   const url = process.env.DATABASE_URL ?? '';
   if (!url || url.includes('-pooler.') || url.includes('pgbouncer=true')) return;
 
+  hasWarnedUnpooled = true;
   console.warn(
     'DATABASE_URL does not look like a pooled endpoint. On a serverless host ' +
       'each invocation opens its own connection and the limit is quickly ' +

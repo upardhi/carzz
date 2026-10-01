@@ -3,6 +3,7 @@ import {
   recordInboundWhatsAppMessage,
   updateWhatsAppMessageStatus,
 } from '@/lib/services/whatsappQueue';
+import { emitWhatsAppEvent } from '@/lib/services/whatsappEvents';
 
 /**
  * Meta WhatsApp Cloud API Official Webhook Handler
@@ -88,6 +89,14 @@ export async function POST(request: Request) {
                 console.log(
                   `[WhatsApp Inbound] Received reply from ${senderName} (${from}): "${messageText}" (ID: ${recorded.id})`,
                 );
+
+                // Push real-time event to connected SSE clients
+                emitWhatsAppEvent({
+                  type: 'inbound',
+                  phone: from,
+                  metaMessageId: msg.id,
+                  timestamp: recorded.createdAt,
+                });
               }
             }
           }
@@ -116,6 +125,14 @@ export async function POST(request: Request) {
                 console.log(
                   `[WhatsApp Webhook] Receipt update for ${metaMessageId}: status="${statusName}"`,
                 );
+
+                // Push real-time event to connected SSE clients
+                emitWhatsAppEvent({
+                  type: 'receipt',
+                  metaMessageId,
+                  status: statusName,
+                  timestamp,
+                });
               }
             }
           }

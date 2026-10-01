@@ -15,6 +15,15 @@ import {
 } from '@/lib/services/whatsappQueue';
 import { opsError } from '../../_guard';
 
+interface CachedScope {
+  allowedPhones: Set<string>;
+  allowedRecipientIds: Set<string>;
+  cachedAt: number;
+}
+
+const scopeCache = new Map<string, CachedScope>();
+const SCOPE_CACHE_TTL_MS = 60 * 1000;
+
 export async function GET(request: Request) {
   try {
     const session = await requireApiSession('visit:view');
@@ -34,37 +43,52 @@ export async function GET(request: Request) {
 
     // Multi-tenant Scoping: If not SUPER_ADMIN (areaIds is not null), restrict to manager's or area admin's area
     if (session.scope.areaIds !== null) {
-      const store = await getStore();
-      const [scopedCustomers, scopedStaff, scopedUsers] = await Promise.all([
-        store.customers.find({
-          where: { areaId: { in: session.scope.areaIds } } as never,
-        }),
-        store.staff.find({
-          where: { areaId: { in: session.scope.areaIds } } as never,
-        }),
-        store.users.find({
-          where: { areaId: { in: session.scope.areaIds } } as never,
-        }),
-      ]);
+      const cacheKey = [...session.scope.areaIds].sort().join(',');
+      const now = Date.now();
+      const cached = scopeCache.get(cacheKey);
 
-      allowedPhones = new Set<string>();
-      allowedRecipientIds = new Set<string>();
+      if (cached && now - cached.cachedAt < SCOPE_CACHE_TTL_MS) {
+        allowedPhones = cached.allowedPhones;
+        allowedRecipientIds = cached.allowedRecipientIds;
+      } else {
+        const store = await getStore();
+        const [scopedCustomers, scopedStaff, scopedUsers] = await Promise.all([
+          store.customers.find({
+            where: { areaId: { in: session.scope.areaIds } } as never,
+          }),
+          store.staff.find({
+            where: { areaId: { in: session.scope.areaIds } } as never,
+          }),
+          store.users.find({
+            where: { areaId: { in: session.scope.areaIds } } as never,
+          }),
+        ]);
 
-      for (const c of scopedCustomers) {
-        if (c.id) allowedRecipientIds.add(c.id);
-        if (c.phone) allowedPhones.add(normalizePhoneNumber(c.phone));
-      }
+        allowedPhones = new Set<string>();
+        allowedRecipientIds = new Set<string>();
 
-      for (const s of scopedStaff) {
-        if (s.id) allowedRecipientIds.add(s.id);
-        if (s.userId) allowedRecipientIds.add(s.userId);
-        if (s.phone) allowedPhones.add(normalizePhoneNumber(s.phone));
-      }
+        for (const c of scopedCustomers) {
+          if (c.id) allowedRecipientIds.add(c.id);
+          if (c.phone) allowedPhones.add(normalizePhoneNumber(c.phone));
+        }
 
-      for (const u of scopedUsers) {
-        if (u.id) allowedRecipientIds.add(u.id);
-        if (u.staffId) allowedRecipientIds.add(u.staffId);
-        if (u.phone) allowedPhones.add(normalizePhoneNumber(u.phone));
+        for (const s of scopedStaff) {
+          if (s.id) allowedRecipientIds.add(s.id);
+          if (s.userId) allowedRecipientIds.add(s.userId);
+          if (s.phone) allowedPhones.add(normalizePhoneNumber(s.phone));
+        }
+
+        for (const u of scopedUsers) {
+          if (u.id) allowedRecipientIds.add(u.id);
+          if (u.staffId) allowedRecipientIds.add(u.staffId);
+          if (u.phone) allowedPhones.add(normalizePhoneNumber(u.phone));
+        }
+
+        scopeCache.set(cacheKey, {
+          allowedPhones,
+          allowedRecipientIds,
+          cachedAt: now,
+        });
       }
     }
 

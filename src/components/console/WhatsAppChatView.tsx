@@ -69,11 +69,31 @@ export function WhatsAppChatView({
   }
 
   useEffect(() => {
+    // 1. Initial load on mount
     fetchMessages();
-    const interval = setInterval(() => {
-      fetchMessages(true, true);
-    }, 3000);
-    return () => clearInterval(interval);
+
+    // 2. Event-driven push: Listen for server events pushed by WhatsApp webhook
+    let eventSource: EventSource | null = null;
+    try {
+      eventSource = new EventSource('/api/ops/notifications/stream');
+
+      eventSource.addEventListener('whatsapp', () => {
+        // Pushed directly when WhatsApp webhook receives inbound replies or status receipts
+        fetchMessages(true, true);
+      });
+
+      eventSource.onerror = () => {
+        // EventSource will auto-reconnect if connection drops
+      };
+    } catch (err) {
+      console.warn('[WhatsAppChatView] EventSource push connection error:', err);
+    }
+
+    return () => {
+      if (eventSource) {
+        eventSource.close();
+      }
+    };
   }, []);
 
   // Auto-resize composer textarea as user types or templates are inserted
