@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireApiSession } from '@/lib/auth/server';
+import { getStore } from '@/lib/data';
+import { normalizePhoneNumber } from '@/lib/services/whatsapp';
 import {
   getWhatsAppLog,
   getWhatsAppStats,
@@ -27,6 +29,36 @@ export async function GET(request: Request) {
     const recipientId = searchParams.get('recipientId') || undefined;
     const batchId = searchParams.get('batchId') || undefined;
 
+    let allowedPhones: Set<string> | undefined = undefined;
+    let allowedRecipientIds: Set<string> | undefined = undefined;
+
+    // Multi-tenant Scoping: If not SUPER_ADMIN (areaIds is not null), restrict to manager's or area admin's area
+    if (session.scope.areaIds !== null) {
+      const store = await getStore();
+      const [scopedCustomers, scopedUsers] = await Promise.all([
+        store.customers.find({
+          where: { areaId: { in: session.scope.areaIds } } as never,
+        }),
+        store.users.find({
+          where: { areaId: { in: session.scope.areaIds } } as never,
+        }),
+      ]);
+
+      allowedPhones = new Set<string>();
+      allowedRecipientIds = new Set<string>();
+
+      for (const c of scopedCustomers) {
+        if (c.id) allowedRecipientIds.add(c.id);
+        if (c.phone) allowedPhones.add(normalizePhoneNumber(c.phone));
+      }
+
+      for (const u of scopedUsers) {
+        if (u.id) allowedRecipientIds.add(u.id);
+        if (u.staffId) allowedRecipientIds.add(u.staffId);
+        if (u.phone) allowedPhones.add(normalizePhoneNumber(u.phone));
+      }
+    }
+
     const logData = getWhatsAppLog({
       page,
       limit,
@@ -36,6 +68,8 @@ export async function GET(request: Request) {
       search,
       recipientId,
       batchId,
+      allowedPhones,
+      allowedRecipientIds,
     });
 
     const stats = getWhatsAppStats();
@@ -108,13 +142,49 @@ export async function POST(request: Request) {
     }
 
     if (parsed.data.action === 'send') {
+      const sendData = parsed.data;
+      const normalizedTo = normalizePhoneNumber(sendData.to);
+      const targetRecipientId = sendData.recipientId;
+
+      // Multi-tenant Scoping: If not SUPER_ADMIN, ensure manager or area admin only sends to their own area
+      if (session.scope.areaIds !== null) {
+        const store = await getStore();
+        const [scopedCustomers, scopedUsers] = await Promise.all([
+          store.customers.find({
+            where: { areaId: { in: session.scope.areaIds } } as never,
+          }),
+          store.users.find({
+            where: { areaId: { in: session.scope.areaIds } } as never,
+          }),
+        ]);
+
+        const isAllowed =
+          scopedCustomers.some(
+            (c) =>
+              (c.phone && normalizePhoneNumber(c.phone) === normalizedTo) ||
+              (targetRecipientId && c.id === targetRecipientId),
+          ) ||
+          scopedUsers.some(
+            (u) =>
+              (u.phone && normalizePhoneNumber(u.phone) === normalizedTo) ||
+              (targetRecipientId && (u.id === targetRecipientId || u.staffId === targetRecipientId)),
+          );
+
+        if (!isAllowed) {
+          return NextResponse.json(
+            { error: 'Access denied: You are only authorized to message customers and staff in your assigned area.' },
+            { status: 403 },
+          );
+        }
+      }
+
       const job = enqueueWhatsAppMessage({
-        to: parsed.data.to,
-        recipientName: parsed.data.recipientName || 'Recipient',
-        recipientType: parsed.data.recipientType,
-        recipientId: parsed.data.recipientId,
+        to: sendData.to,
+        recipientName: sendData.recipientName || 'Recipient',
+        recipientType: sendData.recipientType,
+        recipientId: sendData.recipientId,
         event: 'Direct Message',
-        message: parsed.data.message.trim(),
+        message: sendData.message.trim(),
         senderUserId: session.user.id,
         senderUserName: session.user.name,
         senderRole: session.user.role,
@@ -123,7 +193,7 @@ export async function POST(request: Request) {
       return NextResponse.json({
         ok: true,
         job,
-        message: `Message queued for delivery to ${parsed.data.recipientName || parsed.data.to}.`,
+        message: `Message queued for delivery to ${sendData.recipientName || sendData.to}.`,
       });
     }
 

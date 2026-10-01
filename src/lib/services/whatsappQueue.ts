@@ -67,6 +67,8 @@ export interface WhatsAppLogQuery {
   recipientId?: string;
   batchId?: string;
   search?: string;
+  allowedPhones?: Set<string> | string[];
+  allowedRecipientIds?: Set<string> | string[];
 }
 
 export interface WhatsAppStats {
@@ -496,6 +498,8 @@ export function getWhatsAppLog(query: WhatsAppLogQuery = {}) {
     recipientId,
     batchId,
     search,
+    allowedPhones,
+    allowedRecipientIds,
   } = query;
 
   let records = Array.from(messageStore.values());
@@ -529,6 +533,26 @@ export function getWhatsAppLog(query: WhatsAppLogQuery = {}) {
       r.message.toLowerCase().includes(q) ||
       r.event.toLowerCase().includes(q),
     );
+  }
+
+  // Scoped Area Restriction: If allowed phones or recipient IDs are specified (e.g. for Manager or Area Admin)
+  if (allowedPhones || allowedRecipientIds) {
+    const phoneSet = allowedPhones
+      ? allowedPhones instanceof Set
+        ? allowedPhones
+        : new Set(allowedPhones)
+      : null;
+    const idSet = allowedRecipientIds
+      ? allowedRecipientIds instanceof Set
+        ? allowedRecipientIds
+        : new Set(allowedRecipientIds)
+      : null;
+
+    records = records.filter((r) => {
+      if (idSet && r.recipientId && idSet.has(r.recipientId)) return true;
+      if (phoneSet && (phoneSet.has(r.to) || (r.from && phoneSet.has(r.from)))) return true;
+      return false;
+    });
   }
 
   // Sort descending by creation date (newest first)

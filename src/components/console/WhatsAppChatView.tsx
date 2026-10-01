@@ -38,9 +38,6 @@ export function WhatsAppChatView({
   const [composerText, setComposerText] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [showQuickTemplates, setShowQuickTemplates] = useState(false);
-  const [showSimulateModal, setShowSimulateModal] = useState(false);
-  const [simulatedText, setSimulatedText] = useState('ok');
-  const [isSimulating, setIsSimulating] = useState(false);
   const [retryingIds, setRetryingIds] = useState<Set<string>>(new Set());
   const [notificationToast, setNotificationToast] = useState<{ message: string; tone: 'success' | 'error' } | null>(null);
 
@@ -150,10 +147,12 @@ export function WhatsAppChatView({
     });
   }, [threads, filterType, searchQuery]);
 
-  // Default active contact
+  // Default active contact on desktop screens (on mobile, user starts at contact list)
   useEffect(() => {
-    if (!activeContactKey && filteredThreads.length > 0) {
-      setActiveContactKey(filteredThreads[0].contactKey);
+    if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+      if (!activeContactKey && filteredThreads.length > 0) {
+        setActiveContactKey(filteredThreads[0].contactKey);
+      }
     }
   }, [filteredThreads, activeContactKey]);
 
@@ -282,45 +281,6 @@ export function WhatsAppChatView({
     }
   }
 
-  // Actions: Simulate customer reply (for local testing without needing ngrok/tunnel)
-  async function handleSimulateReply() {
-    if (!activeThread || !simulatedText.trim() || isSimulating) return;
-
-    setIsSimulating(true);
-    try {
-      const res = await fetch('/api/ops/notifications/queue', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'simulate_reply',
-          from: activeThread.phone,
-          senderName: activeThread.name,
-          message: simulatedText.trim(),
-        }),
-      });
-
-      if (res.ok) {
-        setNotificationToast({
-          message: `Received reply from ${activeThread.name}!`,
-          tone: 'success',
-        });
-        setSimulatedText('');
-        setShowSimulateModal(false);
-        await fetchMessages(true);
-        setTimeout(() => {
-          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-        }, 150);
-      } else {
-        const err = await res.json();
-        setNotificationToast({ message: err?.error || 'Failed to record reply', tone: 'error' });
-      }
-    } catch {
-      setNotificationToast({ message: 'Error simulating reply.', tone: 'error' });
-    } finally {
-      setIsSimulating(false);
-    }
-  }
-
   function handleCopyText(id: string, text: string) {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
@@ -369,7 +329,7 @@ export function WhatsAppChatView({
   const totalSentOverall = messages.filter((m) => m.status === 'SENT').length;
 
   return (
-    <div className="relative flex flex-col w-full h-[calc(100vh-130px)] min-h-[680px] rounded-2xl bg-white shadow-2xl overflow-hidden font-sans border border-[#d1d7db] text-[#111b21]">
+    <div className="relative flex flex-col w-full h-[calc(100dvh-165px)] sm:h-[calc(100vh-130px)] min-h-[500px] sm:min-h-[600px] md:min-h-[680px] rounded-xl sm:rounded-2xl bg-white shadow-2xl overflow-hidden font-sans border border-[#d1d7db] text-[#111b21]">
       {/* ==================================================================== */}
       {/* WHATSAPP TOP ACCENT APP BAR */}
       {/* ==================================================================== */}
@@ -429,13 +389,17 @@ export function WhatsAppChatView({
         {/* ==================================================================== */}
         {/* LEFT COLUMN: CHAT THREADS & CONTACT LIST */}
         {/* ==================================================================== */}
-        <div className="flex flex-col w-80 sm:w-[380px] border-r border-[#e9edef] bg-white shrink-0">
+        <div className={`${activeContactKey ? 'hidden md:flex' : 'flex'} flex-col w-full md:w-80 lg:w-[380px] border-r border-[#e9edef] bg-white shrink-0 h-full`}>
           {/* WhatsApp Left Header (60px) */}
           <div className="flex items-center justify-between h-[60px] px-4 bg-[#f0f2f5] border-b border-[#e9edef] shrink-0">
-            {/* Operator Avatar */}
+            {/* Operator Avatar with Carz Logo */}
             <div className="flex items-center gap-2.5">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#00a884] text-white font-bold text-sm shadow-xs">
-                🚗
+              <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full overflow-hidden shadow-xs ring-1 ring-black/10 bg-[#061529]">
+                <img
+                  src="/icons/logo.svg"
+                  alt="Carz"
+                  className="h-full w-full object-cover"
+                />
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-[#111b21] leading-tight">
@@ -445,30 +409,16 @@ export function WhatsAppChatView({
               </div>
             </div>
 
-            {/* WhatsApp Standard Action Icons */}
+            {/* Refresh Action Icon */}
             <div className="flex items-center gap-3 text-[#54656f]">
               <button
                 type="button"
-                onClick={() => fetchMessages()}
-                title="Status updates"
-                className="hover:text-[#111b21] transition-colors p-1"
+                onClick={() => fetchMessages(true)}
+                disabled={refreshing}
+                title="Refresh messages"
+                className="hover:text-[#111b21] transition-colors p-1.5 rounded-full hover:bg-black/5 disabled:opacity-50"
               >
-                <WhatsAppStatusIcon />
-              </button>
-              <button
-                type="button"
-                onClick={() => composerInputRef.current?.focus()}
-                title="New Chat"
-                className="hover:text-[#111b21] transition-colors p-1"
-              >
-                <WhatsAppNewChatIcon />
-              </button>
-              <button
-                type="button"
-                title="Menu"
-                className="hover:text-[#111b21] transition-colors p-1"
-              >
-                <WhatsAppMenuIcon />
+                <WhatsAppRefreshIcon className={refreshing ? 'animate-spin text-[#00a884]' : ''} />
               </button>
             </div>
           </div>
@@ -650,10 +600,25 @@ export function WhatsAppChatView({
         {/* RIGHT COLUMN: ACTIVE CHAT CONVERSATION WINDOW */}
         {/* ==================================================================== */}
         {activeThread ? (
-          <div className="flex flex-col flex-1 h-full min-w-0 bg-[#efeae2]">
+          <div className={`${activeContactKey ? 'flex' : 'hidden md:flex'} flex-col flex-1 h-full min-w-0 bg-[#efeae2] w-full`}>
             {/* WhatsApp Chat Header (60px) */}
-            <div className="flex items-center justify-between h-[60px] px-4 bg-[#f0f2f5] border-b border-[#e9edef] shrink-0 z-10">
-              <div className="flex items-center gap-3 min-w-0">
+            <div className="flex items-center justify-between h-[60px] px-3 sm:px-4 bg-[#f0f2f5] border-b border-[#e9edef] shrink-0 z-10">
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                {/* Mobile Back Arrow Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveContactKey(null);
+                    onSelectContact?.('');
+                  }}
+                  className="md:hidden flex items-center justify-center h-9 w-9 -ml-1 text-[#54656f] hover:text-[#111b21] rounded-full hover:bg-black/5 active:bg-black/10 transition-colors shrink-0"
+                  title="Back to chats"
+                >
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M19 12H5M12 19l-7-7 7-7" />
+                  </svg>
+                </button>
+
                 <div
                   className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full font-semibold text-sm shadow-xs ${
                     activeThread.recipientType === 'STAFF'
@@ -665,12 +630,12 @@ export function WhatsAppChatView({
                 </div>
 
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-base font-normal text-[#111b21] truncate">
+                  <div className="flex items-center gap-1.5">
+                    <h3 className="text-[15px] sm:text-base font-medium sm:font-normal text-[#111b21] truncate max-w-[110px] xs:max-w-[150px] sm:max-w-none">
                       {activeThread.name}
                     </h3>
                     <span
-                      className={`rounded px-1.5 py-0.2 text-[10px] font-semibold ${
+                      className={`rounded px-1.5 py-0.2 text-[9px] sm:text-[10px] font-semibold shrink-0 ${
                         activeThread.recipientType === 'STAFF'
                           ? 'bg-indigo-100 text-indigo-800'
                           : 'bg-emerald-100 text-emerald-800'
@@ -680,22 +645,24 @@ export function WhatsAppChatView({
                     </span>
                   </div>
 
-                  <p className="text-[12px] text-[#667781] truncate">
-                    {formatPhonePretty(activeThread.phone)} • {activeThread.messages.length} messages
+                  <p className="text-[11px] sm:text-[12px] text-[#667781] truncate">
+                    {formatPhonePretty(activeThread.phone)} • {activeThread.messages.length} msgs
                   </p>
                 </div>
               </div>
 
               {/* Action Icons */}
-              <div className="flex items-center gap-3 text-[#54656f]">
+              <div className="flex items-center gap-1 sm:gap-2.5 text-[#54656f] shrink-0">
                 {activeThread.failedCount > 0 && (
                   <button
                     type="button"
                     onClick={handleRetryThreadFailed}
-                    className="flex items-center gap-1 rounded-full bg-[#ea0038] hover:bg-[#c90030] text-white px-3 py-1 text-xs font-bold shadow-xs transition-colors"
+                    className="flex items-center gap-1 rounded-full bg-[#ea0038] hover:bg-[#c90030] text-white px-2 sm:px-3 py-1 text-xs font-bold shadow-xs transition-colors shrink-0"
+                    title={`Retry All Failed (${activeThread.failedCount})`}
                   >
                     <span>↻</span>
-                    <span>Retry All Failed ({activeThread.failedCount})</span>
+                    <span className="hidden sm:inline">Retry All Failed</span>
+                    <span>({activeThread.failedCount})</span>
                   </button>
                 )}
 
@@ -713,34 +680,14 @@ export function WhatsAppChatView({
                   type="button"
                   onClick={() => setShowQuickTemplates((prev) => !prev)}
                   title="Quick reply templates"
-                  className={`p-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors ${
+                  className={`p-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors shrink-0 ${
                     showQuickTemplates
                       ? 'bg-[#00a884] text-white'
                       : 'hover:bg-slate-200/80 text-[#54656f]'
                   }`}
                 >
-                  <span>⚡ Templates</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setShowSimulateModal((prev) => !prev)}
-                  title="Simulate customer reply (testing on localhost)"
-                  className={`p-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors ${
-                    showSimulateModal
-                      ? 'bg-amber-600 text-white'
-                      : 'hover:bg-slate-200/80 text-[#54656f] border border-dashed border-slate-300'
-                  }`}
-                >
-                  <span>🧪 Test Reply</span>
-                </button>
-
-                <button
-                  type="button"
-                  title="Menu"
-                  className="hover:text-[#111b21] transition-colors p-1"
-                >
-                  <WhatsAppMenuIcon />
+                  <span>⚡</span>
+                  <span className="hidden sm:inline">Templates</span>
                 </button>
               </div>
             </div>
@@ -775,54 +722,9 @@ export function WhatsAppChatView({
               </div>
             )}
 
-            {/* Simulate Customer Reply Drawer (for quick testing on localhost) */}
-            {showSimulateModal && (
-              <div className="bg-amber-50 border-b border-amber-200 px-4 py-3 z-20 shadow-xs animate-fade-in">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-1.5 text-amber-900 font-semibold text-xs">
-                    <span>🧪</span>
-                    <span>Simulate Incoming WhatsApp Reply from {activeThread.name}:</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowSimulateModal(false)}
-                    className="text-xs text-amber-700 hover:text-amber-950 font-bold"
-                  >
-                    ✕ Close
-                  </button>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={simulatedText}
-                    onChange={(e) => setSimulatedText(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleSimulateReply();
-                      }
-                    }}
-                    placeholder="e.g. ok, thanks, car is clean!"
-                    className="flex-1 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-amber-500"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleSimulateReply}
-                    disabled={!simulatedText.trim() || isSimulating}
-                    className="rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-semibold px-3 py-1.5 text-xs shadow-xs transition-colors disabled:opacity-50"
-                  >
-                    {isSimulating ? 'Receiving...' : 'Simulate Customer Reply'}
-                  </button>
-                </div>
-                <p className="text-[11px] text-amber-700 mt-1.5">
-                  💡 On localhost, Meta Cloud API cannot send webhooks directly without a public tunnel (like ngrok). This lets you test incoming customer replies right now!
-                </p>
-              </div>
-            )}
-
             {/* WhatsApp Wallpaper Messages Stream */}
             <div
-              className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-3.5"
+              className="flex-1 overflow-y-auto p-2.5 sm:p-6 space-y-3"
               style={{
                 backgroundColor: '#efeae2',
                 backgroundImage:
@@ -848,12 +750,12 @@ export function WhatsAppChatView({
                   <div
                     key={msg.id}
                     className={`flex flex-col my-1.5 ${
-                      isInbound ? 'items-start pr-10' : 'items-end pl-10'
+                      isInbound ? 'items-start pr-2 sm:pr-10' : 'items-end pl-2 sm:pl-10'
                     }`}
                   >
                     {/* Message Bubble with WhatsApp Tail */}
                     <div
-                      className={`relative max-w-lg sm:max-w-xl rounded-lg px-3 py-2 text-[#111b21] shadow-2xs transition-all ${
+                      className={`relative max-w-[88%] sm:max-w-xl rounded-lg px-3 py-2 text-[#111b21] shadow-2xs transition-all ${
                         isInbound
                           ? 'bg-white border border-[#e9edef]'
                           : isFailed
@@ -989,32 +891,9 @@ export function WhatsAppChatView({
             </div>
 
             {/* WhatsApp Bottom Composer (Auto-growing height for multi-line messages) */}
-            <div className="flex items-end gap-2 min-h-[62px] py-2.5 px-4 bg-[#f0f2f5] border-t border-[#e9edef] shrink-0">
-              {/* Emoji Icon */}
-              <button
-                type="button"
-                title="Emojis"
-                onClick={() => {
-                  setComposerText((prev) => `${prev} 👍`);
-                  setTimeout(adjustTextareaHeight, 0);
-                }}
-                className="text-[#54656f] hover:text-[#111b21] transition-colors p-1.5 mb-1"
-              >
-                <WhatsAppEmojiIcon />
-              </button>
-
-              {/* Attachment Clip Icon */}
-              <button
-                type="button"
-                title="Attach"
-                onClick={() => setShowQuickTemplates((prev) => !prev)}
-                className="text-[#54656f] hover:text-[#111b21] transition-colors p-1.5 mb-1"
-              >
-                <WhatsAppAttachIcon />
-              </button>
-
+            <div className="flex items-end gap-1.5 sm:gap-2 min-h-[58px] sm:min-h-[62px] py-2 sm:py-2.5 px-2 sm:px-4 bg-[#f0f2f5] border-t border-[#e9edef] shrink-0">
               {/* Message Input Box (Single crisp border, zero double outline, auto-expanding) */}
-              <div className="flex-1 bg-white rounded-lg px-3.5 py-2.5 flex items-center shadow-2xs border border-transparent transition-colors focus-within:border-[#00a884]">
+              <div className="flex-1 bg-white rounded-lg px-3 sm:px-3.5 py-2 sm:py-2.5 flex items-center shadow-2xs border border-transparent transition-colors focus-within:border-[#00a884] min-w-0">
                 <textarea
                   ref={composerInputRef}
                   rows={1}
@@ -1029,15 +908,15 @@ export function WhatsAppChatView({
                       handleSendMessage();
                     }
                   }}
-                  placeholder={`Type a message to ${activeThread.name}...`}
+                  placeholder={`Type a message...`}
                   style={{
                     outline: 'none',
                     border: 'none',
                     boxShadow: 'none',
-                    minHeight: '24px',
-                    maxHeight: '180px',
+                    minHeight: '22px',
+                    maxHeight: '160px',
                   }}
-                  className="w-full resize-none border-none bg-transparent text-[14.5px] leading-[20px] text-[#111b21] placeholder-[#8696a0] focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 p-0 m-0 overflow-y-auto"
+                  className="w-full resize-none border-none bg-transparent text-[14px] sm:text-[14.5px] leading-[20px] text-[#111b21] placeholder-[#8696a0] focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 p-0 m-0 overflow-y-auto"
                 />
               </div>
 
@@ -1046,7 +925,7 @@ export function WhatsAppChatView({
                 type="button"
                 onClick={handleSendMessage}
                 disabled={!composerText.trim() || isSending}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#00a884] hover:bg-[#008f6f] text-white shadow-xs transition-transform active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed mb-0.5"
+                className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full bg-[#00a884] hover:bg-[#008f6f] text-white shadow-xs transition-transform active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed mb-0.5"
                 title="Send Message (Enter)"
               >
                 {isSending ? (
@@ -1058,8 +937,8 @@ export function WhatsAppChatView({
             </div>
           </div>
         ) : (
-          /* Empty State: No thread selected */
-          <div className="flex flex-col flex-1 items-center justify-center p-8 bg-[#f0f2f5] text-center text-[#8696a0]">
+          /* Empty State: No thread selected (only shown on desktop) */
+          <div className="hidden md:flex flex-col flex-1 items-center justify-center p-8 bg-[#f0f2f5] text-center text-[#8696a0]">
             <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#e9edef] text-[#00a884] text-4xl mb-4 shadow-xs">
               <WhatsAppLogoLarge />
             </div>
@@ -1145,26 +1024,23 @@ function WhatsAppLogoLarge() {
   );
 }
 
-function WhatsAppStatusIcon() {
+function WhatsAppRefreshIcon({ className = '' }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-      <path d="M12 20.5a8.5 8.5 0 1 1 8.5-8.5 8.51 8.51 0 0 1-8.5 8.5zm0-18.5a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm-1 5.5v5.25l4.5 2.67.75-1.23-3.75-2.22V7.5z"/>
-    </svg>
-  );
-}
-
-function WhatsAppNewChatIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-      <path d="M19.005 3.175H4.674C3.642 3.175 2.8 4.017 2.8 5.05V15.7c0 1.033.842 1.875 1.874 1.875h1.86v3.25l3.585-3.25h8.886c1.032 0 1.874-.842 1.874-1.875V5.05c0-1.033-.842-1.875-1.874-1.875zm-3.33 7.825h-2.5v2.5h-1.67v-2.5h-2.5V9.33h2.5V6.83h1.67v2.5h2.5v1.67z"/>
-    </svg>
-  );
-}
-
-function WhatsAppMenuIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-      <path d="M12 7a2 2 0 1 0-.001-4.001A2 2 0 0 0 12 7zm0 7a2 2 0 1 0-.001-4.001A2 2 0 0 0 12 14zm0 7a2 2 0 1 0-.001-4.001A2 2 0 0 0 12 21z"/>
+    <svg
+      viewBox="0 0 24 24"
+      width="19"
+      height="19"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+      <path d="M21 3v5h-5" />
+      <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+      <path d="M3 21v-5h5" />
     </svg>
   );
 }
@@ -1188,23 +1064,7 @@ function WhatsAppDirectIcon() {
   );
 }
 
-function WhatsAppEmojiIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <circle cx="12" cy="12" r="9" />
-      <path d="M9 10h.01M15 10h.01" strokeWidth="2.5" />
-      <path d="M8 14.5c1 1.8 2.5 2.5 4 2.5s3-.7 4-2.5" />
-    </svg>
-  );
-}
 
-function WhatsAppAttachIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
-    </svg>
-  );
-}
 
 function WhatsAppSendIcon() {
   return (

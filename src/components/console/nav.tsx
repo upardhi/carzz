@@ -12,6 +12,7 @@ import {
   IconRupee,
   IconUser,
   IconUsers,
+  IconWhatsApp,
 } from '@/components/shell/icons';
 
 export interface NavCounts {
@@ -65,7 +66,7 @@ export function operationsNav(
       heading: 'Customers',
       items: [
         { href: `${base}/customers`, label: 'All customers', icon: <IconUsers width={18} height={18} /> },
-        { href: `${base}/messages`, label: 'WhatsApp Logs', icon: <IconChat width={18} height={18} /> },
+        { href: `${base}/messages`, label: 'WhatsApp Chat', icon: <IconWhatsApp width={18} height={18} /> },
         {
           href: `${base}/requests`,
           label: 'Special Requests',
@@ -215,8 +216,8 @@ export function adminNav(counts: NavCounts): NavGroup[] {
         },
         {
           href: '/admin/messages',
-          label: 'WhatsApp Messages',
-          icon: <IconChat width={18} height={18} />,
+          label: 'WhatsApp Chat',
+          icon: <IconWhatsApp width={18} height={18} />,
         },
       ],
     },
