@@ -209,6 +209,19 @@ export default async function CarDetail({
         </div>
       )}
 
+      {/* Upcoming Package Scheduled Banner */}
+      {car.upcomingPackage && (
+        <div className="rounded-2xl border border-blue-200 bg-blue-50/70 p-4 shadow-2xs space-y-1">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-blue-900">
+            <span>📅</span>
+            <span>Upcoming Plan Change Approved</span>
+          </div>
+          <p className="text-xs text-blue-700 leading-relaxed">
+            Your current plan (<b>{car.package?.name}</b>) remains active with all remaining washes until this package completes. Once your current package finishes, your vehicle will automatically switch to <b>{car.upcomingPackage.name}</b> (₹{car.upcomingPackage.price}/pkg · {car.upcomingPackage.washesPerMonth} washes).
+          </p>
+        </div>
+      )}
+
       {/* 2. Top Stats Grid */}
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-2xs">

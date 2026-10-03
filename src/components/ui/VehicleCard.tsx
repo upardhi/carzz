@@ -10,6 +10,7 @@ export interface VehicleCardProps {
   name?: string;
   plate?: string;
   package?: string;
+  upcomingPackage?: string;
   paymentStatus?: {
     price: number;
     paid: number;
@@ -40,6 +41,7 @@ export const VehicleCard: React.FC<VehicleCardProps> = ({
   name,
   plate,
   package: pkgName,
+  upcomingPackage,
   paymentStatus,
   colour,
   doneWashes,
@@ -129,9 +131,16 @@ export const VehicleCard: React.FC<VehicleCardProps> = ({
       {/* Spec rows */}
       <div className="space-y-1.5 text-[12px] sm:text-[12.5px]">
         {pkgName && (
-          <div className="flex items-center justify-between border-b border-slate-50 py-1">
+          <div className="flex items-center justify-between border-b border-slate-50 py-1 flex-wrap gap-1">
             <span className="font-medium text-slate-500">Package</span>
-            <span className="font-semibold text-slate-900">{pkgName}</span>
+            <div className="text-right">
+              <span className="font-semibold text-slate-900">{pkgName}</span>
+              {upcomingPackage && (
+                <div className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded mt-0.5">
+                  📅 Switches to {upcomingPackage} after current package finishes
+                </div>
+              )}
+            </div>
           </div>
         )}
 

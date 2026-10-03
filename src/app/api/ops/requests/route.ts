@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { HttpError, requireApiSession } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
-import { currentCycle, todayISO } from '@/lib/util/format';
+import { currentCycle, nextCycle, todayISO } from '@/lib/util/format';
 import { assertInScope, opsError } from '../_guard';
 
 function revalidateRequestPages() {
@@ -287,14 +287,38 @@ export async function POST(request: Request) {
       if (req.type === 'PACKAGE_CHANGE' && req.requestedPackageId && req.carId) {
         const car = await store.cars.get(req.carId);
         const requestedPkg = await store.packages.get(req.requestedPackageId);
+        const activationMode = parsed.data.activationMode || 'IMMEDIATE_PRORATED';
 
         if (car) {
-          await store.cars.update(car.id, {
-            packageId: req.requestedPackageId,
-          });
+          if (activationMode === 'NEXT_CYCLE') {
+            // Effective from 1st of next month:
+            // Do NOT overwrite current packageId now. Customer finishes current month on existing plan.
+            // Save upcoming package so it activates automatically on the next billing cycle.
+            await store.cars.update(car.id, {
+              nextPackageId: req.requestedPackageId,
+              nextPackageCycle: nextCycle(currentCycle()),
+              packageResetAt: null,
+            });
+          } else if (activationMode === 'IMMEDIATE_FULL') {
+            // Immediate change with full reset:
+            // Quota counter will only count washes done from this reset timestamp onward.
+            await store.cars.update(car.id, {
+              packageId: req.requestedPackageId,
+              nextPackageId: null,
+              nextPackageCycle: null,
+              packageResetAt: new Date().toISOString(),
+            });
+          } else {
+            // Immediate change (Prorated):
+            await store.cars.update(car.id, {
+              packageId: req.requestedPackageId,
+              nextPackageId: null,
+              nextPackageCycle: null,
+              packageResetAt: null,
+            });
+          }
         }
 
-        const activationMode = parsed.data.activationMode || 'IMMEDIATE_PRORATED';
         const adjustmentAmount = parsed.data.adjustmentAmount ?? 0;
         const applyFinance = parsed.data.applyFinancialAdjustment !== false;
 
@@ -435,6 +459,27 @@ export async function POST(request: Request) {
         decidedAt: new Date().toISOString(),
         decidedByUserId: session.user.id,
       });
+
+      // Auto-cancel any other pending requests for the same car if a package change or wash is approved
+      if (req.carId) {
+        try {
+          const otherPending = await store.customerRequests.find({
+            where: { customerId: req.customerId, status: 'PENDING' } as never,
+          });
+          for (const other of otherPending) {
+            if (other.id !== req.id && other.carId === req.carId && other.type === req.type) {
+              await store.customerRequests.update(other.id, {
+                status: 'REJECTED',
+                adminRemarks: `Auto-cancelled: Superseded by approved request #${req.id.slice(-6).toUpperCase()}`,
+                decidedAt: new Date().toISOString(),
+                decidedByUserId: session.user.id,
+              });
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
 
       revalidateRequestPages();
       return NextResponse.json({

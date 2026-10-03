@@ -24,6 +24,7 @@ export interface CustomerAccount {
   customer: Customer;
   cars: (Car & {
     package: ServicePackage | null;
+    upcomingPackage?: ServicePackage | null;
     tally: VisitTally;
     payment: {
       price: number;
@@ -102,6 +103,54 @@ export async function loadCustomerAccount(
   const packageById = new Map(packages.map((p) => [p.id, p]));
   const pendingRequests = (customerRequests ?? []).filter((r) => r.status === 'PENDING');
 
+  // 0. Auto-promote or manage upcoming next-cycle packages
+  for (const car of cars) {
+    if (car.nextPackageId && car.nextPackageCycle && cycle >= car.nextPackageCycle) {
+      try {
+        await store.cars.update(car.id, {
+          packageId: car.nextPackageId,
+          nextPackageId: null,
+          nextPackageCycle: null,
+        });
+        car.packageId = car.nextPackageId;
+        car.nextPackageId = null;
+        car.nextPackageCycle = null;
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  // Self-heal any cars whose package was prematurely modified in current cycle:
+  const approvedNextCycleReqs = (customerRequests ?? []).filter(
+    (r) =>
+      r.type === 'PACKAGE_CHANGE' &&
+      r.status === 'APPROVED' &&
+      Boolean(r.carId) &&
+      Boolean(r.currentPackageId) &&
+      Boolean(r.requestedPackageId) &&
+      r.currentPackageId !== r.requestedPackageId
+  );
+  for (const r of approvedNextCycleReqs) {
+    const c = cars.find((car) => car.id === r.carId);
+    const currPkgId = r.currentPackageId;
+    const reqPkgId = r.requestedPackageId;
+    if (c && currPkgId && reqPkgId && c.packageId === reqPkgId && !c.nextPackageId) {
+      c.packageId = currPkgId;
+      c.nextPackageId = reqPkgId;
+      c.nextPackageCycle = nextCycle(cycle);
+      try {
+        await store.cars.update(c.id, {
+          packageId: currPkgId,
+          nextPackageId: reqPkgId,
+          nextPackageCycle: nextCycle(cycle),
+        });
+      } catch {
+        // ignore
+      }
+    }
+  }
+
   const starterUserIds = Array.from(
     new Set(cars.map((c) => c.serviceStartedByUserId).filter(Boolean) as string[]),
   );
@@ -150,15 +199,54 @@ export async function loadCustomerAccount(
   }
   effectiveVisits = effectiveVisits.filter((v) => !prunedVisitIds.has(v.id));
 
+  // 2.5 Auto-promote scheduled package upgrades/downgrades ONLY when the current package has completed all its washes
+  for (const car of cars) {
+    if (car.nextPackageId) {
+      const currentPkg = packageById.get(car.packageId);
+      const quota = currentPkg?.washesPerMonth ?? 8;
+      const completedWashes = effectiveVisits.filter((v) => {
+        if (v.carId !== car.id || v.status !== 'DONE') return false;
+        if (car.packageResetAt) {
+          const resetDate = car.packageResetAt.slice(0, 10);
+          return v.scheduledDate >= resetDate || Boolean(v.completedAt && v.completedAt >= car.packageResetAt);
+        }
+        return true;
+      }).length;
+
+      if (completedWashes >= quota) {
+        try {
+          const resetTime = new Date().toISOString();
+          await store.cars.update(car.id, {
+            packageId: car.nextPackageId,
+            nextPackageId: null,
+            nextPackageCycle: null,
+            packageResetAt: resetTime,
+          });
+          car.packageId = car.nextPackageId;
+          car.nextPackageId = null;
+          car.nextPackageCycle = null;
+          car.packageResetAt = resetTime;
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }
+
   // 3. Ensure cars with active service have their upcoming pending visit scheduled on or after today
   for (const car of cars) {
     const isStarted = car.serviceStarted ?? true;
     if (!isStarted || !car.active || customer.status === 'INACTIVE') continue;
     if (customer.status === 'HOLD' && customer.holdUntil && customer.holdUntil >= today) continue;
 
-    const carDoneThisCycle = effectiveVisits.filter(
-      (v) => v.carId === car.id && v.cycle === cycle && v.status === 'DONE',
-    ).length;
+    const carDoneThisCycle = effectiveVisits.filter((v) => {
+      if (v.carId !== car.id || v.cycle !== cycle || v.status !== 'DONE') return false;
+      if (car.packageResetAt && car.packageResetAt.slice(0, 7) === cycle) {
+        const resetDate = car.packageResetAt.slice(0, 10);
+        return v.scheduledDate >= resetDate || Boolean(v.completedAt && v.completedAt >= car.packageResetAt);
+      }
+      return true;
+    }).length;
     const pkg = packageById.get(car.packageId);
     const quota = pkg?.washesPerMonth ?? 8;
 
@@ -233,6 +321,7 @@ export async function loadCustomerAccount(
       ? userById.get(car.serviceStartedByUserId)
       : null;
     const pkg = packageById.get(car.packageId) ?? null;
+    const upcomingPackage = car.nextPackageId ? packageById.get(car.nextPackageId) ?? null : null;
     const effectiveQuota = pkg?.washesPerMonth ?? 8;
 
     const carPending = pendingRequests.find((r) => r.carId === car.id);
@@ -252,13 +341,19 @@ export async function loadCustomerAccount(
       ? latestPastInvoice.cycle
       : cycle;
 
-    const carVisits = effectiveVisits.filter(
-      (v) => v.carId === car.id && v.cycle >= carActiveCycle,
-    );
+    const carVisits = effectiveVisits.filter((v) => {
+      if (v.carId !== car.id || v.cycle < carActiveCycle) return false;
+      if (car.packageResetAt && car.packageResetAt.slice(0, 7) === cycle) {
+        const resetDate = car.packageResetAt.slice(0, 10);
+        return v.scheduledDate >= resetDate || Boolean(v.completedAt && v.completedAt >= car.packageResetAt);
+      }
+      return true;
+    });
 
     return {
       ...car,
       package: pkg,
+      upcomingPackage,
       pendingRequest,
       tally: tallyVisits(
         carVisits,

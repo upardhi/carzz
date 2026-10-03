@@ -396,7 +396,7 @@ export default async function CustomerHome() {
                         <div className="text-[11px] font-mono uppercase text-slate-400 font-medium mt-0.5 truncate">
                           {car.plate}
                         </div>
-                        <div className="flex items-center gap-1.5 mt-1">
+                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                           <span className="text-[10.5px] font-medium text-slate-500 truncate max-w-[110px]">
                             {car.package?.name ?? 'Plan'}
                           </span>
@@ -413,6 +413,12 @@ export default async function CustomerHome() {
                           ) : (
                             <span className="text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded">
                               Due: ₹{car.payment.due.toLocaleString('en-IN')}
+                            </span>
+                          )}
+                          {car.upcomingPackage && (
+                            <span className="text-[9.5px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded inline-flex items-center gap-1">
+                              <span>📅</span>
+                              <span>{car.upcomingPackage.name} starting 1st next mo</span>
                             </span>
                           )}
                         </div>

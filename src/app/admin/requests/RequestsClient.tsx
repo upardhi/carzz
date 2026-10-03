@@ -877,7 +877,7 @@ export function RequestsClient({
                                   {activationMode === 'NEXT_CYCLE' && (
                                     <div className="text-[11px] text-slate-600 space-y-0.5">
                                       <div>• Customer finishes remaining {activeRequest.packageAudit.washesRemaining} washes on current plan.</div>
-                                      <div>• <b>₹0 charged today.</b> Starting 1st of next month, billed at ₹{activeRequest.packageAudit.requestedPrice}/month.</div>
+                                      <div>• <b>₹0 charged today.</b> Next plan (₹{activeRequest.packageAudit.requestedPrice}) starts automatically when current package completes all washes.</div>
                                     </div>
                                   )}
                                 </div>
@@ -927,17 +927,17 @@ export function RequestsClient({
                             <div className="flex-1">
                               <div className="flex items-center justify-between gap-2">
                                 <span className="font-bold text-slate-900 text-xs">
-                                  Continues from 1st of Next Month
+                                  Starts After Current Package Finishes
                                 </span>
                                 <span className="font-black text-xs px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-900 border border-emerald-300 whitespace-nowrap">
                                   ₹0 to pay now
                                 </span>
                               </div>
                               <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
-                                Customer continues current plan and can use their remaining <b>{activeRequest.packageAudit.washesRemaining} washes</b> this month.
+                                Customer continues current plan and can use their remaining <b>{activeRequest.packageAudit.washesRemaining} washes</b>.
                               </p>
                               <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
-                                The downgraded plan (<b>{activeRequest.packageAudit.requestedPackageName}</b>) will automatically take effect from the 1st of next month billed at <b>₹{activeRequest.packageAudit.requestedPrice}/month</b>.
+                                The new plan (<b>{activeRequest.packageAudit.requestedPackageName}</b>) will automatically take effect once the current package completes all its washes, billed at <b>₹{activeRequest.packageAudit.requestedPrice}/package</b>.
                               </p>
                             </div>
                           </div>
@@ -1024,14 +1024,14 @@ export function RequestsClient({
                               <div className="flex-1">
                                 <div className="flex items-center justify-between gap-2">
                                   <span className="font-bold text-slate-900">
-                                    📅 Effective 1st of Next Month (Zero Charge Now)
+                                    📅 Start From Next Package (After Current Package Completes)
                                   </span>
                                   <span className="font-black text-xs px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-300 whitespace-nowrap">
                                     ₹0 to pay now
                                   </span>
                                 </div>
                                 <p className="text-[11px] text-slate-500 mt-0.5">
-                                  Customer finishes current month on existing plan. Next month will start on new plan billed at regular ₹{activeRequest.packageAudit.requestedPrice}.
+                                  Customer finishes current package washes on existing plan. Next package will automatically start and be billed at regular ₹{activeRequest.packageAudit.requestedPrice} once current package finishes.
                                 </p>
                               </div>
                             </label>

@@ -423,6 +423,12 @@ export interface Car {
   colour: string;
   plate: string;
   packageId: Id;
+  /** Upcoming package id that will take effect on nextPackageCycle. */
+  nextPackageId?: Id | null;
+  /** The cycle (YYYY-MM) when nextPackageId should become active. */
+  nextPackageCycle?: string | null;
+  /** Timestamp when plan was fully reset mid-cycle (IMMEDIATE_FULL). */
+  packageResetAt?: Timestamp | null;
   /** Staff id of the wash boy who normally services this car. */
   assignedStaffId: Id | null;
   /** The weekdays this car gets washed, recurring every week going forward. */

@@ -78,8 +78,8 @@ export async function scheduleNextVisitForCar(
     return null;
   }
 
-  const pkg = await store.packages.get(car.packageId);
-  const quota = pkg?.washesPerMonth ?? 8;
+  let pkg = await store.packages.get(car.packageId);
+  let quota = pkg?.washesPerMonth ?? 8;
 
   // Get all visits for this car in the cycle
   const existing = await store.visits.find({
@@ -87,10 +87,40 @@ export async function scheduleNextVisitForCar(
     orderBy: [{ field: 'scheduledDate', dir: 'asc' }],
   });
 
-  const doneCount = existing.filter((v) => v.status === 'DONE').length;
+  const doneCount = existing.filter((v) => {
+    if (v.status !== 'DONE') return false;
+    if (car.packageResetAt && car.packageResetAt.slice(0, 7) === cycle) {
+      const resetDate = car.packageResetAt.slice(0, 10);
+      return v.scheduledDate >= resetDate || Boolean(v.completedAt && v.completedAt >= car.packageResetAt);
+    }
+    return true;
+  }).length;
+
   if (doneCount >= quota) {
-    // Car already reached its monthly wash limit for this cycle
-    return null;
+    // Current package is complete!
+    if (car.nextPackageId) {
+      // Auto-promote to the queued upcoming package now that current package is complete
+      const resetTime = new Date().toISOString();
+      try {
+        await store.cars.update(car.id, {
+          packageId: car.nextPackageId,
+          nextPackageId: null,
+          nextPackageCycle: null,
+          packageResetAt: resetTime,
+        });
+        car.packageId = car.nextPackageId;
+        car.nextPackageId = null;
+        car.nextPackageCycle = null;
+        car.packageResetAt = resetTime;
+        pkg = await store.packages.get(car.packageId);
+        quota = pkg?.washesPerMonth ?? 8;
+      } catch {
+        return null;
+      }
+    } else {
+      // Car reached its package wash limit for this cycle and has no queued package
+      return null;
+    }
   }
 
   // Clean up any stale past pending visits that were never completed
