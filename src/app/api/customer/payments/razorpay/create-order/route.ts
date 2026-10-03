@@ -6,6 +6,8 @@ import { createRazorpayOrder } from '@/lib/services/razorpay';
 
 const schema = z.object({
   amount: z.number().int().positive(),
+  requestId: z.string().optional(),
+  description: z.string().optional(),
 });
 
 export async function POST(request: Request) {

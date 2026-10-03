@@ -32,10 +32,18 @@ function parseDateBadge(dateStr: string) {
   }
 }
 
-export default async function CustomerPayments() {
+export default async function CustomerPayments(props: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const session = await requirePermission('self:payments');
   const store = await getStore();
   const firstName = session.user.name.split(' ')[0] || 'Customer';
+
+  const searchParams = props.searchParams ? await props.searchParams : {};
+  const rawRequestId = searchParams.requestId;
+  const initialRequestId = Array.isArray(rawRequestId) ? rawRequestId[0] : rawRequestId;
+  const rawDesc = searchParams.desc;
+  const initialDesc = Array.isArray(rawDesc) ? rawDesc[0] : rawDesc;
 
   const [account, settings, packages] = await Promise.all([
     loadCustomerAccount(store, session.user.customerId!, currentCycle()),
@@ -43,6 +51,29 @@ export default async function CustomerPayments() {
     store.packages.find({ where: { active: true } }),
   ]);
   if (!account) notFound();
+
+  const openOneTimeInvoices = account.invoices.filter(
+    (inv) =>
+      (inv.cycle.startsWith('ONE-TIME') || inv.cycle.startsWith('CUSTOM')) &&
+      inv.status !== 'PAID' &&
+      inv.status !== 'WRITTEN_OFF',
+  );
+
+  const pendingPayItems = [
+    ...(account.pendingOneTimeRequests || []).map((r) => ({
+      id: r.id,
+      name: `${r.serviceDetails || r.washType || (r.type === 'ONE_WASH' ? 'One-Time Wash' : 'Special Service')}`,
+      amount: r.paymentAmount || 0,
+      date: r.preferredDate || r.createdAt,
+      notes: r.notes || undefined,
+    })),
+    ...openOneTimeInvoices.map((inv) => ({
+      id: inv.id,
+      name: `Invoice: ${inv.cycle}`,
+      amount: inv.amount - inv.paidAmount,
+      date: inv.dueOn || inv.createdAt,
+    })),
+  ];
 
   return (
     <div className="space-y-5">
@@ -154,7 +185,9 @@ export default async function CustomerPayments() {
             <IconRupee width={20} height={20} />
           </div>
           <div>
-            <h3 className="text-base font-bold text-slate-900">Pay Subscription Online</h3>
+            <h3 className="text-base font-bold text-slate-900">
+              {account.outstanding > 0 ? 'Pay Outstanding / Services Online' : 'Pay Online or Add Advance Credit'}
+            </h3>
             <p className="text-xs text-slate-500">Pay via Instant UPI QR, Net Banking, or record manual transfer</p>
           </div>
         </div>
@@ -163,6 +196,9 @@ export default async function CustomerPayments() {
           <PayActions
             amount={account.outstanding}
             modes={settings.paymentModesEnabled}
+            initialRequestId={initialRequestId}
+            initialDesc={initialDesc}
+            pendingOneTimeRequests={pendingPayItems}
           />
         </div>
       </div>

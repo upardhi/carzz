@@ -8,6 +8,10 @@ import { currentCycle } from '@/lib/util/format';
 const schema = z.object({
   amount: z.number().int().positive(),
   mode: z.enum(['CASH', 'MANUAL_UPI', 'GATEWAY']),
+  reference: z.string().optional(),
+  requestId: z.string().optional(),
+  description: z.string().optional(),
+  note: z.string().optional(),
 });
 
 /**
@@ -37,14 +41,22 @@ export async function POST(request: Request) {
       throw new HttpError(400, 'That payment mode is currently switched off.');
     }
 
+    const noteText = [
+      parsed.data.description ? `For: ${parsed.data.description}` : null,
+      parsed.data.note || 'Declared by customer, awaiting manager confirmation',
+    ]
+      .filter(Boolean)
+      .join(' · ');
+
     const payment = await recordPayment(store, {
       customerId: session.user.customerId,
       amount: parsed.data.amount,
       mode: parsed.data.mode,
-      cycle: currentCycle(),
+      cycle: parsed.data.description ? `ONE-TIME (${parsed.data.description})` : currentCycle(),
       recordedByUserId: session.user.id,
       status: 'PENDING',
-      note: 'Declared by customer, awaiting manager confirmation',
+      reference: parsed.data.reference || (parsed.data.mode === 'CASH' ? 'CASH-PAYMENT' : undefined),
+      note: noteText,
     });
 
     return NextResponse.json({

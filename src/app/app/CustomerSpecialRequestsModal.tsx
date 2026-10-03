@@ -10,6 +10,7 @@ interface CustomerRequestItem {
   id: string;
   type: 'PACKAGE_CHANGE' | 'ONE_WASH' | 'OTHER_SERVICE';
   status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+  carId?: string | null;
   car?: { make: string; model: string; plate: string } | null;
   currentPackage?: { name: string; price?: number; washesPerMonth?: number; services?: string[] } | null;
   requestedPackage?: { name: string; price?: number; washesPerMonth?: number; services?: string[] } | null;
@@ -667,23 +668,41 @@ export function CustomerSpecialRequestsModal({
 
                       {req.paymentAmount !== undefined && req.paymentAmount !== null && req.paymentAmount !== 0 && (
                         <div
-                          className={`rounded-lg p-2.5 text-xs font-semibold flex items-center justify-between ${
-                            req.paymentAmount > 0
+                          className={`rounded-lg p-2.5 text-xs font-semibold flex items-center justify-between gap-2 ${
+                            req.paymentStatus === 'PAID'
+                              ? 'bg-emerald-50 text-emerald-900 border border-emerald-200'
+                              : req.paymentAmount > 0
                               ? 'bg-amber-50 text-amber-900 border border-amber-200'
                               : 'bg-emerald-50 text-emerald-900 border border-emerald-200'
                           }`}
                         >
                           <span className="flex items-center gap-1.5">
-                            <span>{req.paymentAmount > 0 ? '🔺 Extra Charge:' : '💰 Account Credit:'}</span>
+                            <span>
+                              {req.paymentStatus === 'PAID'
+                                ? '✓ Paid Charge:'
+                                : req.paymentAmount > 0
+                                ? '🔺 Extra Charge:'
+                                : '💰 Account Credit:'}
+                            </span>
                             <span className="font-black text-sm">₹{Math.abs(req.paymentAmount)}</span>
                           </span>
-                          {req.paymentAmount > 0 && (
+
+                          {req.paymentAmount > 0 && req.paymentStatus !== 'PAID' && (
                             <a
-                              href="/app/payments"
-                              className="rounded-md bg-amber-600 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-amber-700 transition-colors shadow-2xs"
+                              href={`/app/payments?amount=${req.paymentAmount}&requestId=${req.id}&desc=${encodeURIComponent(
+                                `${req.car ? `${req.car.make} ${req.car.model}` : (cars.find((c) => c.id === req.carId)?.model || 'Vehicle')} - ${req.serviceDetails || req.washType || (req.type === 'ONE_WASH' ? 'One-Time Wash' : 'Special Service')}`,
+                              )}`}
+                              className="rounded-md bg-amber-600 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-amber-700 transition-colors shadow-2xs shrink-0 flex items-center gap-1"
                             >
-                              Pay Online →
+                              <span>💳 Pay ₹{req.paymentAmount} Now</span>
+                              <span>→</span>
                             </a>
+                          )}
+
+                          {req.paymentStatus === 'PAID' && (
+                            <span className="rounded bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2 py-0.5 border border-emerald-300">
+                              Payment Confirmed
+                            </span>
                           )}
                         </div>
                       )}

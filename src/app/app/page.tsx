@@ -31,7 +31,7 @@ export const metadata = { title: 'Customer Dashboard' };
 export default async function CustomerHome() {
   const session = await requirePermission('self:cars');
   const store = await getStore();
-  const [account, packages, complaints] = await Promise.all([
+  const [account, packages, complaints, allRequests] = await Promise.all([
     loadCustomerAccount(
       store,
       session.user.customerId!,
@@ -41,8 +41,23 @@ export default async function CustomerHome() {
     store.complaints.find({
       where: { customerId: session.user.customerId! },
     }),
+    store.customerRequests.find({
+      where: { customerId: session.user.customerId! } as never,
+      orderBy: [{ field: 'createdAt', dir: 'desc' }],
+    }),
   ]);
   if (!account) notFound();
+
+  const approvedPaymentPendingRequests = (allRequests || []).filter(
+    (r) =>
+      r.status === 'APPROVED' &&
+      r.paymentStatus === 'PENDING' &&
+      (r.paymentAmount ?? 0) > 0,
+  );
+
+  const pendingReviewRequests = (allRequests || []).filter(
+    (r) => r.status === 'PENDING',
+  );
 
   const complaintsByVisitId = new Map(
     complaints.filter((c) => c.visitId).map((c) => [c.visitId!, c]),
@@ -166,6 +181,93 @@ export default async function CustomerHome() {
           <div className="mt-2 h-0.5 w-16 rounded-full bg-blue-400 shadow-sm" />
         </div>
       </div>
+
+      {/* ========================================================================= */}
+      {/* 1.5 ACTION REQUIRED & REQUEST STATUS ALERTS                               */}
+      {/* ========================================================================= */}
+      {approvedPaymentPendingRequests.length > 0 && (
+        <div className="space-y-3">
+          {approvedPaymentPendingRequests.map((req) => {
+            const car = account.cars.find((c) => c.id === req.carId);
+            const carLabel = car ? `${car.make} ${car.model}` : 'Your Vehicle';
+            const serviceLabel = req.serviceDetails || req.washType || (req.type === 'ONE_WASH' ? 'One-Time Wash' : 'Special Service');
+
+            return (
+              <div
+                key={req.id}
+                className="relative overflow-hidden rounded-2xl border-2 border-amber-300 bg-gradient-to-r from-amber-50 via-orange-50/50 to-amber-50/30 p-5 shadow-sm transition-all"
+              >
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3.5">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-500 text-white shadow-xs text-xl">
+                      💳
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="rounded-full bg-amber-200/80 text-amber-950 px-2.5 py-0.5 text-[11px] font-black uppercase tracking-wider border border-amber-300">
+                          Action Required · Request Approved
+                        </span>
+                        {req.preferredDate && (
+                          <span className="text-xs text-slate-500 font-medium">
+                            Preferred Date: <strong className="text-slate-700">{formatDateFull(req.preferredDate)}</strong>
+                          </span>
+                        )}
+                      </div>
+
+                      <h3 className="text-base font-extrabold text-slate-900 mt-1">
+                        Complete payment for {carLabel} ({serviceLabel})
+                      </h3>
+                      <p className="text-xs text-slate-600 mt-0.5 max-w-xl">
+                        Your request has been approved by operations. Please complete the payment of{' '}
+                        <strong className="text-slate-950 font-black">₹{req.paymentAmount}</strong> to schedule and dispatch the wash boy.
+                      </p>
+
+                      {req.adminRemarks && (
+                        <div className="mt-2 text-xs text-amber-900 bg-white/80 rounded-lg px-2.5 py-1.5 border border-amber-200/80 inline-block">
+                          <span className="font-bold">Admin Note:</span> {req.adminRemarks}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 shrink-0 self-start md:self-center">
+                    <Link
+                      href={`/app/payments?amount=${req.paymentAmount}&requestId=${req.id}&desc=${encodeURIComponent(
+                        `${carLabel} - ${serviceLabel}`,
+                      )}`}
+                      className="inline-flex items-center gap-2 rounded-xl bg-amber-600 hover:bg-amber-700 active:scale-95 px-5 py-2.5 text-xs font-black text-white shadow-md transition-all"
+                    >
+                      <span>Pay ₹{req.paymentAmount} Now</span>
+                      <span className="text-sm">→</span>
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Pending Review Requests Info Banner */}
+      {approvedPaymentPendingRequests.length === 0 && pendingReviewRequests.length > 0 && (
+        <div className="rounded-2xl border border-blue-200 bg-blue-50/70 p-4 shadow-2xs flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="text-xl">⏳</span>
+            <div>
+              <div className="text-xs font-bold text-blue-950">
+                Special Request Under Review ({pendingReviewRequests.length} pending)
+              </div>
+              <p className="text-[11.5px] text-blue-800 mt-0.5">
+                Our operations team is reviewing your requested service or package change. You will be notified once approved.
+              </p>
+            </div>
+          </div>
+          <CustomerSpecialRequestsModal
+            cars={account.cars}
+            packages={packages}
+          />
+        </div>
+      )}
 
       {/* ========================================================================= */}
       {/* 2. TOP 3 STAT CARDS (Matches Image Exactly)                               */}

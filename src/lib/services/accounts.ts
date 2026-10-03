@@ -46,6 +46,8 @@ export interface CustomerAccount {
   payments: Payment[];
   invoices: Invoice[];
   pendingRequests?: CustomerRequest[];
+  pendingOneTimeRequests?: CustomerRequest[];
+  oneTimeDues?: Rupees;
   /** Monthly charge across every active car on the account. */
   monthly: Rupees;
   advanceDeposited: Rupees;
@@ -601,8 +603,33 @@ export async function loadCustomerAccount(
 
   const totalBilled = effectiveInvoices.reduce((sum, i) => sum + i.amount, 0);
 
+  // Standalone one-time / special wash dues
+  const oneTimeDues = effectiveInvoices
+    .filter(
+      (i) =>
+        (i.cycle.startsWith('ONE-TIME') || i.cycle.startsWith('CUSTOM')) &&
+        i.status !== 'PAID' &&
+        i.status !== 'WRITTEN_OFF',
+    )
+    .reduce((sum, i) => sum + Math.max(0, i.amount - i.paidAmount), 0);
+
+  const pendingOneTimeRequests = (customerRequests ?? []).filter(
+    (r) =>
+      r.status === 'APPROVED' &&
+      r.paymentStatus === 'PENDING' &&
+      (r.type === 'ONE_WASH' || r.type === 'OTHER_SERVICE') &&
+      (r.paymentAmount ?? 0) > 0,
+  );
+
+  const unInvoicedPendingAmount = pendingOneTimeRequests.reduce((sum, r) => {
+    const hasInvoice = effectiveInvoices.some(
+      (i) => i.cycle.includes(r.id.slice(-6).toUpperCase()) && i.status !== 'PAID' && i.status !== 'WRITTEN_OFF',
+    );
+    return hasInvoice ? sum : sum + (r.paymentAmount ?? 0);
+  }, 0);
+
   // Outstanding: only uncovered dues (if advance covers the due, customer owes nothing out of pocket)
-  const outstanding = sortedActiveCars.reduce((sum, c) => {
+  const subscriptionOutstanding = sortedActiveCars.reduce((sum, c) => {
     const pay = carPaymentsMap.get(c.id);
     if (!pay) return sum;
     if (pay.awaitingFirstWash) {
@@ -610,6 +637,8 @@ export async function loadCustomerAccount(
     }
     return sum + pay.due;
   }, 0);
+
+  const totalOutstanding = subscriptionOutstanding + oneTimeDues + unInvoicedPendingAmount;
 
   const nextDue =
     effectiveInvoices
@@ -653,12 +682,14 @@ export async function loadCustomerAccount(
     payments,
     invoices: effectiveInvoices,
     pendingRequests,
+    pendingOneTimeRequests,
+    oneTimeDues: oneTimeDues + unInvoicedPendingAmount,
     monthly,
     advanceDeposited,
     totalPaid,
     totalBilled,
     balance: walletAdvanceBalance,
-    outstanding,
+    outstanding: totalOutstanding,
     nextDue,
     nextVisit: resolvedNextVisit,
     tally: tallyVisits(effectiveCycleVisits, totalAccountQuota),

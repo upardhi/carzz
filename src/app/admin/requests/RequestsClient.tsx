@@ -114,6 +114,63 @@ export function RequestsClient({
   const [viewDetailsItem, setViewDetailsItem] = useState<CustomerRequestItem | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // Record Payment Modal on behalf of Customer
+  const [paymentItem, setPaymentItem] = useState<CustomerRequestItem | null>(null);
+  const [recAmount, setRecAmount] = useState<number>(0);
+  const [recMode, setRecMode] = useState<'CASH' | 'MANUAL_UPI' | 'GATEWAY'>('CASH');
+  const [recRef, setRecRef] = useState<string>('');
+  const [recNote, setRecNote] = useState<string>('');
+  const [recSubmitting, setRecSubmitting] = useState<boolean>(false);
+
+  function openRecordPayment(item: CustomerRequestItem) {
+    setPaymentItem(item);
+    setRecAmount(item.paymentAmount || 0);
+    setRecMode('CASH');
+    setRecRef(`RCP-${Date.now().toString().slice(-6)}`);
+    setRecNote(`Payment for special request #${item.id.slice(-6).toUpperCase()} (${item.carName || 'Vehicle'})`);
+  }
+
+  async function submitRecordPayment() {
+    if (!paymentItem) return;
+    if (recAmount <= 0) {
+      toast.error('Please enter a valid payment amount.');
+      return;
+    }
+    if (!recRef.trim()) {
+      toast.error('Receipt / Reference number is required.');
+      return;
+    }
+
+    setRecSubmitting(true);
+    try {
+      const res = await fetch('/api/ops/payments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'record',
+          customerId: paymentItem.customerId,
+          amount: recAmount,
+          mode: recMode,
+          kind: 'PACKAGE',
+          reference: recRef.trim(),
+          note: recNote.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to record payment');
+      }
+
+      toast.success(data.message || 'Payment recorded. Wash visit is now active and scheduled!');
+      setPaymentItem(null);
+      fetchData();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not record payment.');
+    } finally {
+      setRecSubmitting(false);
+    }
+  }
+
   useEffect(() => {
     setPage(1);
   }, [debouncedSearch, typeFilter, statusFilter]);
@@ -528,15 +585,31 @@ export function RequestsClient({
       header: 'ACTIONS',
       render: (item) => {
         if (item.status !== 'PENDING') {
+          const hasPendingPayment =
+            item.status === 'APPROVED' &&
+            item.paymentAmount &&
+            item.paymentAmount > 0 &&
+            item.paymentStatus !== 'PAID';
+
           return (
-            <div className="text-xs space-y-1 min-w-[120px]">
-              <div className="text-ink-mute text-[11px] font-medium">
-                {item.decidedAt ? formatDateFull(item.decidedAt) : 'Processed'}
-              </div>
+            <div className="text-xs space-y-1.5 min-w-[130px]">
+              {hasPendingPayment ? (
+                <button
+                  type="button"
+                  onClick={() => openRecordPayment(item)}
+                  className="w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 border border-emerald-700 px-2.5 py-1 text-[11px] font-bold text-white transition-colors cursor-pointer shadow-2xs"
+                >
+                  <span>💳 Record ₹{item.paymentAmount}</span>
+                </button>
+              ) : (
+                <div className="text-ink-mute text-[11px] font-medium">
+                  {item.decidedAt ? formatDateFull(item.decidedAt) : 'Processed'}
+                </div>
+              )}
               <button
                 type="button"
                 onClick={() => setViewDetailsItem(item)}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 border border-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-700 transition-colors cursor-pointer shadow-2xs"
+                className="w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 border border-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-700 transition-colors cursor-pointer shadow-2xs"
               >
                 <span>{item.adminRemarks ? '💬' : '👁️'}</span>
                 <span>{item.adminRemarks ? 'View Note' : 'Details'}</span>
@@ -1423,6 +1496,136 @@ export function RequestsClient({
                 className="rounded-lg bg-slate-900 px-5 py-2 text-xs font-bold text-white hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Record Payment on Behalf of Customer Modal */}
+      {paymentItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-950/60 p-4 backdrop-blur-xs animate-fadeIn">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl space-y-4">
+            <div className="flex items-start justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <span>💳</span>
+                  <span>Record Customer Payment</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Collect payment on behalf of {paymentItem.customerName}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPaymentItem(null)}
+                className="text-slate-400 hover:text-slate-600 text-lg leading-none"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 space-y-1.5 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-500 font-semibold">Customer:</span>
+                <span className="font-bold text-slate-900">{paymentItem.customerName} ({paymentItem.customerPhone})</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500 font-semibold">Vehicle:</span>
+                <span className="font-bold text-slate-900">🚗 {paymentItem.carName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500 font-semibold">Service:</span>
+                <span className="font-medium text-slate-800">{paymentItem.serviceDetails || paymentItem.washType || 'One-Time Wash'}</span>
+              </div>
+              <div className="flex justify-between pt-1 border-t border-slate-200/60">
+                <span className="text-slate-500 font-semibold">Due Amount:</span>
+                <span className="font-black text-emerald-700 text-sm">₹{paymentItem.paymentAmount ?? 0}</span>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Amount Received (₹) <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">₹</span>
+                  <input
+                    type="number"
+                    min="1"
+                    value={recAmount || ''}
+                    onChange={(e) => setRecAmount(Number(e.target.value) || 0)}
+                    className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-7 pr-3 text-sm font-bold text-slate-900 focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Payment Mode</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: 'CASH', label: '💵 Cash' },
+                    { id: 'MANUAL_UPI', label: '📱 UPI' },
+                    { id: 'GATEWAY', label: '🌐 Online' },
+                  ].map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setRecMode(m.id as never)}
+                      className={`rounded-lg border py-2 text-xs font-bold transition-all ${
+                        recMode === m.id
+                          ? 'border-emerald-500 bg-emerald-50 text-emerald-900 shadow-2xs'
+                          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Receipt / Invoice / UTR # <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={recRef}
+                  onChange={(e) => setRecRef(e.target.value)}
+                  placeholder="e.g. RCP-102938 or UPI Ref"
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-mono text-slate-900 focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Remarks / Note (Optional)</label>
+                <input
+                  type="text"
+                  value={recNote}
+                  onChange={(e) => setRecNote(e.target.value)}
+                  placeholder="e.g. Cash collected by staff on round"
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-900 focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setPaymentItem(null)}
+                disabled={recSubmitting}
+                className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => submitRecordPayment()}
+                disabled={recSubmitting || recAmount <= 0 || !recRef.trim()}
+                className="rounded-lg bg-emerald-600 px-5 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors cursor-pointer shadow-2xs"
+              >
+                {recSubmitting ? 'Recording…' : `Confirm & Activate Visit (₹${recAmount})`}
               </button>
             </div>
           </div>

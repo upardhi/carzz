@@ -11,6 +11,8 @@ const schema = z.object({
   razorpayOrderId: z.string().min(1),
   razorpayPaymentId: z.string().min(1),
   razorpaySignature: z.string().min(1),
+  requestId: z.string().optional(),
+  description: z.string().optional(),
 });
 
 export async function POST(request: Request) {
@@ -56,18 +58,19 @@ export async function POST(request: Request) {
       });
     }
 
-    // Record the payment with status: PENDING
-    // Per requirement: Online payment sits at PENDING until a manager, admin,
-    // or owner approves it. Only upon approval does it settle invoices and add credit.
+    const noteText = parsed.data.description
+      ? `Online Razorpay Payment: ${parsed.data.description} (Order: ${razorpayOrderId}, Txn: ${razorpayPaymentId}) — Awaiting Admin/Manager Approval`
+      : `Online Razorpay Payment (Order: ${razorpayOrderId}, Txn: ${razorpayPaymentId}) — Awaiting Admin/Manager Approval`;
+
     const payment = await recordPayment(store, {
       customerId: customer.id,
       amount,
       mode: 'GATEWAY',
-      cycle: currentCycle(),
+      cycle: parsed.data.description ? `ONE-TIME (${parsed.data.description})` : currentCycle(),
       recordedByUserId: session.user.id,
       status: 'PENDING',
       reference: razorpayPaymentId,
-      note: `Online Razorpay Payment (Order: ${razorpayOrderId}, Txn: ${razorpayPaymentId}) — Awaiting Admin/Manager Approval`,
+      note: noteText,
     });
 
     return NextResponse.json({
