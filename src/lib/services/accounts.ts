@@ -179,6 +179,17 @@ export async function loadCustomerAccount(
     );
   }
 
+  // 1.5 Auto-activate customer if vacation hold date has passed
+  if (customer.status === 'HOLD' && customer.holdUntil && customer.holdUntil < today) {
+    try {
+      await store.customers.update(customer.id, { status: 'ACTIVE', holdUntil: null });
+      customer.status = 'ACTIVE';
+      customer.holdUntil = null;
+    } catch {
+      // ignore
+    }
+  }
+
   // 2. Prune any redundant future pending visits beyond the first upcoming visit per car
   const prunedVisitIds = new Set<string>();
   for (const car of cars) {

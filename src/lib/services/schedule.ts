@@ -74,26 +74,35 @@ export async function scheduleNextVisitForCar(
   if (customer.status === 'INACTIVE' || !car.active || car.serviceStarted === false) {
     return null;
   }
-  if (customer.status === 'HOLD' && customer.holdUntil && customer.holdUntil >= today) {
-    return null;
+  // If hold expired, auto-activate customer
+  if (customer.status === 'HOLD' && customer.holdUntil && customer.holdUntil < today) {
+    try {
+      await store.customers.update(customer.id, { status: 'ACTIVE', holdUntil: null });
+      customer.status = 'ACTIVE';
+      customer.holdUntil = null;
+    } catch {
+      // ignore
+    }
   }
 
   let pkg = await store.packages.get(car.packageId);
   let quota = pkg?.washesPerMonth ?? 8;
 
-  // Get all visits for this car in the cycle
-  const existing = await store.visits.find({
-    where: { carId: car.id, cycle },
+  // Get all visits for this car to evaluate package completion accurately across month boundaries
+  const allCarVisits = await store.visits.find({
+    where: { carId: car.id },
     orderBy: [{ field: 'scheduledDate', dir: 'asc' }],
   });
 
-  const doneCount = existing.filter((v) => {
+  const carStartCycle = car.serviceStartedAt ? car.serviceStartedAt.slice(0, 7) : cycle;
+
+  const doneCount = allCarVisits.filter((v) => {
     if (v.status !== 'DONE') return false;
-    if (car.packageResetAt && car.packageResetAt.slice(0, 7) === cycle) {
+    if (car.packageResetAt) {
       const resetDate = car.packageResetAt.slice(0, 10);
       return v.scheduledDate >= resetDate || Boolean(v.completedAt && v.completedAt >= car.packageResetAt);
     }
-    return true;
+    return v.cycle >= carStartCycle;
   }).length;
 
   if (doneCount >= quota) {
@@ -124,7 +133,7 @@ export async function scheduleNextVisitForCar(
   }
 
   // Clean up any stale past pending visits that were never completed
-  const pastPending = existing.filter(
+  const pastPending = allCarVisits.filter(
     (v) => v.status === 'PENDING' && v.scheduledDate < today,
   );
   for (const p of pastPending) {
@@ -136,7 +145,7 @@ export async function scheduleNextVisitForCar(
   }
 
   // Check if there is already an upcoming pending or in-progress visit on or after today
-  const openUpcoming = existing.filter(
+  const openUpcoming = allCarVisits.filter(
     (v) =>
       (v.status === 'PENDING' || v.status === 'IN_PROGRESS') &&
       v.scheduledDate >= today,
@@ -169,12 +178,14 @@ export async function scheduleNextVisitForCar(
     return null;
   }
 
+  const targetCycle = nextDate.slice(0, 7);
+
   const created = await store.visits.create({
     carId: car.id,
     customerId: customer.id,
     areaId: customer.areaId,
     staffId: car.assignedStaffId,
-    cycle,
+    cycle: targetCycle,
     scheduledDate: nextDate,
     scheduledTime: car.scheduleTime,
     status: 'PENDING',
