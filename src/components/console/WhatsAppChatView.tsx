@@ -391,7 +391,6 @@ export function WhatsAppChatView({
 
   // Overall Stats
   const totalFailedOverall = messages.filter((m) => m.status === 'FAILED').length;
-  const totalSentOverall = messages.filter((m) => m.status === 'SENT').length;
 
   return (
     <div className="relative flex flex-col w-full h-[calc(100dvh-165px)] sm:h-[calc(100vh-130px)] min-h-[500px] sm:min-h-[600px] md:min-h-[680px] rounded-xl sm:rounded-2xl bg-white shadow-2xl overflow-hidden font-sans border border-[#d1d7db] text-[#111b21]">
@@ -819,7 +818,6 @@ export function WhatsAppChatView({
               {activeThread.messages.map((msg) => {
                 const isInbound = msg.direction === 'INBOUND';
                 const isFailed = !isInbound && msg.status === 'FAILED';
-                const isQueued = !isInbound && (msg.status === 'QUEUED' || msg.status === 'PROCESSING');
                 const isRetrying = retryingIds.has(msg.id);
 
                 return (

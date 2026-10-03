@@ -11,7 +11,7 @@ import { requirePermission } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { businessSummary } from '@/lib/services/reports';
 import { currentCycle, cycleLabel, money } from '@/lib/util/format';
-import { EXPENSE_HEAD_LABEL, PAYMENT_MODE_LABEL } from '@/lib/util/labels';
+import { EXPENSE_HEAD_LABEL } from '@/lib/util/labels';
 import { ExpenseForm } from './ExpenseForm';
 
 export const metadata = { title: 'Accounting' };

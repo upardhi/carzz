@@ -59,11 +59,12 @@ async function handleCron(request: Request) {
       dispatchedAt: new Date().toISOString(),
       message: `Dispatched 6:00 AM morning reminders for ${queuedCount} customer${queuedCount === 1 ? '' : 's'}.`,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Cron 6AM Reminder Error]', error);
+    const err = error as { message?: string; status?: number } | null | undefined;
     return NextResponse.json(
-      { ok: false, error: error?.message || 'Failed to dispatch 6 AM morning reminders' },
-      { status: error?.status || 500 },
+      { ok: false, error: err?.message || 'Failed to dispatch 6 AM morning reminders' },
+      { status: err?.status || 500 },
     );
   }
 }

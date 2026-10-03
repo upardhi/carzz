@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
  * Pushes updates ONLY when WhatsApp calls our webhook.
  * Zero database polling when idle.
  */
-export async function GET(request: Request) {
+export async function GET() {
   try {
     await requireApiSession('visit:view');
 
@@ -58,7 +58,7 @@ export async function GET(request: Request) {
         Connection: 'keep-alive',
       },
     });
-  } catch (error) {
+  } catch {
     return new Response('Unauthorized', { status: 401 });
   }
 }

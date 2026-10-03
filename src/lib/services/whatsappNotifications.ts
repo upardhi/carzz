@@ -18,7 +18,6 @@ import {
   buildWashSkippedMessage,
   buildInvoiceDueMessage,
   buildWashboyScheduleMessage,
-  buildAdvanceReminderMessage,
   buildSameDayReminderMessage,
   buildWashTodayScheduledMessage,
   buildWashRescheduledMessage,

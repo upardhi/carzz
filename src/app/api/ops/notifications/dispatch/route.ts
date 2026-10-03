@@ -2,11 +2,10 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireApiSession } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
-import { todayISO, addDays } from '@/lib/util/format';
+import { todayISO } from '@/lib/util/format';
 import { businessToday } from '@/lib/util/time';
 import {
   broadcastWashboySchedules,
-  broadcastCustomerDayBeforeReminders,
   broadcastCustomerSameDayReminders,
   notifyInvoiceDue,
 } from '@/lib/services/whatsappNotifications';
@@ -36,7 +35,7 @@ const schema = z.discriminatedUnion('action', [
 
 export async function POST(request: Request) {
   try {
-    const session = await requireApiSession('visit:view');
+    await requireApiSession('visit:view');
     const parsed = schema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) {
       return NextResponse.json(

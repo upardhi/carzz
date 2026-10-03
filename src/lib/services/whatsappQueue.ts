@@ -2,7 +2,7 @@ import 'server-only';
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { sendWhatsAppMessage, normalizePhoneNumber, getWhatsAppConfig } from './whatsapp';
+import { sendWhatsAppMessage, normalizePhoneNumber } from './whatsapp';
 
 export type WhatsAppRecipientType = 'CUSTOMER' | 'STAFF';
 
@@ -96,7 +96,7 @@ const DATA_DIR = path.join(process.cwd(), '.data');
 const DATA_FILE = path.join(DATA_DIR, 'whatsapp_messages.json');
 
 // Memory storage holding all jobs and track records
-let messageStore: Map<string, WhatsAppMessageRecord> = new Map();
+const messageStore: Map<string, WhatsAppMessageRecord> = new Map();
 let isInitialized = false;
 let isWorkerRunning = false;
 let saveDebounceTimer: NodeJS.Timeout | null = null;

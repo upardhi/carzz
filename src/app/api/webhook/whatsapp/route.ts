@@ -34,9 +34,56 @@ export async function GET(request: Request) {
   }
 }
 
+interface MetaWebhookContact {
+  wa_id?: string;
+  profile?: {
+    name?: string;
+  };
+}
+
+interface MetaWebhookMessage {
+  id?: string;
+  from?: string;
+  type?: string;
+  timestamp?: string;
+  text?: { body?: string };
+  image?: { caption?: string };
+  button?: { text?: string };
+  interactive?: {
+    button_reply?: { title?: string };
+    list_reply?: { title?: string };
+  };
+}
+
+interface MetaWebhookStatus {
+  id?: string;
+  status?: string;
+  timestamp?: string;
+  errors?: Array<{ message?: string; title?: string }>;
+}
+
+interface MetaWebhookValue {
+  messages?: MetaWebhookMessage[];
+  contacts?: MetaWebhookContact[];
+  statuses?: MetaWebhookStatus[];
+}
+
+interface MetaWebhookChange {
+  value?: MetaWebhookValue;
+}
+
+interface MetaWebhookEntry {
+  changes?: MetaWebhookChange[];
+}
+
+interface MetaWebhookBody {
+  object?: string;
+  entry?: MetaWebhookEntry[];
+}
+
 export async function POST(request: Request) {
   try {
-    const body = (await request.json().catch(() => null)) as any;
+    const body = (await request.json().catch(() => null)) as MetaWebhookBody | null;
     if (!body) {
       return NextResponse.json({ ok: false, error: 'Empty payload' }, { status: 400 });
     }
@@ -53,11 +100,11 @@ export async function POST(request: Request) {
               const from = msg.from;
               if (!from) continue;
 
-              const contact = (value.contacts || []).find((c: any) => c.wa_id === from);
+              const contact = (value.contacts || []).find((c) => c.wa_id === from);
               const senderName = contact?.profile?.name || 'Customer';
 
               let messageText = '';
-              let mediaUrl: string | undefined = undefined;
+              const mediaUrl: string | undefined = undefined;
 
               if (msg.type === 'text') {
                 messageText = msg.text?.body || '';

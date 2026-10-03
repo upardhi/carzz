@@ -994,7 +994,7 @@ export async function GET(request: Request) {
     }
 
     const areaFilter = scopeAreaFilter(session.scope);
-    const [all, areas, staff, packages, invoices, users] = await Promise.all([
+    const [all, areas, staff, packages, users] = await Promise.all([
       store.customers.find({
         where: areaFilter as never,
         orderBy: [{ field: 'name' }],
@@ -1002,7 +1002,6 @@ export async function GET(request: Request) {
       store.areas.find(),
       store.staff.find({ where: { role: 'EMPLOYEE', ...areaFilter } as never }),
       store.packages.find(),
-      store.invoices.find({ where: { cycle, ...areaFilter } as never }),
       store.users.find(),
     ]);
 
