@@ -98,7 +98,7 @@ export async function POST(request: Request) {
         reference: receiptOrInvoiceRef,
         recordedByUserId: session.user.id,
       });
-      await loadCustomerAccount(store, payment.customerId, payment.cycle);
+      const account = await loadCustomerAccount(store, payment.customerId, payment.cycle);
 
       revalidatePaymentPages();
       const receiptNo = settled.reference || `RCP-${settled.id.slice(-6).toUpperCase()}`;
@@ -112,6 +112,12 @@ export async function POST(request: Request) {
         ok: true,
         payment: settled,
         receiptNo,
+        account: {
+          balance: account?.balance ?? 0,
+          outstanding: account?.outstanding ?? 0,
+          totalPaid: account?.totalPaid ?? 0,
+          totalBilled: account?.totalBilled ?? 0,
+        },
         message: `Payment confirmed successfully. Receipt #${receiptNo}`,
       });
     }
@@ -178,10 +184,19 @@ export async function POST(request: Request) {
       console.error('Failed to dispatch payment approved WhatsApp notification:', err),
     );
 
+    const cycle = currentCycle();
+    const account = await loadCustomerAccount(store, customer.id, cycle);
+
     return NextResponse.json({
       ok: true,
       payment,
       receiptNo,
+      account: {
+        balance: account?.balance ?? 0,
+        outstanding: account?.outstanding ?? 0,
+        totalPaid: account?.totalPaid ?? 0,
+        totalBilled: account?.totalBilled ?? 0,
+      },
       message: `Payment of ₹${payment.amount.toLocaleString('en-IN')} recorded. Receipt #${receiptNo}`,
     });
   } catch (error) {

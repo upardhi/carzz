@@ -785,11 +785,18 @@ export async function ConsoleCustomerDetail({
                     id: 'status',
                     header: 'STATUS',
                     align: 'right',
-                    render: (payment) => (
-                      <Tag tone={payment.status === 'CONFIRMED' ? 'ok' : 'warn'}>
-                        {payment.status === 'CONFIRMED' ? 'Paid' : 'To confirm'}
-                      </Tag>
-                    ),
+                    render: (payment) => {
+                      if (payment.status === 'CONFIRMED') {
+                        return <Tag tone="ok">Paid</Tag>;
+                      }
+                      if (payment.status === 'FAILED') {
+                        return <Tag tone="bad">Rejected</Tag>;
+                      }
+                      if (payment.status === 'REFUNDED') {
+                        return <Tag tone="neutral">Refunded</Tag>;
+                      }
+                      return <Tag tone="warn">To confirm</Tag>;
+                    },
                   },
                 ]}
               />

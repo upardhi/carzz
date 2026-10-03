@@ -1012,9 +1012,17 @@ export async function GET(request: Request) {
     );
 
     const customerIds = all.map((c) => c.id);
-    const scopedCars = customerIds.length
-      ? await store.cars.find({ where: { customerId: { in: customerIds } } as never })
-      : [];
+    const [scopedCars, allInvoices, allPayments] = await Promise.all([
+      customerIds.length
+        ? store.cars.find({ where: { customerId: { in: customerIds } } as never })
+        : Promise.resolve([]),
+      customerIds.length
+        ? store.invoices.find({ where: { customerId: { in: customerIds } } as never })
+        : Promise.resolve([]),
+      customerIds.length
+        ? store.payments.find({ where: { customerId: { in: customerIds }, status: 'CONFIRMED' } as never })
+        : Promise.resolve([]),
+    ]);
 
     const carsByCustomer = new Map<string, Car[]>();
     for (const car of scopedCars) {
@@ -1023,7 +1031,20 @@ export async function GET(request: Request) {
       carsByCustomer.set(car.customerId, list);
     }
 
-    const invoiceByCustomer = new Map(invoices.map((i) => [i.customerId, i]));
+    const invoicesByCustomer = new Map<string, typeof allInvoices>();
+    for (const inv of allInvoices) {
+      const list = invoicesByCustomer.get(inv.customerId) ?? [];
+      list.push(inv);
+      invoicesByCustomer.set(inv.customerId, list);
+    }
+
+    const paymentsByCustomer = new Map<string, typeof allPayments>();
+    for (const p of allPayments) {
+      const list = paymentsByCustomer.get(p.customerId) ?? [];
+      list.push(p);
+      paymentsByCustomer.set(p.customerId, list);
+    }
+
     const staffById = new Map(staff.map((s) => [s.id, s]));
     const areaById = new Map(areas.map((a) => [a.id, a]));
     const packageById = new Map(packages.map((p) => [p.id, p]));
@@ -1038,22 +1059,34 @@ export async function GET(request: Request) {
     const inactivePercent = totalCustomers > 0 ? ((inactiveCustomers / totalCustomers) * 100).toFixed(1) : '0.0';
     const totalCarsCount = scopedCars.length;
 
-    const unpaidInvoices = invoices.filter((i) => i.status !== 'PAID' && i.amount - i.paidAmount > 0);
+    const today = todayISO();
+    const unpaidInvoices = allInvoices.filter((i) => i.status !== 'PAID' && i.status !== 'WRITTEN_OFF' && i.amount - i.paidAmount > 0);
     const unpaidCount = unpaidInvoices.length;
     const unpaidAmount = unpaidInvoices.reduce((sum, i) => sum + (i.amount - i.paidAmount), 0);
 
     const customers = all.map((customer) => {
       const own = carsByCustomer.get(customer.id) ?? [];
       const user = (customer.userId ? userByUserId.get(customer.userId) : null) ?? userByCustomerId.get(customer.id);
-      const invoice = invoiceByCustomer.get(customer.id);
-      const owed = invoice ? Math.max(0, invoice.amount - invoice.paidAmount) : 0;
-      const paymentStatus = !invoice
-        ? 'NONE'
-        : owed <= 0
-        ? 'PAID'
-        : invoice.paidAmount > 0
-        ? 'PARTIAL'
-        : 'PENDING';
+      const custInvoices = invoicesByCustomer.get(customer.id) ?? [];
+      const custPayments = paymentsByCustomer.get(customer.id) ?? [];
+
+      const totalPaid = custPayments.reduce((sum, p) => sum + p.amount, 0);
+      const totalBilled = custInvoices.reduce((sum, i) => sum + i.amount, 0);
+      const openInvoices = custInvoices.filter((i) => i.status !== 'PAID' && i.status !== 'WRITTEN_OFF');
+      const owed = openInvoices.reduce((sum, i) => sum + (i.amount - i.paidAmount), 0);
+      const advanceBalance = Math.max(0, totalPaid - (totalBilled - owed));
+      const isOverdue = openInvoices.some((i) => i.status === 'OVERDUE' || (i.dueOn < today && i.paidAmount < i.amount));
+
+      const paymentStatus: 'PAID' | 'DUE' | 'OVERDUE' | 'PARTIAL' | 'NONE' =
+        custInvoices.length === 0
+          ? 'NONE'
+          : owed <= 0
+          ? 'PAID'
+          : isOverdue
+          ? 'OVERDUE'
+          : totalPaid > 0
+          ? 'PARTIAL'
+          : 'DUE';
 
       const monthlyAmount = own.reduce(
         (sum, car) => sum + (packageById.get(car.packageId)?.price ?? 0),
@@ -1101,6 +1134,8 @@ export async function GET(request: Request) {
         monthlyAmount,
         paymentStatus,
         outstandingAmount: owed,
+        advanceBalance,
+        totalPaid,
         weeklyDays: firstCar?.weeklyDays,
         scheduleTime: firstCar?.scheduleTime,
         assignedStaffId: firstCar?.assignedStaffId,
