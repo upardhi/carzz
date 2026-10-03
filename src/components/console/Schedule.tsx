@@ -8,7 +8,7 @@ import { getStore } from '@/lib/data';
 import { formatDateFull, todayISO } from '@/lib/util/format';
 import { resolvePublicPhotoUrl } from '@/lib/util/photoUrl';
 import { visitsForDate } from '@/lib/services/schedule';
-import { isOneTimeWash } from '@/lib/services/visits';
+import { isOneTimeWash } from '@/lib/util/labels';
 
 /**
  * The live schedule page for the day's rounds.

@@ -106,3 +106,16 @@ export const LANGUAGE_LABEL: Record<Language, string> = {
   hi: 'हिंदी',
   mr: 'मराठी',
 };
+
+/** Identifies whether a wash visit is an ad-hoc one-time wash rather than a monthly subscription quota wash. */
+export function isOneTimeWash(v?: { missNote?: string | null; cycle?: string | null } | null): boolean {
+  if (!v) return false;
+  return Boolean(
+    v.missNote?.includes('[Customer Special Request: ONE_WASH]') ||
+    v.missNote?.includes('[Customer Special Request: OTHER_SERVICE]') ||
+    v.missNote?.includes('[One-Time Wash]') ||
+    v.missNote?.includes('[One Wash]') ||
+    v.cycle?.includes('ONE-TIME') ||
+    v.cycle?.includes('ONEWASH')
+  );
+}

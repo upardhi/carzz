@@ -4,8 +4,11 @@ import type { DataStore } from '../data/ports/store';
 import type { Id, MissReason, WashVisit } from '../data/types';
 import { slotInstant } from '../util/time';
 import { isWashFeedbackExpired } from '../util/washTiming';
+import { isOneTimeWash } from '../util/labels';
 import { nextSlotAfter, plannedServiceFor, scheduleNextVisitForCar } from './schedule';
 import { invalidateAreaPerformanceCache } from './reports';
+
+export { isOneTimeWash };
 
 export class WashRuleError extends Error {}
 
@@ -228,17 +231,6 @@ export interface VisitTally {
   missed: number;
   pending: number;
   remaining: number;
-}
-
-export function isOneTimeWash(v: WashVisit): boolean {
-  return Boolean(
-    v.missNote?.includes('[Customer Special Request: ONE_WASH]') ||
-    v.missNote?.includes('[Customer Special Request: OTHER_SERVICE]') ||
-    v.missNote?.includes('[One-Time Wash]') ||
-    v.missNote?.includes('[One Wash]') ||
-    v.cycle?.includes('ONE-TIME') ||
-    v.cycle?.includes('ONEWASH')
-  );
 }
 
 export function tallyVisits(visits: WashVisit[], monthlyQuota?: number): VisitTally {

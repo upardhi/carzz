@@ -5,7 +5,6 @@ import { requirePermission } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { loadCustomerAccount } from '@/lib/services/accounts';
 import { parsePackageServices } from '@/lib/data/types';
-import { isOneTimeWash } from '@/lib/services/visits';
 import {
   currentCycle,
   cycleLabel,
@@ -13,7 +12,7 @@ import {
   formatClock,
   formatTime,
 } from '@/lib/util/format';
-import { MISS_REASON_LABEL } from '@/lib/util/labels';
+import { MISS_REASON_LABEL, isOneTimeWash } from '@/lib/util/labels';
 import { resolvePublicPhotoUrl } from '@/lib/util/photoUrl';
 import { WashRatingAction } from '../../WashRatingAction';
 import { WashProgressTimer } from '@/components/ui/WashProgressTimer';

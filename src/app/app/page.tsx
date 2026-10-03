@@ -12,11 +12,11 @@ import {
 import { requirePermission } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { loadCustomerAccount } from '@/lib/services/accounts';
-import { isOneTimeWash } from '@/lib/services/visits';
 import { WashActionControls } from './WashActionControls';
 import { CustomerSpecialRequestsModal } from './CustomerSpecialRequestsModal';
 import { WashRatingAction } from './WashRatingAction';
 import { WashProgressTimer } from '@/components/ui/WashProgressTimer';
+import { isOneTimeWash } from '@/lib/util/labels';
 import {
   currentCycle,
   formatDate,

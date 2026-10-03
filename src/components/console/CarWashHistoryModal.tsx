@@ -14,8 +14,7 @@ import {
 import { resolvePublicPhotoUrl } from '@/lib/util/photoUrl';
 import { formatDateFull, formatClock } from '@/lib/util/format';
 import { washDurationMinutes, formatDurationMinutes, washSpeedFlag } from '@/lib/util/washTiming';
-import { MISS_REASON_LABEL } from '@/lib/util/labels';
-import { isOneTimeWash } from '@/lib/services/visits';
+import { MISS_REASON_LABEL, isOneTimeWash } from '@/lib/util/labels';
 import { WashProgressTimer } from '@/components/ui/WashProgressTimer';
 import type { WashVisit } from '@/lib/data/types';
 
