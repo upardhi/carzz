@@ -106,6 +106,10 @@ export function RequestsClient({
   const [activationMode, setActivationMode] = useState<'IMMEDIATE_PRORATED' | 'IMMEDIATE_FULL' | 'NEXT_CYCLE'>('IMMEDIATE_PRORATED');
   const [adjustmentAmount, setAdjustmentAmount] = useState<number>(0);
   const [applyFinancialAdjustment, setApplyFinancialAdjustment] = useState(true);
+  const [invoiceNumber, setInvoiceNumber] = useState('');
+  const [paymentReceived, setPaymentReceived] = useState(false);
+  const [paymentMode, setPaymentMode] = useState<'MANUAL_UPI' | 'CASH' | 'GATEWAY'>('MANUAL_UPI');
+  const [paymentReference, setPaymentReference] = useState('');
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [viewDetailsItem, setViewDetailsItem] = useState<CustomerRequestItem | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -155,6 +159,10 @@ export function RequestsClient({
     setShowBreakdown(false);
     setAssignedStaffId(item.assignedStaffId || '');
     setScheduledDate(item.preferredDate || new Date().toISOString().slice(0, 10));
+    setInvoiceNumber('');
+    setPaymentReceived(false);
+    setPaymentMode('MANUAL_UPI');
+    setPaymentReference('');
 
     if (item.type === 'PACKAGE_CHANGE' && item.packageAudit) {
       const audit = item.packageAudit;
@@ -228,6 +236,11 @@ export function RequestsClient({
     e.preventDefault();
     if (!activeRequest || !actionType) return;
 
+    if (actionType === 'APPROVE' && paymentReceived && !paymentReference.trim() && !invoiceNumber.trim()) {
+      toast.error('Please enter a Receipt # or UPI Reference number for collected payment.');
+      return;
+    }
+
     setSubmitting(true);
     try {
       const res = await fetch('/api/ops/requests', {
@@ -242,6 +255,10 @@ export function RequestsClient({
           activationMode: activeRequest.type === 'PACKAGE_CHANGE' ? activationMode : null,
           adjustmentAmount: applyFinancialAdjustment ? adjustmentAmount : 0,
           applyFinancialAdjustment: applyFinancialAdjustment,
+          invoiceNumber: invoiceNumber.trim() || null,
+          paymentReceived: paymentReceived,
+          paymentReference: paymentReference.trim() || null,
+          paymentMode: paymentMode,
         }),
       });
 
@@ -1135,11 +1152,11 @@ export function RequestsClient({
                   </div>
 
                   {/* Optional Extra Charge for One Wash / Custom Service */}
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2.5">
                     <div className="flex items-center justify-between">
                       <div>
-                        <span className="font-bold text-slate-900 block">Extra Service Charge / Price:</span>
-                        <span className="text-[11px] text-slate-500">Optional fee to collect for this special wash</span>
+                        <span className="font-bold text-slate-900 block">One-Time Service Charge / Fee:</span>
+                        <span className="text-[11px] text-slate-500">Standalone one-off fee (not recurring, will NOT change monthly plan)</span>
                       </div>
                       <div className="flex items-center gap-1">
                         <span className="font-bold text-slate-700">₹</span>
@@ -1159,15 +1176,76 @@ export function RequestsClient({
                     </div>
 
                     {adjustmentAmount > 0 && (
-                      <label className="flex items-center gap-2 text-[11px] font-semibold text-slate-700 cursor-pointer pt-1 border-t border-slate-200/60">
-                        <input
-                          type="checkbox"
-                          checked={applyFinancialAdjustment}
-                          onChange={(e) => setApplyFinancialAdjustment(e.target.checked)}
-                          className="rounded"
-                        />
-                        <span>Auto-generate open invoice of ₹{adjustmentAmount} on customer account</span>
-                      </label>
+                      <div className="pt-2 border-t border-slate-200 space-y-2">
+                        <label className="flex items-center gap-2 text-[11px] font-semibold text-slate-700 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={applyFinancialAdjustment}
+                            onChange={(e) => setApplyFinancialAdjustment(e.target.checked)}
+                            className="rounded text-blue-600 focus:ring-blue-500"
+                          />
+                          <span>Generate separate standalone invoice of ₹{adjustmentAmount} (One-Time)</span>
+                        </label>
+
+                        {applyFinancialAdjustment && (
+                          <div className="space-y-2 pl-5 pt-1">
+                            <div>
+                              <label className="block text-[11px] font-bold text-slate-700 mb-0.5">
+                                Invoice # / Bill Reference (Optional):
+                              </label>
+                              <input
+                                type="text"
+                                value={invoiceNumber}
+                                onChange={(e) => setInvoiceNumber(e.target.value)}
+                                placeholder="e.g. INV-2026-OW01"
+                                className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none"
+                              />
+                            </div>
+
+                            <label className="flex items-center gap-2 text-[11px] font-semibold text-emerald-800 bg-emerald-50/80 p-2 rounded-lg border border-emerald-200 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={paymentReceived}
+                                onChange={(e) => setPaymentReceived(e.target.checked)}
+                                className="rounded text-emerald-600 focus:ring-emerald-500"
+                              />
+                              <span>Payment has already been received upfront (Record Paid)</span>
+                            </label>
+
+                            {paymentReceived && (
+                              <div className="grid grid-cols-2 gap-2 p-2 rounded-lg bg-emerald-50/50 border border-emerald-200 text-xs">
+                                <div>
+                                  <label className="block text-[10px] font-bold text-emerald-900 mb-0.5">
+                                    Payment Mode *
+                                  </label>
+                                  <select
+                                    value={paymentMode}
+                                    onChange={(e) => setPaymentMode(e.target.value as 'MANUAL_UPI' | 'CASH' | 'GATEWAY')}
+                                    className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-900"
+                                  >
+                                    <option value="MANUAL_UPI">UPI / QR Transfer</option>
+                                    <option value="CASH">Cash</option>
+                                    <option value="GATEWAY">Online Gateway</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-bold text-emerald-900 mb-0.5">
+                                    Receipt / UPI Ref # *
+                                  </label>
+                                  <input
+                                    type="text"
+                                    required={paymentReceived}
+                                    value={paymentReference}
+                                    onChange={(e) => setPaymentReference(e.target.value)}
+                                    placeholder="Receipt # / Ref ID"
+                                    className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-900 placeholder:text-slate-400"
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>

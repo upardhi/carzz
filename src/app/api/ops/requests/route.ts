@@ -255,6 +255,10 @@ const decisionSchema = z.object({
   activationMode: z.enum(['IMMEDIATE_PRORATED', 'IMMEDIATE_FULL', 'NEXT_CYCLE']).optional().nullable(),
   adjustmentAmount: z.number().optional().nullable(),
   applyFinancialAdjustment: z.boolean().optional().default(true),
+  invoiceNumber: z.string().max(100).optional().nullable(),
+  paymentReceived: z.boolean().optional().default(false),
+  paymentReference: z.string().max(100).optional().nullable(),
+  paymentMode: z.enum(['CASH', 'MANUAL_UPI', 'GATEWAY']).optional(),
 });
 
 export async function POST(request: Request) {
@@ -377,7 +381,7 @@ export async function POST(request: Request) {
         }
       }
 
-      // 2. If One Wash or Other Service: handle financial adjustment if set & create scheduled wash visit if staff & date specified
+      // 2. If One Wash or Other Service: Standalone non-recurring invoice (NEVER touches monthly subscription invoice)
       if ((req.type === 'ONE_WASH' || req.type === 'OTHER_SERVICE') && req.carId) {
         const car = await store.cars.get(req.carId);
         const assignedStaffId = parsed.data.assignedStaffId || req.assignedStaffId || car?.assignedStaffId;
@@ -387,35 +391,56 @@ export async function POST(request: Request) {
 
         if (applyFinance && adjustmentAmount > 0) {
           finalPaymentAmount = Math.round(adjustmentAmount);
-          const reqInvoices = await store.invoices.find({
-            where: { customerId: customer.id, cycle: currentCycle() } as never,
-          });
-          const existingInvoice = reqInvoices[0];
-          if (existingInvoice) {
-            const newAmount = existingInvoice.amount + Math.round(adjustmentAmount);
-            const newStatus =
-              existingInvoice.paidAmount >= newAmount
-                ? 'PAID'
-                : existingInvoice.paidAmount > 0
-                ? 'PARTIAL'
-                : 'OPEN';
-            await store.invoices.update(existingInvoice.id, {
-              amount: newAmount,
-              status: newStatus,
-            });
-          } else {
+          const paymentReceived = parsed.data.paymentReceived === true;
+          const invoiceCycleLabel = `ONE-TIME (${req.type === 'ONE_WASH' ? 'One Wash' : 'Special Wash'})`;
+          const customInvoiceNo = parsed.data.invoiceNumber?.trim();
+
+          if (paymentReceived) {
+            // Already paid: Create paid standalone invoice and confirmed payment record
+            const refNumber =
+              parsed.data.paymentReference?.trim() ||
+              customInvoiceNo ||
+              `REC-ONEWASH-${req.id.slice(-6).toUpperCase()}`;
+
             await store.invoices.create({
               customerId: customer.id,
               areaId: customer.areaId,
-              cycle: currentCycle(),
+              cycle: customInvoiceNo ? `${invoiceCycleLabel} #${customInvoiceNo}` : invoiceCycleLabel,
               amount: Math.round(adjustmentAmount),
               dueOn: todayISO(),
+              paidAmount: Math.round(adjustmentAmount),
+              status: 'PAID',
+              createdAt: new Date().toISOString(),
+            });
+
+            await store.payments.create({
+              customerId: customer.id,
+              areaId: customer.areaId,
+              amount: Math.round(adjustmentAmount),
+              kind: 'PACKAGE',
+              mode: parsed.data.paymentMode || 'MANUAL_UPI',
+              status: 'CONFIRMED',
+              cycle: invoiceCycleLabel,
+              recordedByUserId: session.user.id,
+              reference: refNumber,
+              note: `Payment collected for one-time wash (${car?.make ?? 'Car'} ${car?.plate ?? ''})`,
+              createdAt: new Date().toISOString(),
+            });
+            finalPaymentStatus = 'PAID';
+          } else {
+            // Standalone separate one-time invoice (does not merge into monthly recurring subscription)
+            await store.invoices.create({
+              customerId: customer.id,
+              areaId: customer.areaId,
+              cycle: customInvoiceNo ? `${invoiceCycleLabel} #${customInvoiceNo}` : invoiceCycleLabel,
+              amount: Math.round(adjustmentAmount),
+              dueOn: targetDate,
               paidAmount: 0,
               status: 'OPEN',
               createdAt: new Date().toISOString(),
             });
+            finalPaymentStatus = 'PENDING';
           }
-          finalPaymentStatus = 'PENDING';
         }
 
         if (car && assignedStaffId) {
