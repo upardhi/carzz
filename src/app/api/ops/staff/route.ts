@@ -1,10 +1,14 @@
 import { revalidatePath } from 'next/cache';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { HttpError, requireApiSession } from '@/lib/auth/server';
 import { hashPassword } from '@/lib/auth/password';
+import { scopeAreaFilter } from '@/lib/auth/rbac';
 import { getStore } from '@/lib/data';
-import { todayISO } from '@/lib/util/format';
+import { computePayoutRun } from '@/lib/services/payroll';
+import { staffPerformance } from '@/lib/services/reports';
+import { currentCycle, todayISO } from '@/lib/util/format';
+import { getSafeDocumentUrl } from '@/lib/util/doc-url';
 import { assertInScope, opsError } from '../_guard';
 
 function revalidateStaffPages() {
@@ -16,6 +20,136 @@ function revalidateStaffPages() {
     }
   } catch {
     // ignore — running outside a request context
+  }
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const session = await requireApiSession('staff:view');
+    const store = await getStore();
+    const cycle = currentCycle();
+    const today = todayISO();
+    const { searchParams } = new URL(request.url);
+
+    const areaId = searchParams.get('areaId');
+    const role = searchParams.get('role'); // 'EMPLOYEE' | 'MANAGER' | 'ALL'
+    const status = searchParams.get('status'); // 'active' | 'inactive' | 'all'
+    const query = (searchParams.get('q') ?? '').trim().toLowerCase();
+
+    const areaFilter = areaId ? { areaId } : scopeAreaFilter(session.scope);
+
+    const [staffList, areas, performanceList, payoutList, attendanceToday, todayVisits, allLeaves] = await Promise.all([
+      store.staff.find({
+        where: {
+          ...(role && role !== 'ALL' ? { role } : {}),
+          ...areaFilter,
+        } as never,
+        orderBy: [{ field: 'name' }],
+      }),
+      store.areas.find(),
+      staffPerformance(store, cycle, session.scope.areaIds),
+      computePayoutRun(store, cycle, session.scope.areaIds),
+      store.attendance.find({ where: { date: today } }),
+      store.visits.find({ where: { scheduledDate: today, ...areaFilter } as never }),
+      store.leaves.find({
+        where: {
+          status: 'APPROVED',
+          startDate: { lte: today },
+          endDate: { gte: today },
+        } as never,
+      }),
+    ]);
+
+    const areaById = new Map(areas.map((a) => [a.id, a]));
+    const perfByStaff = new Map(performanceList.rows.map((p) => [p.staffId, p]));
+    const payoutByStaff = new Map(payoutList.map((p) => [p.staffId, p]));
+    const attendanceByStaff = new Map(attendanceToday.map((a) => [a.staffId, a]));
+    const onLeaveStaffIds = new Set(allLeaves.map((l) => l.staffId));
+
+    const enrichedStaff = staffList
+      .filter((s) => {
+        if (status === 'active' && !s.active) return false;
+        if (status === 'inactive' && s.active) return false;
+        if (query) {
+          const areaName = areaById.get(s.areaId)?.name ?? '';
+          const haystack = [s.name, s.phone, areaName, s.role].filter(Boolean).join(' ').toLowerCase();
+          if (!haystack.includes(query)) return false;
+        }
+        return true;
+      })
+      .map((s) => {
+        const area = areaById.get(s.areaId);
+        const perf = perfByStaff.get(s.id);
+        const payout = payoutByStaff.get(s.id);
+        const att = attendanceByStaff.get(s.id);
+        const isOnLeave = onLeaveStaffIds.has(s.id);
+
+        const washesAssignedToday = todayVisits.filter((v) => v.staffId === s.id).length;
+        const washesDoneToday = todayVisits.filter((v) => v.staffId === s.id && v.status === 'DONE').length;
+
+        return {
+          id: s.id,
+          userId: s.userId,
+          name: s.name,
+          phone: s.phone,
+          role: s.role,
+          active: s.active,
+          areaId: s.areaId,
+          areaName: area?.name ?? '—',
+          joinedOn: s.joinedOn,
+          address: s.address,
+          emergencyPhone: s.emergencyPhone,
+          emergencyContactName: s.emergencyContactName,
+          aadharNumber: s.aadharNumber,
+          aadharCardUrl: s.aadharCardUrl,
+          panNumber: s.panNumber,
+          panCardUrl: s.panCardUrl,
+          documentUrl: getSafeDocumentUrl(s.documentUrl),
+          documentType: s.documentType,
+          todayStatus: isOnLeave
+            ? 'ON_LEAVE'
+            : att?.status ?? (s.active ? 'PRESENT' : 'INACTIVE'),
+          attendanceRecord: att ?? null,
+          todayWashes: {
+            assigned: washesAssignedToday,
+            completed: washesDoneToday,
+          },
+          performance: {
+            washes: perf?.washes ?? 0,
+            onTimeRate: perf?.onTimeRate ?? 0,
+            averageRating: perf?.averageRating ?? 0,
+            missed: perf?.missed ?? 0,
+            complaints: perf?.complaints ?? 0,
+            flaggedWashes: perf?.flaggedWashes ?? 0,
+            averageManagerRating: perf?.averageManagerRating ?? 0,
+          },
+          payout: payout
+            ? {
+                washes: payout.washes,
+                base: payout.base,
+                bonuses: payout.bonuses,
+                referrals: payout.referrals,
+                deductions: payout.deductions,
+                pocketTaken: payout.pocketTaken,
+                net: payout.net,
+                status: payout.status,
+              }
+            : null,
+        };
+      });
+
+    return NextResponse.json({
+      success: true,
+      summary: {
+        totalStaff: staffList.length,
+        activeCount: staffList.filter((s) => s.active).length,
+        presentTodayCount: staffList.filter((s) => s.active && !onLeaveStaffIds.has(s.id)).length,
+        onLeaveCount: onLeaveStaffIds.size,
+      },
+      staff: enrichedStaff,
+    });
+  } catch (error) {
+    return opsError(error);
   }
 }
 

@@ -70,6 +70,10 @@ export function RecordPaymentForm({
       setState({ error: 'Please enter a valid payment amount.' });
       return;
     }
+    if (!reference.trim()) {
+      setState({ error: 'Invoice number or Receipt / Reference number is required.' });
+      return;
+    }
     setPending(true);
     setState({});
     setLastReceipt(null);
@@ -88,7 +92,7 @@ export function RecordPaymentForm({
           amount: value,
           mode,
           kind: hasDues ? 'PACKAGE' : 'ADVANCE',
-          reference: reference.trim() || undefined,
+          reference: reference.trim(),
           note: note.trim() || undefined,
         },
         label: `Record Payment ₹${value} (${mode})`,
@@ -301,10 +305,11 @@ export function RecordPaymentForm({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <input
             type="text"
-            placeholder="Ref # / UPI Txn / Receipt #"
+            required
+            placeholder="* Invoice # / Receipt # / UPI Ref (Required)"
             value={reference}
             onChange={(e) => setReference(e.target.value)}
-            className="field text-xs"
+            className={`field text-xs ${!reference.trim() && numAmount > 0 ? 'border-amber-400/80 bg-amber-50/20' : ''}`}
           />
           <input
             type="text"
@@ -318,7 +323,7 @@ export function RecordPaymentForm({
         <Button
           block
           className="mt-1 font-semibold"
-          disabled={pending || numAmount <= 0}
+          disabled={pending || numAmount <= 0 || !reference.trim()}
           onClick={submit}
         >
           {pending
