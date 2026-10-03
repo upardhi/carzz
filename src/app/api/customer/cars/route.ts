@@ -1,8 +1,107 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { HttpError, requireApiSession } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
-import { maxWeeklyDaysForPackage } from '@/lib/data/types';
+import { maxWeeklyDaysForPackage, parsePackageServices } from '@/lib/data/types';
+import { loadCustomerAccount } from '@/lib/services/accounts';
+import { currentCycle } from '@/lib/util/format';
+import { resolvePublicPhotoUrl } from '@/lib/util/photoUrl';
+
+export async function GET(request: NextRequest) {
+  try {
+    const session = await requireApiSession('self:cars');
+    if (!session.user.customerId) {
+      throw new HttpError(403, 'Customer account required.');
+    }
+
+    const store = await getStore();
+    const cycle = currentCycle();
+    const account = await loadCustomerAccount(store, session.user.customerId, cycle);
+    if (!account) {
+      throw new HttpError(404, 'Customer account not found.');
+    }
+
+    const { searchParams } = new URL(request.url);
+    const carId = searchParams.get('carId');
+
+    if (carId) {
+      const car = account.cars.find((c) => c.id === carId);
+      if (!car) {
+        throw new HttpError(404, 'Car not found on your account.');
+      }
+
+      // Compute service progress breakdown
+      const parsedPackageServices = parsePackageServices(
+        car.package?.services,
+        car.package?.washesPerMonth ?? 8,
+      );
+
+      const completedCarVisitsThisCycle = account.visits.filter(
+        (v) => v.carId === carId && v.cycle === cycle && v.status === 'DONE',
+      );
+
+      const serviceStats = parsedPackageServices.map((s) => {
+        const timesDone = completedCarVisitsThisCycle.filter(
+          (v) =>
+            Array.isArray(v.servicesDone) &&
+            v.servicesDone.some(
+              (doneName) =>
+                doneName.trim().toLowerCase() === s.name.trim().toLowerCase() ||
+                doneName.trim().toLowerCase().includes(s.name.trim().toLowerCase()),
+            ),
+        ).length;
+
+        const quota = s.washesPerMonth;
+        const remaining = Math.max(0, quota - timesDone);
+        const isCompleted = timesDone >= quota;
+        const percent = Math.min(100, Math.round((timesDone / (quota || 1)) * 100));
+
+        return {
+          name: s.name,
+          quota,
+          timesDone,
+          remaining,
+          isCompleted,
+          percent,
+        };
+      });
+
+      const carVisits = account.visits.filter((v) => v.carId === carId);
+      const history = carVisits
+        .filter((v) => v.status !== 'PENDING')
+        .slice(0, 30)
+        .map((v) => ({
+          ...v,
+          beforePhotoUrl: resolvePublicPhotoUrl(v.beforePhotoUrl),
+          afterPhotoUrl: resolvePublicPhotoUrl(v.afterPhotoUrl),
+        }));
+
+      const nextVisit = carVisits.find((v) => v.status === 'PENDING') || null;
+
+      return NextResponse.json({
+        ok: true,
+        car,
+        serviceStats,
+        history,
+        nextVisit,
+      });
+    }
+
+    return NextResponse.json({
+      ok: true,
+      cars: account.cars,
+    });
+  } catch (error) {
+    if (error instanceof HttpError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    console.error('Error fetching customer cars:', error);
+    return NextResponse.json(
+      { error: 'Could not fetch cars.' },
+      { status: 500 },
+    );
+  }
+}
 
 const carInputSchema = z.object({
   make: z.string().trim().min(1).default('Car'),
@@ -39,10 +138,6 @@ export async function POST(request: Request) {
       throw new HttpError(404, 'Customer account not found.');
     }
 
-    // Resolve service package — a caller-supplied id must still be an active
-    // package. Packages are only hidden from the UI's own dropdown; without
-    // this, a stale page or a crafted request could subscribe a new car to a
-    // discontinued plan the owner deliberately retired.
     let pkg: Awaited<ReturnType<typeof store.packages.get>> = null;
     if (data.packageId) {
       const requested = await store.packages.get(data.packageId);
