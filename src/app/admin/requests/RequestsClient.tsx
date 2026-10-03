@@ -106,6 +106,8 @@ export function RequestsClient({
   const [activationMode, setActivationMode] = useState<'IMMEDIATE_PRORATED' | 'IMMEDIATE_FULL' | 'NEXT_CYCLE'>('IMMEDIATE_PRORATED');
   const [adjustmentAmount, setAdjustmentAmount] = useState<number>(0);
   const [applyFinancialAdjustment, setApplyFinancialAdjustment] = useState(true);
+  const [showBreakdown, setShowBreakdown] = useState(false);
+  const [viewDetailsItem, setViewDetailsItem] = useState<CustomerRequestItem | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -150,6 +152,7 @@ export function RequestsClient({
   function openAction(item: CustomerRequestItem, type: 'APPROVE' | 'REJECT') {
     setActiveRequest(item);
     setActionType(type);
+    setShowBreakdown(false);
     setAssignedStaffId(item.assignedStaffId || '');
     setScheduledDate(item.preferredDate || new Date().toISOString().slice(0, 10));
 
@@ -353,12 +356,6 @@ export function RequestsClient({
               )}
             </div>
           )}
-
-          {item.notes && (
-            <div className="text-[11px] text-slate-500 font-medium bg-slate-50 p-1.5 rounded border border-slate-200">
-              Note: {item.notes}
-            </div>
-          )}
         </div>
       ),
     },
@@ -372,7 +369,7 @@ export function RequestsClient({
             const isUpgrade = audit.proratedDifference > 0;
             const isDowngrade = audit.proratedDifference < 0;
             return (
-              <div className="text-xs space-y-1 min-w-[150px]">
+              <div className="text-xs space-y-1 min-w-[160px]">
                 <div
                   className={`font-bold inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs ${
                     isUpgrade
@@ -385,9 +382,9 @@ export function RequestsClient({
                   <span>{isUpgrade ? '🔺' : isDowngrade ? '💰' : '✓'}</span>
                   <span>
                     {isUpgrade
-                      ? `+₹${audit.proratedDifference} Extra`
+                      ? `Pay ₹${audit.proratedDifference} more`
                       : isDowngrade
-                      ? `₹${Math.abs(audit.proratedDifference)} Credit`
+                      ? `₹${Math.abs(audit.proratedDifference)} Credit (₹0 pay)`
                       : '₹0 Difference'}
                   </span>
                 </div>
@@ -395,7 +392,7 @@ export function RequestsClient({
                   {audit.washesDoneCount} used / {audit.washesRemaining} remaining washes
                 </div>
                 <div className="text-[10px] text-slate-400">
-                  Full reset: +₹{audit.fullDifference}
+                  Full reset: {audit.fullDifference > 0 ? `Pay ₹${audit.fullDifference} more` : audit.fullDifference < 0 ? `₹${Math.abs(audit.fullDifference)} Credit` : '₹0'}
                 </div>
               </div>
             );
@@ -409,7 +406,7 @@ export function RequestsClient({
                 <div className="text-xs space-y-0.5">
                   <div className="font-bold flex items-center gap-1">
                     <span className={isCharge ? 'text-amber-700' : 'text-emerald-700'}>
-                      {isCharge ? `+₹${item.paymentAmount}` : `-₹${Math.abs(item.paymentAmount)} Credit`}
+                      {isCharge ? `Paid ₹${item.paymentAmount} extra` : `₹${Math.abs(item.paymentAmount)} Credited to ledger`}
                     </span>
                     <span
                       className={`rounded px-1.5 py-0.2 text-[9.5px] font-bold ${
@@ -515,11 +512,18 @@ export function RequestsClient({
       render: (item) => {
         if (item.status !== 'PENDING') {
           return (
-            <div className="text-xs text-ink-faint">
-              <div>Decided {item.decidedAt ? formatDateFull(item.decidedAt) : ''}</div>
-              {item.adminRemarks && (
-                <div className="text-[11px] text-slate-600">Remark: {item.adminRemarks}</div>
-              )}
+            <div className="text-xs space-y-1 min-w-[120px]">
+              <div className="text-ink-mute text-[11px] font-medium">
+                {item.decidedAt ? formatDateFull(item.decidedAt) : 'Processed'}
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewDetailsItem(item)}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 border border-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-700 transition-colors cursor-pointer shadow-2xs"
+              >
+                <span>{item.adminRemarks ? '💬' : '👁️'}</span>
+                <span>{item.adminRemarks ? 'View Note' : 'Details'}</span>
+              </button>
             </div>
           );
         }
@@ -703,45 +707,184 @@ export function RequestsClient({
               </button>
             </div>
 
+            {activeRequest.notes && (
+              <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50/80 p-2.5 text-xs text-amber-900">
+                <span className="font-bold block text-[10.5px] uppercase tracking-wider text-amber-800">Customer Note:</span>
+                <p className="mt-0.5 font-medium">&ldquo;{activeRequest.notes}&rdquo;</p>
+              </div>
+            )}
+
             <form onSubmit={handleConfirmDecision} className="space-y-4 text-xs">
               {/* PACKAGE CHANGE BREAKDOWN & PRORATION MATH */}
               {actionType === 'APPROVE' && activeRequest.type === 'PACKAGE_CHANGE' && (
                 <div className="space-y-3">
                   {/* Plan comparison badges */}
-                  <div className="grid grid-cols-2 gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200">
-                    <div className="border-r border-slate-200 pr-2">
-                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Current Plan</div>
-                      <div className="font-black text-slate-900 text-sm mt-0.5">
-                        {activeRequest.packageAudit?.currentPackageName || activeRequest.currentPackageName}
-                      </div>
-                      <div className="text-[11px] text-slate-500 font-medium">
-                        ₹{activeRequest.packageAudit?.currentPrice ?? '—'} /mo · {activeRequest.packageAudit?.currentWashesPerMonth ?? '—'} washes
-                      </div>
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Package Change Request</span>
+                      {activeRequest.packageAudit && (
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
+                          activeRequest.packageAudit.isUpgrade
+                            ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                            : 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                        }`}>
+                          {activeRequest.packageAudit.isUpgrade ? '🔺 Plan Upgrade' : '💰 Plan Downgrade (Credit Applicable)'}
+                        </span>
+                      )}
                     </div>
 
-                    <div className="pl-1">
-                      <div className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">Requested Plan</div>
-                      <div className="font-black text-blue-700 text-sm mt-0.5">
-                        {activeRequest.packageAudit?.requestedPackageName || activeRequest.requestedPackageName}
+                    <div className="grid grid-cols-2 gap-2.5 pt-1">
+                      <div className="border-r border-slate-200 pr-2">
+                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Current Plan</div>
+                        <div className="font-black text-slate-900 text-sm mt-0.5">
+                          {activeRequest.packageAudit?.currentPackageName || activeRequest.currentPackageName}
+                        </div>
+                        <div className="text-[11px] text-slate-600 font-medium">
+                          ₹{activeRequest.packageAudit?.currentPrice ?? '—'} /mo · {activeRequest.packageAudit?.currentWashesPerMonth ?? '—'} washes
+                        </div>
                       </div>
-                      <div className="text-[11px] text-blue-600 font-medium">
-                        ₹{activeRequest.packageAudit?.requestedPrice ?? '—'} /mo · {activeRequest.packageAudit?.requestedWashesPerMonth ?? '—'} washes
+
+                      <div className="pl-1">
+                        <div className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Requested Plan</div>
+                        <div className="font-black text-blue-700 text-sm mt-0.5">
+                          {activeRequest.packageAudit?.requestedPackageName || activeRequest.requestedPackageName}
+                        </div>
+                        <div className="text-[11px] text-blue-600 font-medium">
+                          ₹{activeRequest.packageAudit?.requestedPrice ?? '—'} /mo · {activeRequest.packageAudit?.requestedWashesPerMonth ?? '—'} washes
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Quota & Unused Value Bar */}
+                  {/* Quota, Unused Credit & Calculation Breakdown */}
                   {activeRequest.packageAudit && (
-                    <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-3 space-y-2">
+                    <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-3 space-y-2.5">
                       <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
                         <span>Washes Completed This Month:</span>
                         <span className="font-bold text-slate-900">
-                          {activeRequest.packageAudit.washesDoneCount} done / {activeRequest.packageAudit.currentWashesPerMonth} total ({activeRequest.packageAudit.washesRemaining} left)
+                          {activeRequest.packageAudit.washesDoneCount} done / {activeRequest.packageAudit.currentWashesPerMonth} total ({activeRequest.packageAudit.washesRemaining} remaining)
                         </span>
                       </div>
                       <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
                         <span>Unused Credit from Old Plan:</span>
                         <span className="font-bold text-emerald-700">₹{activeRequest.packageAudit.unusedCredit}</span>
+                      </div>
+
+                      {/* Calculation Breakdown Accordion */}
+                      <div className="pt-1.5 border-t border-blue-200/70">
+                        <button
+                          type="button"
+                          onClick={() => setShowBreakdown(!showBreakdown)}
+                          className="w-full flex items-center justify-between text-left text-xs font-bold text-blue-700 hover:text-blue-900 transition-colors"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <span>📊</span>
+                            <span>{showBreakdown ? 'Hide Details & Policy' : 'View Plan Details & Policy'}</span>
+                          </span>
+                          <span className="text-[10.5px] font-semibold bg-white border border-blue-200 rounded px-2 py-0.5 text-blue-700 shadow-sm">
+                            {showBreakdown ? '▲ Hide' : '▼ View Breakdown'}
+                          </span>
+                        </button>
+
+                        {showBreakdown && (
+                          <div className="mt-2.5 rounded-lg bg-white border border-blue-200 p-3 text-xs space-y-2 text-slate-700 shadow-sm animate-in fade-in duration-150">
+                            <div className="font-bold text-slate-900 text-[11px] border-b border-slate-100 pb-1 flex items-center justify-between">
+                              <span>{activeRequest.packageAudit.isUpgrade ? 'Step-by-step Audit Formula' : 'Downgrade Policy & Details'}</span>
+                              <span className="text-[10px] text-slate-400 font-normal">Transparent Ledger Math</span>
+                            </div>
+
+                            {!activeRequest.packageAudit.isUpgrade ? (
+                              <div className="space-y-1.5 text-[11px]">
+                                <div className="flex items-start justify-between">
+                                  <span className="text-slate-600">1. Current Plan:</span>
+                                  <span className="font-semibold text-slate-800">
+                                    {activeRequest.packageAudit.currentPackageName} (₹{activeRequest.packageAudit.currentPrice}/mo · {activeRequest.packageAudit.currentWashesPerMonth} washes)
+                                  </span>
+                                </div>
+                                <div className="flex items-start justify-between">
+                                  <span className="text-slate-600">2. Remaining Washes This Month:</span>
+                                  <span className="font-semibold text-slate-800">
+                                    {activeRequest.packageAudit.washesRemaining} washes left (already paid)
+                                  </span>
+                                </div>
+                                <div className="flex items-start justify-between">
+                                  <span className="text-slate-600">3. Downgraded Target Plan:</span>
+                                  <span className="font-semibold text-blue-700">
+                                    {activeRequest.packageAudit.requestedPackageName} (₹{activeRequest.packageAudit.requestedPrice}/mo · {activeRequest.packageAudit.requestedWashesPerMonth} washes)
+                                  </span>
+                                </div>
+
+                                <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 mt-2 space-y-1 text-emerald-900">
+                                  <div className="font-bold text-[11.5px]">Downgrade Activation Policy:</div>
+                                  <div className="text-[11px] leading-relaxed">
+                                    • Customer continues and finishes all remaining <b>{activeRequest.packageAudit.washesRemaining} washes</b> on their current plan this month.
+                                  </div>
+                                  <div className="text-[11px] leading-relaxed">
+                                    • The new lower rate of <b>₹{activeRequest.packageAudit.requestedPrice}/month</b> will automatically take effect from the <b>1st of next month</b>.
+                                  </div>
+                                  <div className="font-bold text-[11px] text-emerald-800 mt-1 pt-1 border-t border-emerald-200">
+                                    ➔ ₹0 to pay today. No charge or complex refund needed.
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="space-y-1.5 text-[11px]">
+                                <div className="flex items-start justify-between">
+                                  <span className="text-slate-600">1. Current Plan Unit Rate:</span>
+                                  <span className="font-semibold text-slate-800">
+                                    ₹{activeRequest.packageAudit.currentPrice} ÷ {activeRequest.packageAudit.currentWashesPerMonth} washes = ₹{Math.round(activeRequest.packageAudit.currentPrice / Math.max(1, activeRequest.packageAudit.currentWashesPerMonth))}/wash
+                                  </span>
+                                </div>
+
+                                <div className="flex items-start justify-between">
+                                  <span className="text-slate-600">2. Remaining Credit in Current Plan:</span>
+                                  <span className="font-semibold text-emerald-700">
+                                    {activeRequest.packageAudit.washesRemaining} washes left × ₹{Math.round(activeRequest.packageAudit.currentPrice / Math.max(1, activeRequest.packageAudit.currentWashesPerMonth))} = ₹{activeRequest.packageAudit.unusedCredit}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-start justify-between">
+                                  <span className="text-slate-600">3. Target Plan Full Price:</span>
+                                  <span className="font-semibold text-slate-800">
+                                    ₹{activeRequest.packageAudit.requestedPrice} ({activeRequest.packageAudit.requestedWashesPerMonth} washes)
+                                  </span>
+                                </div>
+
+                                <div className="p-2 rounded bg-slate-50 border border-slate-200 mt-2 space-y-1">
+                                  <div className="font-bold text-[11px] text-slate-800">
+                                    Math for selected mode ({activationMode === 'IMMEDIATE_PRORATED' ? '⚡ Prorated Mid-Cycle' : activationMode === 'IMMEDIATE_FULL' ? '🔄 Full Reset' : '📅 Next Month'}):
+                                  </div>
+                                  {activationMode === 'IMMEDIATE_PRORATED' && (
+                                    <div className="text-[11px] text-slate-600 space-y-0.5">
+                                      <div>• Remaining washes for new plan: <b>{Math.max(0, activeRequest.packageAudit.requestedWashesPerMonth - activeRequest.packageAudit.washesDoneCount)} washes</b></div>
+                                      <div>• New plan cost for remaining washes: <b>₹{activeRequest.packageAudit.targetRemainingCost}</b></div>
+                                      <div>• Net difference: ₹{activeRequest.packageAudit.targetRemainingCost} (New Plan) − ₹{activeRequest.packageAudit.unusedCredit} (Unused Credit) = <b>+₹{activeRequest.packageAudit.proratedDifference}</b></div>
+                                      <div className="font-bold mt-1.5 p-1 rounded bg-amber-100 text-amber-900">
+                                        ➔ Customer pays ₹{activeRequest.packageAudit.proratedDifference} more for this upgrade.
+                                      </div>
+                                    </div>
+                                  )}
+                                  {activationMode === 'IMMEDIATE_FULL' && (
+                                    <div className="text-[11px] text-slate-600 space-y-0.5">
+                                      <div>• Full new package price: <b>₹{activeRequest.packageAudit.requestedPrice}</b></div>
+                                      <div>• Minus unused credit: <b>−₹{activeRequest.packageAudit.unusedCredit}</b></div>
+                                      <div>• Net difference: ₹{activeRequest.packageAudit.requestedPrice} − ₹{activeRequest.packageAudit.unusedCredit} = <b>+₹{activeRequest.packageAudit.fullDifference}</b></div>
+                                      <div className="font-bold mt-1.5 p-1 rounded bg-amber-100 text-amber-900">
+                                        ➔ Customer pays ₹{activeRequest.packageAudit.fullDifference} more for fresh reset.
+                                      </div>
+                                    </div>
+                                  )}
+                                  {activationMode === 'NEXT_CYCLE' && (
+                                    <div className="text-[11px] text-slate-600 space-y-0.5">
+                                      <div>• Customer finishes remaining {activeRequest.packageAudit.washesRemaining} washes on current plan.</div>
+                                      <div>• <b>₹0 charged today.</b> Starting 1st of next month, billed at ₹{activeRequest.packageAudit.requestedPrice}/month.</div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -776,95 +919,125 @@ export function RequestsClient({
                   {/* Activation Mode Options */}
                   {activeRequest.packageAudit && (
                     <div className="space-y-2">
-                      <label className="block font-bold text-slate-800">Select Billing / Activation Mode:</label>
-                      <div className="space-y-2">
-                        <label
-                          className={`flex items-start gap-2.5 p-2.5 rounded-xl border transition-all cursor-pointer ${
-                            activationMode === 'IMMEDIATE_PRORATED'
-                              ? 'border-blue-500 bg-blue-50/40 ring-1 ring-blue-500'
-                              : 'border-slate-200 bg-white hover:bg-slate-50'
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="activationMode"
-                            checked={activationMode === 'IMMEDIATE_PRORATED'}
-                            onChange={() => handleModeChange('IMMEDIATE_PRORATED')}
-                            className="mt-0.5"
-                          />
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between">
-                              <span className="font-bold text-slate-900">
-                                ⚡ Prorated Mid-Cycle Upgrade / Downgrade (Recommended)
-                              </span>
-                              <span className={`font-black ${activeRequest.packageAudit.proratedDifference >= 0 ? 'text-blue-700' : 'text-emerald-700'}`}>
-                                {activeRequest.packageAudit.proratedDifference >= 0 ? `+₹${activeRequest.packageAudit.proratedDifference}` : `-₹${Math.abs(activeRequest.packageAudit.proratedDifference)} Credit`}
-                              </span>
+                      {!activeRequest.packageAudit.isUpgrade ? (
+                        <>
+                          <label className="block font-bold text-slate-800">Billing & Activation:</label>
+                          <div className="p-3 rounded-xl border border-blue-500 bg-blue-50/50 ring-1 ring-blue-500 flex items-start gap-3">
+                            <div className="text-lg">📅</div>
+                            <div className="flex-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-bold text-slate-900 text-xs">
+                                  Continues from 1st of Next Month
+                                </span>
+                                <span className="font-black text-xs px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-900 border border-emerald-300 whitespace-nowrap">
+                                  ₹0 to pay now
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
+                                Customer continues current plan and can use their remaining <b>{activeRequest.packageAudit.washesRemaining} washes</b> this month.
+                              </p>
+                              <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
+                                The downgraded plan (<b>{activeRequest.packageAudit.requestedPackageName}</b>) will automatically take effect from the 1st of next month billed at <b>₹{activeRequest.packageAudit.requestedPrice}/month</b>.
+                              </p>
                             </div>
-                            <p className="text-[11px] text-slate-500 mt-0.5">
-                              Upgrades remaining {activeRequest.packageAudit.washesRemaining} washes this month. Difference between new plan cost (₹{activeRequest.packageAudit.targetRemainingCost}) and unused credit (₹{activeRequest.packageAudit.unusedCredit}).
-                            </p>
                           </div>
-                        </label>
+                        </>
+                      ) : (
+                        <>
+                          <label className="block font-bold text-slate-800">Select Billing / Activation Mode:</label>
+                          <div className="space-y-2">
+                            {/* Option 1: IMMEDIATE_PRORATED */}
+                            <label
+                              className={`flex items-start gap-2.5 p-2.5 rounded-xl border transition-all cursor-pointer ${
+                                activationMode === 'IMMEDIATE_PRORATED'
+                                  ? 'border-blue-500 bg-blue-50/40 ring-1 ring-blue-500'
+                                  : 'border-slate-200 bg-white hover:bg-slate-50'
+                              }`}
+                            >
+                              <input
+                                type="radio"
+                                name="activationMode"
+                                checked={activationMode === 'IMMEDIATE_PRORATED'}
+                                onChange={() => handleModeChange('IMMEDIATE_PRORATED')}
+                                className="mt-0.5"
+                              />
+                              <div className="flex-1">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="font-bold text-slate-900">
+                                    ⚡ Prorated Mid-Cycle Upgrade (Recommended)
+                                  </span>
+                                  <span className="font-black text-xs px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 whitespace-nowrap">
+                                    Customer pays ₹{activeRequest.packageAudit.proratedDifference} more
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-slate-500 mt-0.5">
+                                  Upgrades remaining {activeRequest.packageAudit.washesRemaining} washes. Difference between new plan cost (₹{activeRequest.packageAudit.targetRemainingCost}) and unused credit (₹{activeRequest.packageAudit.unusedCredit}).
+                                </p>
+                              </div>
+                            </label>
 
-                        <label
-                          className={`flex items-start gap-2.5 p-2.5 rounded-xl border transition-all cursor-pointer ${
-                            activationMode === 'IMMEDIATE_FULL'
-                              ? 'border-blue-500 bg-blue-50/40 ring-1 ring-blue-500'
-                              : 'border-slate-200 bg-white hover:bg-slate-50'
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="activationMode"
-                            checked={activationMode === 'IMMEDIATE_FULL'}
-                            onChange={() => handleModeChange('IMMEDIATE_FULL')}
-                            className="mt-0.5"
-                          />
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between">
-                              <span className="font-bold text-slate-900">
-                                🔄 Full Fresh Reset (Full {activeRequest.packageAudit.requestedWashesPerMonth} Washes)
-                              </span>
-                              <span className="font-black text-blue-700">
-                                +₹{activeRequest.packageAudit.fullDifference}
-                              </span>
-                            </div>
-                            <p className="text-[11px] text-slate-500 mt-0.5">
-                              Provides fresh {activeRequest.packageAudit.requestedWashesPerMonth} washes immediately. ₹{activeRequest.packageAudit.requestedPrice} minus ₹{activeRequest.packageAudit.unusedCredit} unused credit.
-                            </p>
-                          </div>
-                        </label>
+                            {/* Option 2: IMMEDIATE_FULL */}
+                            <label
+                              className={`flex items-start gap-2.5 p-2.5 rounded-xl border transition-all cursor-pointer ${
+                                activationMode === 'IMMEDIATE_FULL'
+                                  ? 'border-blue-500 bg-blue-50/40 ring-1 ring-blue-500'
+                                  : 'border-slate-200 bg-white hover:bg-slate-50'
+                              }`}
+                            >
+                              <input
+                                type="radio"
+                                name="activationMode"
+                                checked={activationMode === 'IMMEDIATE_FULL'}
+                                onChange={() => handleModeChange('IMMEDIATE_FULL')}
+                                className="mt-0.5"
+                              />
+                              <div className="flex-1">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="font-bold text-slate-900">
+                                    🔄 Full Fresh Reset (Full {activeRequest.packageAudit.requestedWashesPerMonth} Washes)
+                                  </span>
+                                  <span className="font-black text-xs px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 whitespace-nowrap">
+                                    Customer pays ₹{activeRequest.packageAudit.fullDifference} more
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-slate-500 mt-0.5">
+                                  Provides fresh {activeRequest.packageAudit.requestedWashesPerMonth} washes immediately. ₹{activeRequest.packageAudit.requestedPrice} new plan price minus ₹{activeRequest.packageAudit.unusedCredit} unused credit.
+                                </p>
+                              </div>
+                            </label>
 
-                        <label
-                          className={`flex items-start gap-2.5 p-2.5 rounded-xl border transition-all cursor-pointer ${
-                            activationMode === 'NEXT_CYCLE'
-                              ? 'border-blue-500 bg-blue-50/40 ring-1 ring-blue-500'
-                              : 'border-slate-200 bg-white hover:bg-slate-50'
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="activationMode"
-                            checked={activationMode === 'NEXT_CYCLE'}
-                            onChange={() => handleModeChange('NEXT_CYCLE')}
-                            className="mt-0.5"
-                          />
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between">
-                              <span className="font-bold text-slate-900">
-                                📅 Effective 1st of Next Month (Zero Charge Now)
-                              </span>
-                              <span className="font-black text-slate-500">
-                                ₹0 Now
-                              </span>
-                            </div>
-                            <p className="text-[11px] text-slate-500 mt-0.5">
-                              Customer finishes current month on existing plan. Next month is billed at full ₹{activeRequest.packageAudit.requestedPrice}.
-                            </p>
+                            {/* Option 3: NEXT_CYCLE */}
+                            <label
+                              className={`flex items-start gap-2.5 p-2.5 rounded-xl border transition-all cursor-pointer ${
+                                activationMode === 'NEXT_CYCLE'
+                                  ? 'border-blue-500 bg-blue-50/40 ring-1 ring-blue-500'
+                                  : 'border-slate-200 bg-white hover:bg-slate-50'
+                              }`}
+                            >
+                              <input
+                                type="radio"
+                                name="activationMode"
+                                checked={activationMode === 'NEXT_CYCLE'}
+                                onChange={() => handleModeChange('NEXT_CYCLE')}
+                                className="mt-0.5"
+                              />
+                              <div className="flex-1">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="font-bold text-slate-900">
+                                    📅 Effective 1st of Next Month (Zero Charge Now)
+                                  </span>
+                                  <span className="font-black text-xs px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-300 whitespace-nowrap">
+                                    ₹0 to pay now
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-slate-500 mt-0.5">
+                                  Customer finishes current month on existing plan. Next month will start on new plan billed at regular ₹{activeRequest.packageAudit.requestedPrice}.
+                                </p>
+                              </div>
+                            </label>
                           </div>
-                        </label>
-                      </div>
+                        </>
+                      )}
                     </div>
                   )}
 
@@ -880,14 +1053,14 @@ export function RequestsClient({
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-bold flex items-center gap-1.5">
+                        <span className="font-bold flex items-center gap-1.5 text-xs">
                           <span>{adjustmentAmount > 0 ? '🔺' : adjustmentAmount < 0 ? '💰' : 'ℹ️'}</span>
                           <span>
                             {adjustmentAmount > 0
-                              ? 'Extra Amount to Collect from Customer:'
+                              ? 'Extra Amount Customer Needs to Pay:'
                               : adjustmentAmount < 0
-                              ? 'Account Credit for Customer:'
-                              : 'No Adjustment Needed'}
+                              ? 'Account Credit Added for Customer (Refund):'
+                              : 'No Payment or Adjustment Needed'}
                           </span>
                         </span>
                         <div className="flex items-center gap-1">
@@ -903,12 +1076,12 @@ export function RequestsClient({
                           />
                         </div>
                       </div>
-                      <p className="text-[11px] mt-1 opacity-80">
+                      <p className="text-[11px] mt-1 opacity-90">
                         {adjustmentAmount > 0
-                          ? `An open invoice of ₹${adjustmentAmount} will be created for the customer to pay via UPI or cash.`
+                          ? `Customer must pay ₹${adjustmentAmount} more for this upgrade. An invoice will be generated.`
                           : adjustmentAmount < 0
-                          ? `₹${Math.abs(adjustmentAmount)} will be credited to the customer's ledger and applied to their next bill.`
-                          : 'Package will be updated with no financial charges.'}
+                          ? `Customer pays ₹0 today. ₹${Math.abs(adjustmentAmount)} will be credited to the customer's wallet/ledger for future bills.`
+                          : 'Package will be updated with ₹0 charge.'}
                       </p>
 
                       <label className="mt-2.5 flex items-center gap-2 text-[11px] font-semibold cursor-pointer">
@@ -918,7 +1091,11 @@ export function RequestsClient({
                           onChange={(e) => setApplyFinancialAdjustment(e.target.checked)}
                           className="rounded"
                         />
-                        <span>Auto-apply this financial entry to customer ledger</span>
+                        <span>
+                          {adjustmentAmount > 0
+                            ? `Generate invoice of ₹${adjustmentAmount} in customer ledger`
+                            : `Auto-apply credit of ₹${Math.abs(adjustmentAmount)} to customer account ledger`}
+                        </span>
                       </label>
                     </div>
                   )}
@@ -1042,6 +1219,134 @@ export function RequestsClient({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* VIEW DETAILS / REMARKS POPUP MODAL */}
+      {viewDetailsItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between border-b border-slate-100 pb-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-black text-slate-900">
+                    Request Details & Decision Note
+                  </h3>
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                      viewDetailsItem.status === 'APPROVED'
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                        : viewDetailsItem.status === 'REJECTED'
+                        ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                        : 'bg-slate-100 text-slate-700 border border-slate-300'
+                    }`}
+                  >
+                    {viewDetailsItem.status === 'APPROVED' ? '✓ Approved' : viewDetailsItem.status === 'REJECTED' ? '✕ Rejected' : viewDetailsItem.status}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {viewDetailsItem.customerName} ({viewDetailsItem.customerPhone || 'No phone'}) · {viewDetailsItem.areaName}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewDetailsItem(null)}
+                className="text-slate-400 hover:text-slate-600 rounded-lg p-1 text-base font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Request Summary Card */}
+            <div className="rounded-xl bg-slate-50 border border-slate-200 p-3.5 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-semibold">Request Type:</span>
+                <span className="font-bold text-slate-800">
+                  {viewDetailsItem.type === 'PACKAGE_CHANGE'
+                    ? '📦 Package Change'
+                    : viewDetailsItem.type === 'ONE_WASH'
+                    ? '🚿 One Wash'
+                    : '✨ Custom Service'}
+                </span>
+              </div>
+
+              {viewDetailsItem.carName !== '—' && (
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 font-semibold">Vehicle:</span>
+                  <span className="font-bold text-slate-900">🚗 {viewDetailsItem.carName}</span>
+                </div>
+              )}
+
+              {viewDetailsItem.type === 'PACKAGE_CHANGE' && (
+                <div className="flex items-center justify-between pt-1 border-t border-slate-200/60">
+                  <span className="text-slate-500 font-semibold">Package Switch:</span>
+                  <span className="font-bold text-slate-900">
+                    <span className="text-slate-600">{viewDetailsItem.currentPackageName}</span>
+                    <span className="text-blue-600 mx-1.5">➔</span>
+                    <span className="text-blue-700">{viewDetailsItem.requestedPackageName}</span>
+                  </span>
+                </div>
+              )}
+
+              {viewDetailsItem.decidedAt && (
+                <div className="flex items-center justify-between pt-1 border-t border-slate-200/60">
+                  <span className="text-slate-500 font-semibold">Decided On:</span>
+                  <span className="font-bold text-slate-700">{formatDateFull(viewDetailsItem.decidedAt)}</span>
+                </div>
+              )}
+
+              {viewDetailsItem.assignedStaffName && (
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 font-semibold">Assigned Wash Boy:</span>
+                  <span className="font-bold text-slate-900">👤 {viewDetailsItem.assignedStaffName}</span>
+                </div>
+              )}
+
+              {viewDetailsItem.paymentAmount !== null && viewDetailsItem.paymentAmount !== undefined && (
+                <div className="flex items-center justify-between pt-1 border-t border-slate-200/60">
+                  <span className="text-slate-500 font-semibold">Financial Entry:</span>
+                  <span className="font-bold text-slate-900">
+                    {viewDetailsItem.paymentAmount > 0
+                      ? `Paid extra ₹${viewDetailsItem.paymentAmount}`
+                      : viewDetailsItem.paymentAmount < 0
+                      ? `₹${Math.abs(viewDetailsItem.paymentAmount)} Credited`
+                      : '₹0 Extra Charge'}
+                  </span>
+                </div>
+              )}
+
+              {viewDetailsItem.notes && (
+                <div className="pt-1.5 border-t border-slate-200/60">
+                  <span className="text-slate-500 font-semibold block mb-0.5">Customer Note:</span>
+                  <p className="text-slate-700 italic bg-white p-2 rounded border border-slate-200">
+                    &ldquo;{viewDetailsItem.notes}&rdquo;
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Admin Remarks / Note Box */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                <span>💬</span>
+                <span>{viewDetailsItem.status === 'REJECTED' ? 'Reason for Rejection:' : 'Admin Remarks / Confirmation Note:'}</span>
+              </label>
+              <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-3.5 text-xs text-slate-800 leading-relaxed font-medium whitespace-pre-wrap">
+                {viewDetailsItem.adminRemarks || 'No remarks recorded.'}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setViewDetailsItem(null)}
+                className="rounded-lg bg-slate-900 px-5 py-2 text-xs font-bold text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
