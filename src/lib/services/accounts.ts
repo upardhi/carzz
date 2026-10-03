@@ -13,7 +13,7 @@ import {
   type ServicePackage,
   type WashVisit,
 } from '../data/types';
-import { tallyVisits, type VisitTally } from './visits';
+import { tallyVisits, isOneTimeWash, type VisitTally } from './visits';
 import { generateVisitsForCar, scheduleNextVisitForCar } from './schedule';
 import { resolvePublicPhotoUrl } from '../util/photoUrl';
 import { nextCycle, todayISO } from '../util/format';
@@ -251,7 +251,7 @@ export async function loadCustomerAccount(
     if (customer.status === 'HOLD' && customer.holdUntil && customer.holdUntil >= today) continue;
 
     const carDoneThisCycle = effectiveVisits.filter((v) => {
-      if (v.carId !== car.id || v.cycle !== cycle || v.status !== 'DONE') return false;
+      if (v.carId !== car.id || v.cycle !== cycle || v.status !== 'DONE' || isOneTimeWash(v)) return false;
       if (car.packageResetAt && car.packageResetAt.slice(0, 7) === cycle) {
         const resetDate = car.packageResetAt.slice(0, 10);
         return v.scheduledDate >= resetDate || Boolean(v.completedAt && v.completedAt >= car.packageResetAt);
@@ -308,7 +308,7 @@ export async function loadCustomerAccount(
     const pkg = packageById.get(car.packageId);
     const quota = pkg?.washesPerMonth ?? 8;
     const completedWashes = effectiveVisits.filter(
-      (v) => v.carId === car.id && v.cycle >= latestPastInvoice.cycle && v.status === 'DONE',
+      (v) => v.carId === car.id && v.cycle >= latestPastInvoice.cycle && v.status === 'DONE' && !isOneTimeWash(v),
     ).length;
     // A car is only covered by that past invoice if it completed at least 1 wash and hasn't exhausted quota.
     // If completedWashes === 0, the first wash was never completed.
@@ -450,7 +450,7 @@ export async function loadCustomerAccount(
 
   // Determine which active cars have completed at least one wash
   function hasCarDoneFirstWash(carId: string): boolean {
-    return effectiveVisits.some((v) => v.carId === carId && v.status === 'DONE');
+    return effectiveVisits.some((v) => v.carId === carId && v.status === 'DONE' && !isOneTimeWash(v));
   }
 
   // Sort active cars: cars with completed first washes first, then highest washes done, then startedAt
@@ -460,8 +460,8 @@ export async function loadCustomerAccount(
     if (firstA !== firstB) {
       return firstA ? -1 : 1;
     }
-    const doneA = effectiveCycleVisits.filter((v) => v.carId === a.id && v.status === 'DONE').length;
-    const doneB = effectiveCycleVisits.filter((v) => v.carId === b.id && v.status === 'DONE').length;
+    const doneA = effectiveCycleVisits.filter((v) => v.carId === a.id && v.status === 'DONE' && !isOneTimeWash(v)).length;
+    const doneB = effectiveCycleVisits.filter((v) => v.carId === b.id && v.status === 'DONE' && !isOneTimeWash(v)).length;
     if (doneA !== doneB) {
       return doneB - doneA;
     }

@@ -5,7 +5,7 @@ import { HttpError, requireApiSession } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { loadCustomerAccount, recordPayment } from '@/lib/services/accounts';
 import { notifyPaymentApproved } from '@/lib/services/whatsappNotifications';
-import { currentCycle } from '@/lib/util/format';
+import { currentCycle, todayISO } from '@/lib/util/format';
 import { assertInScope, opsError } from '../_guard';
 
 function revalidatePaymentPages() {
@@ -13,17 +13,84 @@ function revalidatePaymentPages() {
     for (const base of ['/admin', '/manager', '/area']) {
       revalidatePath(`${base}/customers`);
       revalidatePath(`${base}/customers/[customerId]`, 'page');
+      revalidatePath(`${base}/schedule`);
+      revalidatePath(`${base}/requests`);
     }
     revalidatePath('/admin/accounting');
     revalidatePath('/admin');
-    // A payment an admin/manager records or confirms must show up on the
-    // customer's own account immediately, not just the console side.
     revalidatePath('/app');
     revalidatePath('/app/payments');
     revalidatePath('/app/cars');
     revalidatePath('/app/help');
+    revalidatePath('/staff');
   } catch {
     // ignore — running outside a request context
+  }
+}
+
+async function activatePendingOneTimeWashes(
+  store: Awaited<ReturnType<typeof getStore>>,
+  customerId: string,
+) {
+  try {
+    const customer = await store.customers.get(customerId);
+    if (!customer) return;
+
+    const allRequests = await store.customerRequests.find({
+      where: { customerId } as never,
+    });
+
+    const pendingPaidRequests = allRequests.filter(
+      (r) =>
+        r.status === 'APPROVED' &&
+        r.paymentStatus === 'PENDING' &&
+        (r.type === 'ONE_WASH' || r.type === 'OTHER_SERVICE') &&
+        r.carId,
+    );
+
+    for (const req of pendingPaidRequests) {
+      if (!req.carId) continue;
+      const car = await store.cars.get(req.carId);
+      const assignedStaffId = req.assignedStaffId || car?.assignedStaffId;
+      const targetDate = req.preferredDate || todayISO();
+
+      if (car && assignedStaffId) {
+        await store.visits.create({
+          carId: car.id,
+          customerId: customer.id,
+          areaId: customer.areaId,
+          staffId: assignedStaffId,
+          cycle: currentCycle(),
+          scheduledDate: targetDate,
+          scheduledTime: req.preferredTime || car.scheduleTime || '09:00',
+          status: 'PENDING',
+          startedAt: null,
+          completedAt: null,
+          plannedService: req.serviceDetails || req.washType || 'Special Requested Wash',
+          servicesDone: [],
+          beforePhotoUrl: null,
+          afterPhotoUrl: null,
+          beforePhotoBytes: null,
+          afterPhotoBytes: null,
+          missReason: null,
+          missNote: `[Customer Special Request: ${req.type}] [Paid & Approved] ${req.notes || ''}`.trim(),
+          rescheduledToVisitId: null,
+          rating: null,
+          ratingComment: null,
+          onTime: false,
+          managerRating: null,
+          managerRatingComment: null,
+          managerRatedAt: null,
+          managerRatedByUserId: null,
+        });
+
+        await store.customerRequests.update(req.id, {
+          paymentStatus: 'PAID',
+        });
+      }
+    }
+  } catch (err) {
+    console.error('Failed to activate pending one-time wash requests on payment confirmation:', err);
   }
 }
 
@@ -98,6 +165,10 @@ export async function POST(request: Request) {
         reference: receiptOrInvoiceRef,
         recordedByUserId: session.user.id,
       });
+
+      // Automatically activate any pending one-time wash requests now that payment is approved
+      await activatePendingOneTimeWashes(store, payment.customerId);
+
       const account = await loadCustomerAccount(store, payment.customerId, payment.cycle);
 
       revalidatePaymentPages();
@@ -175,6 +246,9 @@ export async function POST(request: Request) {
       note: parsed.data.note || null,
       status: 'CONFIRMED',
     });
+
+    // Automatically activate any pending one-time wash requests now that payment is approved
+    await activatePendingOneTimeWashes(store, customer.id);
 
     revalidatePaymentPages();
     const receiptNo = payment.reference || `RCP-${payment.id.slice(-6).toUpperCase()}`;

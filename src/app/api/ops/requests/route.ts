@@ -388,10 +388,10 @@ export async function POST(request: Request) {
         const targetDate = parsed.data.scheduledDate || req.preferredDate || todayISO();
         const adjustmentAmount = parsed.data.adjustmentAmount ?? 0;
         const applyFinance = parsed.data.applyFinancialAdjustment !== false;
+        const paymentReceived = parsed.data.paymentReceived === true;
 
         if (applyFinance && adjustmentAmount > 0) {
           finalPaymentAmount = Math.round(adjustmentAmount);
-          const paymentReceived = parsed.data.paymentReceived === true;
           const invoiceCycleLabel = `ONE-TIME (${req.type === 'ONE_WASH' ? 'One Wash' : 'Special Wash'})`;
           const customInvoiceNo = parsed.data.invoiceNumber?.trim();
 
@@ -443,7 +443,11 @@ export async function POST(request: Request) {
           }
         }
 
-        if (car && assignedStaffId) {
+        // If payment is required and still PENDING, DO NOT create visit yet.
+        // The visit will be scheduled automatically when the Manager/Admin confirms/approves the payment.
+        const shouldScheduleNow = !applyFinance || adjustmentAmount === 0 || paymentReceived;
+
+        if (car && assignedStaffId && shouldScheduleNow) {
           await store.visits.create({
             carId: car.id,
             customerId: customer.id,
@@ -462,7 +466,7 @@ export async function POST(request: Request) {
             beforePhotoBytes: null,
             afterPhotoBytes: null,
             missReason: null,
-            missNote: `[Customer Special Request: ${req.type}] ${req.notes || ''}`.trim(),
+            missNote: `[Customer Special Request: ${req.type}] [Paid & Approved] ${req.notes || ''}`.trim(),
             rescheduledToVisitId: null,
             rating: null,
             ratingComment: null,
@@ -478,6 +482,7 @@ export async function POST(request: Request) {
       await store.customerRequests.update(req.id, {
         status: 'APPROVED',
         assignedStaffId: parsed.data.assignedStaffId || req.assignedStaffId || null,
+        preferredDate: parsed.data.scheduledDate || req.preferredDate || null,
         adminRemarks: parsed.data.adminRemarks || null,
         paymentAmount: finalPaymentAmount,
         paymentStatus: finalPaymentStatus,

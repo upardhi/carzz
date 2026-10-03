@@ -5,6 +5,7 @@ import { requirePermission } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { loadCustomerAccount } from '@/lib/services/accounts';
 import { parsePackageServices } from '@/lib/data/types';
+import { isOneTimeWash } from '@/lib/services/visits';
 import {
   currentCycle,
   cycleLabel,
@@ -70,7 +71,7 @@ export default async function CarDetail({
   );
 
   const completedCarVisitsThisCycle = account.visits.filter(
-    (v) => v.carId === carId && v.cycle === activeCycle && v.status === 'DONE',
+    (v) => v.carId === carId && v.cycle === activeCycle && v.status === 'DONE' && !isOneTimeWash(v),
   );
 
   const serviceStats = parsedPackageServices.map((s) => {
@@ -419,6 +420,11 @@ export default async function CarDetail({
                       </span>
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                      {isOneTimeWash(visit) && (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-purple-100 border border-purple-300 px-2 py-0.5 text-[11px] font-bold text-purple-900 shadow-2xs">
+                          🚿 One-Time Wash
+                        </span>
+                      )}
                       <span className="inline-flex items-center gap-1 rounded-md bg-blue-100/80 border border-blue-200 px-2 py-0.5 text-[11px] font-semibold text-blue-900">
                         🚿 {visit.plannedService || 'Package Wash'}
                       </span>
@@ -494,6 +500,11 @@ export default async function CarDetail({
                     <span className="font-medium text-slate-600">{formatClock(visit.completedAt)}</span>
                   </div>
                   <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                    {isOneTimeWash(visit) && (
+                      <span className="inline-flex items-center gap-1 rounded-md bg-purple-100 border border-purple-300 px-2 py-0.5 text-[11px] font-bold text-purple-900 shadow-2xs">
+                        🚿 One-Time Wash
+                      </span>
+                    )}
                     {Array.isArray(visit.servicesDone) && visit.servicesDone.length > 0 ? (
                       visit.servicesDone.map((s) => (
                         <span
@@ -505,7 +516,7 @@ export default async function CarDetail({
                       ))
                     ) : (
                       <span className="inline-flex items-center rounded-md bg-slate-100 border border-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-700">
-                        Standard Wash
+                        {visit.plannedService || 'Standard Wash'}
                       </span>
                     )}
                     {visit.staffId ? (

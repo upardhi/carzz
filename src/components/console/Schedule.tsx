@@ -8,6 +8,7 @@ import { getStore } from '@/lib/data';
 import { formatDateFull, todayISO } from '@/lib/util/format';
 import { resolvePublicPhotoUrl } from '@/lib/util/photoUrl';
 import { visitsForDate } from '@/lib/services/schedule';
+import { isOneTimeWash } from '@/lib/services/visits';
 
 /**
  * The live schedule page for the day's rounds.
@@ -189,6 +190,8 @@ export async function ConsoleSchedule({
       customerDueAmount,
       customerDueStatus,
       customerDueOn,
+      isOneTime: isOneTimeWash(v),
+      plannedService: v.plannedService,
     };
   });
 

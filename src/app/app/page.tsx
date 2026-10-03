@@ -12,6 +12,7 @@ import {
 import { requirePermission } from '@/lib/auth/server';
 import { getStore } from '@/lib/data';
 import { loadCustomerAccount } from '@/lib/services/accounts';
+import { isOneTimeWash } from '@/lib/services/visits';
 import { WashActionControls } from './WashActionControls';
 import { CustomerSpecialRequestsModal } from './CustomerSpecialRequestsModal';
 import { WashRatingAction } from './WashRatingAction';
@@ -83,9 +84,12 @@ export default async function CustomerHome() {
       ? ''
       : d.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
     const car = account.cars.find((c) => c.id === visit.carId);
+    const isOneTime = isOneTimeWash(visit);
 
     let subtitle = car ? `${car.make} ${car.model}` : 'Routine Wash';
-    if (visit.status === 'IN_PROGRESS') {
+    if (isOneTime) {
+      subtitle = `${car ? `${car.make} ${car.model} · ` : ''}One-Time Special Wash`;
+    } else if (visit.status === 'IN_PROGRESS') {
       subtitle = `Cleaning now · ${car ? `${car.make} ${car.model}` : 'Vehicle'}`;
     } else if (visit.missReason) {
       subtitle = `Missed: ${visit.missReason.replace(/_/g, ' ')}`;
@@ -102,6 +106,7 @@ export default async function CustomerHome() {
       yearOrMonth,
       title: formatDateFull(visit.scheduledDate),
       subtitle,
+      isOneTime,
       rating: visit.rating,
       ratingComment: visit.ratingComment,
       isDone: visit.status === 'DONE',
@@ -500,8 +505,15 @@ export default async function CustomerHome() {
 
                       {/* Title and Subtitle */}
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-xs sm:text-sm font-bold text-slate-900">
-                          {b.title}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="truncate text-xs sm:text-sm font-bold text-slate-900">
+                            {b.title}
+                          </span>
+                          {b.isOneTime && (
+                            <span className="inline-flex items-center rounded-md bg-purple-100 border border-purple-200 px-1.5 py-0.2 text-[10px] font-bold text-purple-900">
+                              🚿 One-Time
+                            </span>
+                          )}
                         </div>
                         <div className="truncate text-[11px] text-slate-500 font-medium mt-0.5">
                           {b.subtitle}
@@ -510,7 +522,7 @@ export default async function CustomerHome() {
                     </div>
 
                     {/* Status Pill on Right */}
-                    <div className="shrink-0 flex items-center">
+                    <div className="shrink-0 flex items-center gap-1.5">
                       {b.status === 'In Progress' ? (
                         <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200 px-2 sm:px-2.5 py-0.5 text-[11px] font-bold text-blue-700">
                           <span className="relative flex h-2 w-2 shrink-0">

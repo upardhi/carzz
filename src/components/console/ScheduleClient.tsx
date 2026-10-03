@@ -52,6 +52,8 @@ export interface ScheduleItem {
   customerDueAmount?: number;
   customerDueStatus?: 'PAID' | 'DUE' | 'OVERDUE' | null;
   customerDueOn?: string | null;
+  isOneTime?: boolean;
+  plannedService?: string | null;
 }
 
 interface ScheduleClientProps {
@@ -627,11 +629,18 @@ export function ScheduleClient({
             id: 'car',
             header: 'CAR',
             render: (visit) => (
-              <>
-                <span className="font-semibold text-navy-950">{visit.carModel}</span>{' '}
-                <span className="text-slate-400">•</span>{' '}
-                <span className="font-mono text-[11px] text-slate-600">{visit.carPlate}</span>
-              </>
+              <div className="flex flex-col gap-1">
+                <div>
+                  <span className="font-semibold text-navy-950">{visit.carModel}</span>{' '}
+                  <span className="text-slate-400">•</span>{' '}
+                  <span className="font-mono text-[11px] text-slate-600">{visit.carPlate}</span>
+                </div>
+                {visit.isOneTime && (
+                  <span className="inline-flex items-center gap-1 rounded bg-purple-50 px-1.5 py-0.5 text-[10px] font-bold text-purple-800 border border-purple-200 w-fit">
+                    🚿 One-Time: {visit.plannedService || 'Special Wash'}
+                  </span>
+                )}
+              </div>
             ),
           },
           {

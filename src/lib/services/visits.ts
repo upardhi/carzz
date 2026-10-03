@@ -230,10 +230,23 @@ export interface VisitTally {
   remaining: number;
 }
 
+export function isOneTimeWash(v: WashVisit): boolean {
+  return Boolean(
+    v.missNote?.includes('[Customer Special Request: ONE_WASH]') ||
+    v.missNote?.includes('[Customer Special Request: OTHER_SERVICE]') ||
+    v.missNote?.includes('[One-Time Wash]') ||
+    v.missNote?.includes('[One Wash]') ||
+    v.cycle?.includes('ONE-TIME') ||
+    v.cycle?.includes('ONEWASH')
+  );
+}
+
 export function tallyVisits(visits: WashVisit[], monthlyQuota?: number): VisitTally {
-  const done = visits.filter((v) => v.status === 'DONE').length;
-  const missed = visits.filter((v) => v.status === 'MISSED').length;
-  const pending = visits.filter(
+  // One-time washes are independent non-recurring washes that do not count against monthly subscription quota
+  const regularVisits = visits.filter((v) => !isOneTimeWash(v));
+  const done = regularVisits.filter((v) => v.status === 'DONE').length;
+  const missed = regularVisits.filter((v) => v.status === 'MISSED').length;
+  const pending = regularVisits.filter(
     (v) => v.status === 'PENDING' || v.status === 'IN_PROGRESS',
   ).length;
   const quota = monthlyQuota ?? (done + pending || 8);

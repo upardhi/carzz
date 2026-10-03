@@ -15,6 +15,7 @@ import { resolvePublicPhotoUrl } from '@/lib/util/photoUrl';
 import { formatDateFull, formatClock } from '@/lib/util/format';
 import { washDurationMinutes, formatDurationMinutes, washSpeedFlag } from '@/lib/util/washTiming';
 import { MISS_REASON_LABEL } from '@/lib/util/labels';
+import { isOneTimeWash } from '@/lib/services/visits';
 import { WashProgressTimer } from '@/components/ui/WashProgressTimer';
 import type { WashVisit } from '@/lib/data/types';
 
@@ -315,6 +316,11 @@ export function CarWashHistoryModal({
 
                     {/* Status & Speed Badge */}
                     <div className="flex flex-wrap items-center gap-2">
+                      {isOneTimeWash(visit) && (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-purple-300 bg-purple-50 px-2.5 py-0.5 text-[11px] font-bold text-purple-900 shadow-2xs">
+                          🚿 One-Time Wash
+                        </span>
+                      )}
                       {speedFlag === 'fast' && (
                         <span className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[11px] font-bold text-rose-700">
                           ⚡ Too Fast ({duration}m)
