@@ -54,6 +54,7 @@ export async function GET() {
       } : null;
       return {
         ...v,
+        isCarriedOver: v.scheduledDate < today,
         beforePhotoUrl: resolvePublicPhotoUrl(v.beforePhotoUrl),
         afterPhotoUrl: resolvePublicPhotoUrl(v.afterPhotoUrl),
         customer: customerById.get(v.customerId) ?? null,
@@ -64,6 +65,9 @@ export async function GET() {
     const doneCount = visits.filter((v) => v.status === 'DONE').length;
     const pendingCount = visits.filter(
       (v) => v.status === 'PENDING' || v.status === 'IN_PROGRESS',
+    ).length;
+    const carriedOverCount = visits.filter(
+      (v) => (v.status === 'PENDING' || v.status === 'IN_PROGRESS') && v.scheduledDate < today,
     ).length;
 
     // Calculate today's incremental earnings dynamically based on active payout rules
@@ -77,6 +81,7 @@ export async function GET() {
         total: visits.length,
         done: doneCount,
         pending: pendingCount,
+        carriedOver: carriedOverCount,
         earnedToday,
         monthNetPayable: payout.net,
         monthWashesDone: payout.washes,

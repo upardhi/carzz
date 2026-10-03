@@ -7,6 +7,7 @@ import { getStore } from '@/lib/data';
 import { reassignVisit } from '@/lib/services/visits';
 import { formatDateFull, todayISO } from '@/lib/util/format';
 import { resolvePublicPhotoUrl } from '@/lib/util/photoUrl';
+import { visitsForDate } from '@/lib/services/schedule';
 import { assertInScope, opsError } from '../_guard';
 
 function revalidateVisitPages() {
@@ -31,11 +32,11 @@ export async function GET(request: NextRequest) {
     const areaId = searchParams.get('areaId');
     const areaFilter = areaId ? { areaId } : scopeAreaFilter(session.scope);
 
-    // Fetch day visits, active staff, areas, attendance, and approved leaves
+    // Fetch day visits (including carried-over uncompleted washes), active staff, areas, attendance, and approved leaves
     const [visits, staff, areas, attendance, leaves] = await Promise.all([
-      store.visits.find({
-        where: { scheduledDate: date, ...areaFilter } as never,
-        orderBy: [{ field: 'scheduledTime' }],
+      visitsForDate(store, date, {
+        ...(areaId ? { areaId } : session.scope.areaIds ? { areaIds: session.scope.areaIds } : {}),
+        includeBacklog: true,
       }),
       store.staff.find({
         where: { role: 'EMPLOYEE', active: true, ...areaFilter } as never,
@@ -172,6 +173,7 @@ export async function GET(request: NextRequest) {
         id: v.id,
         scheduledDate: v.scheduledDate,
         scheduledTime: v.scheduledTime,
+        isCarriedOver: v.scheduledDate < date,
         customerId: v.customerId,
         customerName: customer?.name ?? 'Unknown Customer',
         customerPhone: customer?.phone ?? null,

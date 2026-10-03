@@ -132,29 +132,15 @@ export async function scheduleNextVisitForCar(
     }
   }
 
-  // Clean up any stale past pending visits that were never completed
-  const pastPending = allCarVisits.filter(
-    (v) => v.status === 'PENDING' && v.scheduledDate < today,
-  );
-  for (const p of pastPending) {
-    try {
-      await store.visits.delete(p.id);
-    } catch {
-      // Silently continue if record was already deleted
-    }
-  }
-
-  // Check if there is already an upcoming pending or in-progress visit on or after today
-  const openUpcoming = allCarVisits.filter(
-    (v) =>
-      (v.status === 'PENDING' || v.status === 'IN_PROGRESS') &&
-      v.scheduledDate >= today,
+  // Check if there is an open (pending or in-progress) visit from today or carried over from the past
+  const openVisits = allCarVisits.filter(
+    (v) => v.status === 'PENDING' || v.status === 'IN_PROGRESS',
   );
 
-  if (openUpcoming.length > 0) {
-    // Keep the first open visit, remove any redundant future pending visits in DB
-    const firstOpen = openUpcoming[0];
-    const extraOpen = openUpcoming.slice(1);
+  if (openVisits.length > 0) {
+    // Keep the first open visit (oldest first), remove any redundant duplicate pending visits
+    const firstOpen = openVisits[0];
+    const extraOpen = openVisits.slice(1);
     for (const extra of extraOpen) {
       if (extra.status === 'PENDING') {
         try {
@@ -245,19 +231,60 @@ export async function rescheduleVisit(
   return store.visits.update(visitId, patch);
 }
 
-/** Visits due on one date, for one area or one staff member. */
+/** Visits due on one date, for one area or one staff member, including carried-over unfinished washes. */
 export async function visitsForDate(
   store: DataStore,
   date: DateOnly,
-  filter: { areaId?: Id; staffId?: Id; areaIds?: Id[] },
+  filter: { areaId?: Id; staffId?: Id; areaIds?: Id[]; includeBacklog?: boolean },
 ): Promise<WashVisit[]> {
   const where: Record<string, unknown> = { scheduledDate: date };
   if (filter.staffId) where.staffId = filter.staffId;
   if (filter.areaId) where.areaId = filter.areaId;
   else if (filter.areaIds) where.areaId = { in: filter.areaIds };
 
-  return store.visits.find({
+  const todayVisits = await store.visits.find({
     where: where as never,
     orderBy: [{ field: 'scheduledTime' }],
+  });
+
+  // If viewing for a specific staff member (or explicitly requested), include carried-over unfinished washes from past days
+  const shouldIncludeBacklog = filter.includeBacklog ?? Boolean(filter.staffId);
+  if (!shouldIncludeBacklog) {
+    return todayVisits;
+  }
+
+  const backlogWhere: Record<string, unknown> = {
+    scheduledDate: { lt: date },
+    status: { in: ['PENDING', 'IN_PROGRESS'] },
+  };
+  if (filter.staffId) backlogWhere.staffId = filter.staffId;
+  if (filter.areaId) backlogWhere.areaId = filter.areaId;
+  else if (filter.areaIds) backlogWhere.areaId = { in: filter.areaIds };
+
+  const backlogVisits = await store.visits.find({
+    where: backlogWhere as never,
+    orderBy: [{ field: 'scheduledDate', dir: 'asc' }, { field: 'scheduledTime', dir: 'asc' }],
+  });
+
+  if (backlogVisits.length === 0) {
+    return todayVisits;
+  }
+
+  // Deduplicate and prioritize backlog (carried over) at the top of the queue
+  const visitMap = new Map<string, WashVisit>();
+  for (const v of [...backlogVisits, ...todayVisits]) {
+    visitMap.set(v.id, v);
+  }
+
+  return [...visitMap.values()].sort((a, b) => {
+    // Unfinished active washes first
+    if ((a.status === 'IN_PROGRESS') !== (b.status === 'IN_PROGRESS')) {
+      return a.status === 'IN_PROGRESS' ? -1 : 1;
+    }
+    // Then backlog (older dates first)
+    if (a.scheduledDate !== b.scheduledDate) {
+      return a.scheduledDate.localeCompare(b.scheduledDate);
+    }
+    return a.scheduledTime.localeCompare(b.scheduledTime);
   });
 }

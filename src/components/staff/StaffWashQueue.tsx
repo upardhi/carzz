@@ -28,7 +28,9 @@ export interface WashQueueItem {
   carPlate: string;
   carMake: string;
   carModel: string;
+  scheduledDate?: string;
   scheduledTime: string;
+  isCarriedOver?: boolean;
   status: 'PENDING' | 'IN_PROGRESS' | 'DONE' | 'MISSED';
   startedAt: string | null;
   completedAt: string | null;
@@ -302,13 +304,20 @@ export function StaffWashQueue({ initialVisits }: Props) {
                     </span>
                   </div>
 
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100/90 px-2.5 py-0.5 text-[10.5px] font-black uppercase tracking-wider text-emerald-800 border border-emerald-300/80 shrink-0">
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-600"></span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {visit.isCarriedOver && (
+                      <span className="rounded-full bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 shrink-0 shadow-2xs">
+                        <span>⏰</span> Carried Over ({visit.scheduledDate})
+                      </span>
+                    )}
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100/90 px-2.5 py-0.5 text-[10.5px] font-black uppercase tracking-wider text-emerald-800 border border-emerald-300/80 shrink-0">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-600"></span>
+                      </span>
+                      In Progress
                     </span>
-                    In Progress
-                  </span>
+                  </div>
                 </div>
 
                 {/* Car & Schedule Details */}
@@ -456,9 +465,16 @@ export function StaffWashQueue({ initialVisits }: Props) {
                   </span>
                 </div>
 
-                <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10.5px] font-bold text-slate-600 border border-slate-200 shrink-0">
-                  Not Started
-                </span>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {visit.isCarriedOver && (
+                    <span className="rounded-full bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 shrink-0 shadow-2xs">
+                      <span>⏰</span> Carried Over ({visit.scheduledDate})
+                    </span>
+                  )}
+                  <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10.5px] font-bold text-slate-600 border border-slate-200 shrink-0">
+                    Not Started
+                  </span>
+                </div>
               </div>
 
               <div className="flex items-center justify-between text-xs text-slate-600 font-medium">
